@@ -6,21 +6,22 @@
 /* ---------- 경로 ---------- */
 function buildPath(i, jam){
   const tx = (i-1)*LANE;
-  let pts;
+  let pts, mergeZ = -128;
   if(jam > 0 && i !== 1){
     // 정체 시: 대기열 뒤끝(back)보다 더 뒤(양의 z)에서 합류를 끝낸다 → 줄 맨 뒤에 붙음(관통 없음)
     const mEnd = JAM_LV[jam].back + 20, mStart = Math.min(0, mEnd + 50);
+    mergeZ = mStart;
     pts = [V(0,40), V(0,mStart), V(tx*.5,(mStart+mEnd)/2), V(tx,mEnd), V(tx,-218)].concat(BRANCH_PTS[i].map(a=>V(a[0],a[1])));
   } else {
     pts = [V(0,40),V(0,0),V(0,-100),V(0,-128),V(tx*.5,-170),V(tx,-203),V(tx,-218)].concat(BRANCH_PTS[i].map(a=>V(a[0],a[1])));
   }
   const curve = curveOf(pts,800);
-  return {curve, L:curve.getLength(), sStart:40};
+  return {curve, L:curve.getLength(), sStart:40, mergeZ};
 }
 
 /* ---------- 상태 ---------- */
 const S = {mode:'ar', target:2, running:false, paused:false, s:40, testing:false, asked:false, t0:0,
-  band:0, fill:0, info:.8, danger:0, car:null, lastTrial:null, jam:0, speedFactor:1, q:null, jamHoldT:0, streak:0,
+  fill:0, danger:0, car:null, lastTrial:null, jam:0, speedFactor:1, q:null, jamHoldT:0, streak:0,
   qType:'branch', rearDanger:false, rearDist:0, rearGap:56, rearActive:false, demoTarget:2, demoJam:0};
 let path = buildPath(S.target);
 const stageOf = z => z > -60 ? 1 : z > -115 ? 2 : z > CHANGE_END ? 3 : z > -275 ? 4 : 5;
@@ -28,15 +29,16 @@ const stageOf = z => z > -60 ? 1 : z > -115 ? 2 : z > CHANGE_END ? 3 : z > -275 
 function setTarget(i){
   // 테스트는 판단을 먼저 하도록 중앙 차로 유지(합류 없음), 시연은 정체 시 줄 뒤로 합류
   S.target = i; path = buildPath(i, S.testing ? 0 : S.jam); S.s = path.sStart; S.asked = false;
-  S.band = 0; S.fill = 0; S.danger = 0; S.jamHoldT = 0;
+  S.fill = 0; S.danger = 0; S.jamHoldT = 0;
   S.car = null; otherCar.visible = false;
-  tagEls.forEach(t => t.op = 0);
+  G.mp = 0; G.yaw = 0; G.px = null;
   $$('#targetSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.t===i)));
 }
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
   $('#navHud').style.display = m==='nav' ? '' : 'none';
+  $('#minHud').style.display = m==='ghost' ? '' : 'none';
   $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode===m)));
 }
 function setJam(lv){ S.jam = lv; $$('#jamSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.j===lv))); }
@@ -68,6 +70,45 @@ function updateQueue(p, dt){
   return {backZ, mergeNear };
 }
 
+/* ---------- 고스트카 ----------
+   정답 경로를 GHOST_LEAD만큼 앞서 달리며 행동을 시범: 일찍 깜빡이 켜고 차로 이동 · 뒤차가 오면 기다림 · 정체면 줄 뒤에 섬.
+   차로 이동(G.mp)은 운전자 경로와 따로 계산한다 — 판단 테스트 질문(z=-80) 전에 이미 옮겨 가 있어야 하므로.
+   판단 테스트에선 줄에 서지 않는다(운전자가 줄 옆을 지나가도 질문 시점에 화면 안에 있어야 함). */
+const G = {mp:0, yaw:0, px:null, pz:null};
+function updateGhost(dt, tz, jamActive){
+  ghost.visible = S.mode === 'ghost';
+  if(!ghost.visible) return;
+  const tx = (S.target-1)*LANE, q = path.curve.getPointAt(clamp((S.s + GHOST_LEAD)/path.L));
+  let z = q.z, clamped = false;
+  if(jamActive && z < tz + GHOST_GAP){ z = tz + GHOST_GAP; clamped = true; }
+  const mergeZ = S.jam > 0 && !S.testing ? path.mergeZ : GHOST_MERGE_Z;
+  const hold = S.rearActive && (S.testing ? S.rearDanger : S.rearGap > -(GHOST_LEAD + 6)); // 뒤차가 고스트카를 지나갈 때까지
+  if(S.target !== 1 && S.running && !S.paused && ((z < mergeZ && !hold) || z < -170)) G.mp = Math.min(1, G.mp + Math.min(dt,.05)/GHOST_MERGE_T);
+  const onMain = z > -205, m = G.mp*G.mp*(3 - 2*G.mp);
+  const x = onMain ? tx*m : q.x;
+  if(G.px !== null){ const dx = x - G.px, dz = z - G.pz; if(dx*dx + dz*dz > 1e-4) G.yaw += (Math.atan2(-dx,-dz) - G.yaw)*Math.min(1, dt*10); }
+  G.px = x; G.pz = z;
+  ghost.position.set(x, 0, z); ghost.rotation.y = G.yaw;
+  // 등화: 옮기기 전·옮기는 중 깜빡이(기다릴 때도 켜 둠), 줄에 서거나 감속하면 브레이크
+  const signal = S.target !== 1 && G.mp < 1 && z < mergeZ + GHOST_SIGNAL, blink = signal && performance.now() % 700 < 350, u = ghost.userData;
+  u.blinkL.forEach(mt => mt.opacity = blink && tx < 0 ? 1 : 0);
+  u.blinkR.forEach(mt => mt.opacity = blink && tx > 0 ? 1 : 0);
+  u.brakeL.opacity = u.brakeR.opacity = (clamped || S.speedFactor < .9) ? .95 : .3;
+}
+
+/* ---------- 핸들 ----------
+   곡률을 바로 쓰면 경로 제어점마다 각도가 튀어서, 1초 앞 지점을 겨누는 방식(pure pursuit)으로 부드럽게.
+   판단 테스트 질문 시점(z=-80)까지는 경로가 곧아 0° → 핸들이 정답을 흘리지 않는다. */
+const wheelTurn = $$('#wheel .turn');
+let steer = 0;
+function updateWheel(p, f, dt){
+  const q = path.curve.getPointAt(clamp((S.s + STEER_LOOK)/path.L));
+  const dx = q.x - p.x, dz = q.z - p.z, sinA = (f.x*dz - f.z*dx)/(Math.hypot(dx,dz)||1); // + = 오른쪽
+  const deg = Math.atan(2*WHEELBASE*sinA/STEER_LOOK)*STEER_RATIO*STEER_GAIN*180/Math.PI;
+  steer += (deg - steer)*Math.min(1, dt*4);
+  wheelTurn.forEach(g => g.setAttribute('transform', `rotate(${steer.toFixed(2)} 200 200)`));
+}
+
 /* ---------- 매 프레임 ---------- */
 let lastStage = 0;
 function update(dt){
@@ -75,8 +116,8 @@ function update(dt){
   // 줄을 따라 서행하다 정체가 풀리면 다시 주행.
   const tz = tailZ();
   const jamActive = S.jam > 0 && S.running && !S.testing && tz !== null && tz > Q_FRONT;
+  const guardZ = tz + 9 + (S.mode === 'ghost' ? GHOST_GAP : 0); // 맨 뒤차(고스트카 모드면 줄 뒤에 선 고스트카)보다 9m 뒤
   if(jamActive){
-    const guardZ = tz + 9; // 맨 뒤차보다 9m 뒤
     let z = path.curve.getPointAt(clamp(S.s/path.L)).z, g = 0;
     while(z < guardZ && S.s > 0 && g++ < 80){ S.s -= 1; z = path.curve.getPointAt(clamp(S.s/path.L)).z; }
     if(z <= guardZ + 2.5){ S.jamHoldT += dt; if(S.jamHoldT > 5){ finish(); } } // 5초 서행 뒤 마무리
@@ -86,6 +127,7 @@ function update(dt){
   const p = path.curve.getPointAt(u), f = path.curve.getTangentAt(u);
   const ahead = path.curve.getPointAt(clamp((S.s+22)/path.L));
   camera.position.set(p.x,1.25,p.z); camera.lookAt(ahead.x,1.05,ahead.z);
+  updateWheel(p, f, dt);
 
   const st = stageOf(p.z), k = Math.min(1, dt*4), d = DEST[S.target];
 
@@ -93,7 +135,7 @@ function update(dt){
   S.q = updateQueue(p, dt);
   S.speedFactor = 1;
   if(jamActive){
-    const df = p.z - (tz + 9);
+    const df = p.z - guardZ;
     if(df < 30) S.speedFactor = clamp(df/30, 0, 1); // 줄 뒤 30m부터 서서히 감속
   }
 
@@ -121,6 +163,8 @@ function update(dt){
     otherCar.visible = false; S.car = null;
   }
 
+  updateGhost(dt, tz, jamActive);
+
   if(S.running && S.testing && !S.asked && p.z <= TEST_Z) askQuestion();
   if(S.running && (u >= .985 || p.z < -318)) finish();
 
@@ -129,7 +173,8 @@ function update(dt){
   const kmh = S.running && !S.paused ? Math.round(SPEED*3.6 + Math.sin(performance.now()/900)) : 0;
   const remainKm = Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1);
 
-  if(S.mode === 'ar') drawAr(p, f, st, d, k, dangerOn, kmh, remainKm);
+  if(S.mode === 'ar') drawAr(p, f, st, d, k, dangerOn, kmh);
+  else if(S.mode === 'ghost') drawMin(kmh);
   else drawNav(st, p, d, kmh, remainKm, dangerOn);
 }
 
@@ -138,7 +183,7 @@ function frame(now){
   const dt = Math.min(.05,(now-prev)/1000); prev = now;
   if(S.running && !S.paused) S.s += SPEED*(S.speedFactor||1)*dt;
   update(dt);
-  renderer.render(scene,camera);
+  renderScene();
   requestAnimationFrame(frame);
 }
 
@@ -216,7 +261,7 @@ function askQuestion(){
   S.asked = true; S.paused = true; S.t0 = performance.now();
   const danger = S.qType === 'danger';
   $('#quizTitle').textContent = danger ? `${DEST[S.target].side} 차로로 지금 옮겨도 될까요?` : '어느 지선으로 가야 하나요?';
-  $('#quizSub').textContent = danger ? '가운데 HUD의 뒤차 경고를 보고 판단하세요.' : 'HUD를 보고 최대한 빨리 고르세요.';
+  $('#quizSub').textContent = danger ? 'HUD를 보고 판단하세요.' : 'HUD를 보고 최대한 빨리 고르세요.';
   $('#choicesBranch').hidden = danger;
   $('#choicesDanger').hidden = !danger;
   $('#quiz').hidden = false;
@@ -245,7 +290,7 @@ const KEY = 'hud-mvp-trials-v1';
 let trials = [];
 try{ trials = JSON.parse(localStorage.getItem(KEY) || '[]'); if(!Array.isArray(trials)) trials = []; }catch(e){ trials = []; }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(trials)); }catch(e){} }
-const modeName = m => m==='ar' ? '우리 HUD' : '기존 HUD';
+const modeName = m => m==='ar' ? '우리 HUD' : m==='ghost' ? '고스트카' : '기존 HUD';
 const jamName = j => ({0:'없음',1:'보통',2:'심함'})[j] ?? '-';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function renderLog(){
@@ -258,7 +303,7 @@ function renderLog(){
     const cho = dg ? (t.choice === 'wait' ? '대기' : '이동') : DEST[t.choice].side;
     return `<tr><td>${esc(t.p)}</td><td>${modeName(t.mode)}</td><td>${situ}</td><td>${ans}</td><td>${cho}</td><td class="${t.correct?'ok':'bad'}">${t.correct?'정답':'오답'}</td><td>${(t.ms/1000).toFixed(2)}</td></tr>`;
   }).join('');
-  $('#summary').innerHTML = ['ar','nav'].map(m => {
+  $('#summary').innerHTML = ['ar','ghost','nav'].map(m => {
     const list = trials.filter(t => t.mode===m), ok = list.filter(t => t.correct);
     const rate = list.length ? Math.round(ok.length/list.length*100)+'%' : '-';
     const avg = ok.length ? (ok.reduce((a,t)=>a+t.ms,0)/ok.length/1000).toFixed(2)+'초' : '-';

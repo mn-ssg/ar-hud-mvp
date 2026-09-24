@@ -1,9 +1,90 @@
 /* ============================================================
-   hud.js — HUD 그리기 (미니 도로 투영 · 우리 HUD drawAr · 기존 HUD drawNav)
+   hud.js — 유리 위 HUD 상자(SVG) 그리기
+   · 기존 HUD(대조군): 현대·기아 순정 HUD 구성 재현 — 근거는 01_프로젝트/03_MVP_정의.md
+   · 우리 HUD v1.2: 정보 위계대로 ① 지금 할 한 가지(아이콘 + 한 단어, 신호등 색) ② 언제(막대·마감선) ③ 어디로(미니 도로) ④ 속도
+     설계 근거는 01_프로젝트/10_HUD_GUI_설계.md
+   · 고스트카: 속도만 (안내는 main.js updateGhost의 가상 차)
    config.js, scene.js 다음에 로드. 상태 S·path는 main.js에서 정의(호출 시점엔 존재).
    ============================================================ */
 
-/* ---------- HUD 미니 도로 투영 ---------- */
+const NAV_BLUE = '#35b1ff';   // 순정 HUD의 경로 안내 파랑
+
+/* ---------- 기존 HUD 틀 (대조군) ----------
+   왼쪽 주행 경로 안내(남은 거리 막대 · 분기 그림 · 거리 · 방면) / 가운데 위 차로 안내 칸 / 가운데 차속 + 차로 유지 보조 선 /
+   오른쪽 제한속도 / 양옆 후측방 안전(주황) */
+function baseMarkup(p, lanes){
+  const bcw = '<rect x="-5" y="-9" width="10" height="18" rx="3" fill="#ffb020"/><path d="M-10 -6 Q-14 0 -10 6 M-15 -9 Q-20 0 -15 9" stroke="#ffb020" stroke-width="2" fill="none" stroke-linecap="round"/>';
+  const head = (i, t) => `<path id="${p}H${i}" d="M-8 0 L0 -11 L8 0 Z" transform="${t}" fill="${NAV_BLUE}"/>`;
+  return `
+    <rect x="72" y="160" width="5" height="54" rx="2.5" fill="#fff" fill-opacity=".2"/>
+    <rect id="${p}Bar" x="72" y="160" width="5" height="54" rx="2.5" fill="${NAV_BLUE}"/>
+    <g id="${p}Fork" transform="translate(104 190)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path id="${p}B0" d="M0 6 Q0 -6 -15 -21"/><path id="${p}B1" d="M0 6 V-22"/><path id="${p}B2" d="M0 6 Q0 -6 15 -21"/>
+      <path d="M0 26 V6" stroke="${NAV_BLUE}" stroke-width="7"/>
+      ${head(0,'translate(-16 -21) rotate(-45)')}${head(1,'translate(0 -22)')}${head(2,'translate(16 -21) rotate(45)')}
+    </g>
+    <g id="${p}Straight" transform="translate(104 190)"><path d="M0 26 V-16 M-10 -6 L0 -18 L10 -6" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <text x="132" y="190" fill="#fff"><tspan id="${p}Dist" font-size="24" font-weight="700">0</tspan><tspan id="${p}Unit" font-size="13" dx="3" font-weight="500">m</tspan></text>
+    <text id="${p}Name" x="133" y="209" font-size="12" fill="#fff" fill-opacity=".75"></text>
+    ${lanes ? `<g id="${p}Lanes" transform="translate(260 146)"></g>` : ''}
+    <path d="M214 238 L229 176 M306 238 L291 176" stroke="#fff" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"/>
+    <text id="${p}Spd" x="260" y="216" text-anchor="middle" font-size="40" font-weight="700" fill="#fff">0</text>
+    <text x="260" y="233" text-anchor="middle" font-size="11" fill="#fff" fill-opacity=".7">km/h</text>
+    <circle cx="372" cy="192" r="17" fill="#fff" stroke="#e03a3a" stroke-width="4"/>
+    <text x="372" y="198" text-anchor="middle" font-size="15" font-weight="700" fill="#111">80</text>
+    <g id="${p}BcwL" transform="translate(190 202)" opacity="0">${bcw}</g>
+    <g id="${p}BcwR" transform="translate(330 202) scale(-1 1)" opacity="0">${bcw}</g>`;
+}
+$('#navHud').innerHTML = baseMarkup('nv', true);
+
+function drawBase(pf, st, p, d, kmh, remainKm, dangerOn){
+  const dist = Math.max(0, Math.round(p.z - FORK_Z)), before = st <= 3 && dist > 0;
+  // 주행 경로 안내: 분기 그림(갈 지선만 파랑) · 거리 · 방면 · 남은 거리 막대(300m부터 줄어듦)
+  $('#'+pf+'Fork').style.display = before ? '' : 'none';
+  $('#'+pf+'Straight').style.display = before ? 'none' : '';
+  [0,1,2].forEach(i => {
+    const on = i === S.target, b = $('#'+pf+'B'+i);
+    b.setAttribute('stroke', on ? NAV_BLUE : '#ffffff'); b.setAttribute('stroke-opacity', on ? 1 : .35); b.setAttribute('stroke-width', on ? 7 : 5);
+    $('#'+pf+'H'+i).style.display = on ? '' : 'none';
+  });
+  $('#'+pf+'Dist').textContent = before ? dist : remainKm;
+  $('#'+pf+'Unit').textContent = before ? 'm' : 'km';
+  $('#'+pf+'Name').textContent = before ? `${d.name} 방면` : '';
+  const f = before ? clamp(dist/300) : 0, bar = $('#'+pf+'Bar');
+  bar.setAttribute('y', (160 + 54*(1-f)).toFixed(1)); bar.setAttribute('height', (54*f).toFixed(1));
+  $('#'+pf+'Spd').textContent = kmh;
+  // 후측방 안전: 옮기려는 쪽에 주황 아이콘
+  $('#'+pf+'BcwL').setAttribute('opacity', dangerOn && S.target === 0 ? 1 : 0);
+  $('#'+pf+'BcwR').setAttribute('opacity', dangerOn && S.target === 2 ? 1 : 0);
+  return before;
+}
+
+/* ---------- 기존 HUD (대조군) ---------- */
+// 차로 안내 칸 3개: 권장 차로는 파랑으로 채운다
+const nvLaneEls = [-30, 0, 30].map((rot, i) => {
+  const mk = n => document.createElementNS(SVGNS, n), g = mk('g'), box = mk('rect'), arrow = mk('path');
+  g.setAttribute('transform', `translate(${(i-1)*30} 0)`);
+  Object.entries({x:-12, y:-15, width:24, height:30, rx:5, 'stroke-width':1.6}).forEach(([k,v]) => box.setAttribute(k, v));
+  Object.entries({d:'M0 9 V-7 M-5 -2 L0 -8 L5 -2', transform:`rotate(${rot})`, fill:'none', stroke:'#ffffff',
+    'stroke-width':2.6, 'stroke-linecap':'round', 'stroke-linejoin':'round'}).forEach(([k,v]) => arrow.setAttribute(k, v));
+  g.append(box, arrow); $('#nvLanes').appendChild(g);
+  return {box, arrow};
+});
+function drawNav(st, p, d, kmh, remainKm, dangerOn){
+  const before = drawBase('nv', st, p, d, kmh, remainKm, dangerOn);
+  $('#nvLanes').style.display = before ? '' : 'none';
+  nvLaneEls.forEach((l, i) => {
+    const on = i === S.target;
+    l.box.setAttribute('fill', on ? NAV_BLUE : 'none'); l.box.setAttribute('fill-opacity', on ? .9 : 0);
+    l.box.setAttribute('stroke', on ? NAV_BLUE : '#ffffff'); l.box.setAttribute('stroke-opacity', on ? 1 : .35);
+    l.arrow.setAttribute('stroke-opacity', on ? 1 : .45);
+  });
+}
+
+/* ---------- 고스트카: 속도만 ---------- */
+function drawMin(kmh){ $('#spdM').textContent = kmh; }
+
+/* ---------- 우리 HUD: 미니 도로 투영 (v1 크기·위치 그대로, y 112~228) ---------- */
 const HX = 260, HY_NEAR = 228, HY_FAR = 112, HALF = 112, K = 55;
 function makeProj(p, f){
   const rx = -f.z, rz = f.x;
@@ -22,36 +103,49 @@ function offsetPts(curve,u0,u1,off,proj,n=24){
   for(let i=0;i<n;i++){ const u=u0+(u1-u0)*i/(n-1), q=curve.getPointAt(u), t=curve.getTangentAt(u); let nx=-t.z,nz=t.x; const l=Math.hypot(nx,nz)||1; out.push(proj(q.x+nx/l*off, q.z+nz/l*off)); }
   return out;
 }
-
-// 이름표 (지선 라벨) — SVG 요소 미리 생성
-const tagEls = DEST.map(() => {
-  const g = document.createElementNS(SVGNS,'g');
-  const mk = n => document.createElementNS(SVGNS,n);
-  const line = mk('line'), rect = mk('rect'), sub = mk('text'), txt = mk('text');
-  txt.setAttribute('text-anchor','middle'); txt.setAttribute('class','hud-t'); txt.setAttribute('font-weight','700');
-  sub.setAttribute('text-anchor','middle'); sub.setAttribute('class','hud-t'); sub.setAttribute('font-size','11'); sub.setAttribute('font-weight','600');
-  rect.setAttribute('rx','8'); line.setAttribute('stroke-width','1.2');
-  g.append(line, rect, sub, txt); $('#tags').appendChild(g);
-  return {g, line, rect, sub, txt, op:0};
-});
-// 기존 HUD 차로 화살표
-(() => {
-  const g = $('#navLanes');
-  [-28,0,28].forEach((rot,i) => {
-    const a = document.createElementNS(SVGNS,'path');
-    a.setAttribute('d','M0 -7 L5 -1 H2 V7 H-2 V-1 H-5 Z');
-    a.setAttribute('transform',`translate(${(i-1)*15} 0) rotate(${rot})`); a.dataset.i = i; g.appendChild(a);
-  });
-})();
-const navLaneEls = $$('#navLanes path');
-const icons = ['icoFork','icoRight','icoLeft','icoUp','icoCheck','icoWarn'];
+const icons = ['icoRight','icoLeft','icoUp','icoCheck','icoNoGo','icoPause','icoQueue'];
 function showIcon(id, color){ icons.forEach(n => $('#'+n).style.display = n===id ? '' : 'none'); $('#nowIcon').setAttribute('stroke', color); $('#nowIcon').style.display = id ? '' : 'none'; }
 
-/* ---------- 우리 HUD ---------- */
-function drawAr(p, f, st, d, k, dangerOn, kmh, remainKm){
-  const proj = makeProj(p, f), tx = (S.target-1)*LANE;
+/* ---------- 우리 HUD v1.2 ---------- */
+function drawAr(p, f, st, d, k, dangerOn, kmh){
+  const proj = makeProj(p, f), tx = (S.target-1)*LANE, sgn = Math.sign(tx), now = performance.now();
+  // 뒤차 판단은 고스트카의 '기다림'과 같은 기준: 시연은 다가오는 차가 내 옆을 지나갈 때까지, 테스트는 위험한 경우
+  const block = S.rearActive && (S.testing ? S.rearDanger : (S.rearGap < 45 && S.rearGap > -8));
+  const warn = block || S.danger > .5, inLane = Math.abs(p.x - tx) < 1.2;
+  const tail = S.jam > 0 && S.q && S.q.backZ !== null ? S.q.backZ : null;
+  const needMove = S.target !== 1 && !inLane && st <= 3;
+  const besideQueue = tail !== null && needMove && p.z <= tail + 2;          // 이미 줄 옆까지 와 버림
+  const gateZ = tail !== null ? tail + 10 : CHANGE_END;                      // 여기까지는 옮겨 있어야 함
+  const frac = clamp((p.z - gateZ)/(0 - gateZ)), late = frac <= .35;
 
-  // 도로 윤곽
+  /* ① 지금 할 한 가지 — 상황마다 하나만. 색은 신호등(초록 해도 됨 · 주황 서두름/정체 · 빨강 대기), 경로 정보는 청록 */
+  const moveIco = S.target === 0 ? 'icoLeft' : 'icoRight';
+  let icon = null, word = '', color = C_NOW;
+  if(st === 4){ const done = p.z < -238; icon = done ? 'icoCheck' : (S.target === 1 ? 'icoUp' : moveIco); word = done ? '완료' : '진입'; }
+  else if(st <= 3){
+    if(needMove && warn){ icon = 'icoNoGo'; word = '대기'; color = C_DANGER; }
+    else if(besideQueue){ const gap = S.q.mergeNear; icon = gap ? moveIco : 'icoPause'; word = gap ? '지금' : '틈 대기'; color = gap ? C_GO : C_WARN; }
+    else if(needMove){ icon = moveIco; word = late ? '지금 이동' : '이동'; color = late ? C_WARN : C_GO; }
+    else if(tail !== null){ icon = 'icoQueue'; word = '줄 서기'; color = C_WARN; }
+    else { icon = 'icoUp'; word = '유지'; }
+  }
+  showIcon(icon, color);
+  const nt = $('#nowText'); nt.textContent = word; nt.setAttribute('fill', color);
+  const tw = word ? nt.getComputedTextLength() : 0, total = 44 + (word ? 12 + tw : 0);   // 아이콘+단어를 한 덩어리로 가운데 정렬
+  $('#act').setAttribute('transform', `translate(${(HX - total/2 + 22).toFixed(1)} 34)`);
+  nt.setAttribute('x', 34);
+  const urgent = icon && (color === C_DANGER || word === '지금');
+  const halo = $('#nowHalo'); halo.classList.toggle('on', !!urgent); halo.setAttribute('stroke', color);
+  if(!urgent) halo.setAttribute('opacity', '0');
+
+  /* ② 언제 — 옮겨야 할 때만. 막대가 줄어들고 미니 도로 위 마감선과 같은 색 */
+  const showTiming = needMove && !warn && !besideQueue;
+  $('#cd').style.display = showTiming ? '' : 'none';
+  if(showTiming){ $('#cdBar').setAttribute('width', (120*frac).toFixed(1)); $('#cdBar').setAttribute('x', (260 - 60*frac).toFixed(1)); $('#cdBar').setAttribute('fill', color); $('#cdBg').setAttribute('fill', color); }
+  const g0 = showTiming ? proj(tx-1.75, gateZ) : null, g1 = showTiming ? proj(tx+1.75, gateZ) : null;
+  $('#gate').setAttribute('d', g0 && g1 ? `M${fmt(g0)}L${fmt(g1)}` : ''); $('#gate').setAttribute('stroke', color);
+
+  /* ③ 어디로 — 미니 도로 (v1 선 굵기보다 조금 진하게) */
   const lines = [];
   for(const x of [-5.4,5.4]){ const pts=[]; for(let z=40; z>=-230; z-=5) pts.push(proj(x,z)); lines.push(polyline(pts)); }
   branchCurves.forEach((c,i) => { lines.push(polyline(offsetPts(c, i===0?0:.06, 1, -2.3, proj, 40))); lines.push(polyline(offsetPts(c, i===2?0:.06, 1, 2.3, proj, 40))); });
@@ -59,163 +153,49 @@ function drawAr(p, f, st, d, k, dangerOn, kmh, remainKm){
   const dashes = [];
   for(const x of [-LANE/2,LANE/2]){ const pts=[]; for(let z=40; z>=-224; z-=5) pts.push(proj(x,z)); dashes.push(polyline(pts)); }
   $('#rdDash').setAttribute('d', dashes.join(''));
-
-  // 목표 차선 채우기
-  const fillTarget = st===1 ? .25 : (st===2||st===3) ? 1 : st===4 ? .5 : 0;
+  // 내 차로: 지금 위치 바로 앞부터 분기 지선까지 한 줄로 (차로마다 화살표 표지판처럼 '이 차로가 목적지로 간다')
+  const fillTarget = st===1 ? .7 : (st===2||st===3) ? 1 : st===4 ? .6 : 0;
   S.fill += (fillTarget - S.fill)*k;
-  const Lp=[],Rp=[]; for(let z=-110; z>=-230; z-=5){ Lp.push(proj(tx-1.75,z)); Rp.push(proj(tx+1.75,z)); }
+  const Lp=[],Rp=[]; for(let z=Math.min(p.z-3, 20); z>=-230; z-=4){ Lp.push(proj(tx-1.75,z)); Rp.push(proj(tx+1.75,z)); }
   const bc = branchCurves[S.target];
-  const fillD = strip(Lp,Rp) + strip(offsetPts(bc,0,.35,-2.3,proj), offsetPts(bc,0,.35,2.3,proj));
-  const lf = $('#laneFill'); lf.setAttribute('d', fillD);
-  const jamMerge = S.jam > 0 && S.target !== 1 && Math.abs(p.x - tx) > 1.2;
-  lf.setAttribute('fill', (S.danger > .5 || jamMerge) ? C_WARN : C_NOW); lf.setAttribute('fill-opacity', (.22*S.fill).toFixed(3));
-
-  // 경로 띠
-  let len = 60, bt = .45;
-  if(st===2 || st===3){ len = 150; bt = 1; }
-  else if(st===4){ const t = clamp((-205 - p.z)/70); len = 60 - 45*t; bt = .75 - .45*t; }
-  else if(st===5){ len = 10; bt = 0; }
-  S.band += (bt - S.band)*k;
-  const BL=[],BR=[];
-  for(let i=0;i<32;i++){
-    const ss = Math.min(path.L, S.s + 1 + (len-1)*i/31), q = path.curve.getPointAt(ss/path.L), t = path.curve.getTangentAt(ss/path.L);
-    let nx=-t.z,nz=t.x; const l=Math.hypot(nx,nz)||1; nx/=l; nz/=l;
-    BL.push(proj(q.x-nx*1.3,q.z-nz*1.3)); BR.push(proj(q.x+nx*1.3,q.z+nz*1.3));
-  }
-  const band = $('#band'); band.setAttribute('d', strip(BL,BR)); band.setAttribute('opacity', S.band.toFixed(3));
-  const warn = S.danger > .5;
-  band.setAttribute('fill', warn ? 'url(#bandWarn)' : 'url(#bandNow)');
-  band.setAttribute('stroke', warn ? C_WARN : '#8ff1ff');
-
-  // 정체 구간 표시: 목표 차로의 막힌 구간을 빗금 띠 + '정체 Xm' 핀으로
-  const jb = $('#jamBand'), jp = $('#jamPin');
-  if(S.jam > 0 && S.q && S.q.backZ !== null){
-    const tail = S.q.backZ, Ljp=[], Rjp=[];
+  const lf = $('#laneFill'); lf.setAttribute('d', strip(Lp,Rp) + strip(offsetPts(bc,0,.65,-2.3,proj,32), offsetPts(bc,0,.65,2.3,proj,32)));
+  lf.setAttribute('fill', C_NOW); lf.setAttribute('fill-opacity', ((warn ? .14 : .26)*S.fill).toFixed(3));
+  lf.setAttribute('stroke', C_NOW); lf.setAttribute('stroke-opacity', ((warn ? .4 : .75)*S.fill).toFixed(3)); lf.setAttribute('stroke-width', 1.6);
+  // 옮길 방향 화살표: 내 위치 → 목표 차로. 막히면 빨간 점선 + 머리에 막대
+  const a0 = needMove ? proj(p.x, p.z-7) : null, a1 = needMove ? proj(p.x, p.z-19) : null, a2 = needMove ? proj(tx, p.z-31) : null;
+  const ma = $('#moveArrow'), mh = $('#moveHead'), ms = $('#moveStop');
+  if(a0 && a1 && a2){
+    ma.setAttribute('d', `M${fmt(a0)}Q${fmt(a1)} ${fmt(a2)}`); ma.setAttribute('stroke', color);
+    ma.setAttribute('stroke-dasharray', warn ? '5 6' : besideQueue && !S.q.mergeNear ? '5 6' : '12 7');
+    ma.classList.toggle('flow', !warn && !(besideQueue && !S.q.mergeNear));
+    let dx = a2[0]-a1[0], dy = a2[1]-a1[1]; const l = Math.hypot(dx,dy)||1; dx/=l; dy/=l;
+    const hx = a2[0]+dx*7, hy = a2[1]+dy*7, nx = -dy, ny = dx;
+    mh.setAttribute('d', `M${(hx).toFixed(1)} ${(hy).toFixed(1)}L${(a2[0]-dx*6+nx*8).toFixed(1)} ${(a2[1]-dy*6+ny*8).toFixed(1)}L${(a2[0]-dx*6-nx*8).toFixed(1)} ${(a2[1]-dy*6-ny*8).toFixed(1)}Z`);
+    mh.setAttribute('fill', color);
+    const sx = a2[0]-dx*16, sy = a2[1]-dy*16;
+    ms.setAttribute('d', warn ? `M${(sx+nx*11).toFixed(1)} ${(sy+ny*11).toFixed(1)}L${(sx-nx*11).toFixed(1)} ${(sy-ny*11).toFixed(1)}` : '');
+  } else { ma.setAttribute('d', ''); mh.setAttribute('d', ''); ms.setAttribute('d', ''); ma.classList.remove('flow'); }
+  // 정체: 막힌 구간 빗금(주황) + 줄 맨 뒤 '설 칸'
+  const jb = $('#jamBand');
+  if(tail !== null){
+    const Ljp=[], Rjp=[];
     for(let z=tail; z>=Q_FRONT; z-=4){ Ljp.push(proj(tx-1.7,z)); Rjp.push(proj(tx+1.7,z)); }
-    const dj = strip(Ljp, Rjp);
-    jb.setAttribute('d', dj); jb.setAttribute('opacity', dj ? '.9' : '0');
-    const tp = proj(tx, tail);
-    if(tp){ jp.setAttribute('opacity','1'); jp.setAttribute('transform', `translate(${tp[0].toFixed(1)} ${(tp[1]-16).toFixed(1)})`); $('#jamPinT').textContent = `정체 ${Math.max(0, Math.round(p.z - tail))}m`; }
-    else jp.setAttribute('opacity','0');
-  } else { jb.setAttribute('opacity','0'); jp.setAttribute('opacity','0'); }
+    const dj = strip(Ljp, Rjp); jb.setAttribute('d', dj); jb.setAttribute('opacity', dj ? '.95' : '0');
+  } else jb.setAttribute('opacity','0');
+  const sq = tail !== null && p.z > tail + 14 ? [proj(tx-1.3,tail+5), proj(tx+1.3,tail+5), proj(tx+1.3,tail+10), proj(tx-1.3,tail+10)] : [];
+  $('#slot').setAttribute('d', sq.length && sq.every(Boolean) ? 'M'+sq.map(fmt).join('L')+'Z' : '');
+  $('#slot').setAttribute('opacity', (.7 + .3*Math.sin(now/260)).toFixed(2));
 
-  // 이름표
-  const anchors = branchCurves.map(c => { const q = c.getPointAt(.16); return proj(q.x,q.z); });
-  const fs = anchors[1] ? clamp(12 + anchors[1][2]*26, 13, 20) : 13;
-  const w = DEST.map((dd,i) => dd.name.length*fs + (i===S.target?24:14));
-  const xs = anchors.map(a => a ? a[0] : HX);
-  if(anchors[1]){ xs[0] = Math.min(xs[0], xs[1]-(w[0]+w[1])/2-8); xs[2] = Math.max(xs[2], xs[1]+(w[1]+w[2])/2+8); }
-  const tagY = anchors[1] ? Math.max(114, Math.min(...anchors.filter(Boolean).map(a=>a[1])) - 28) : 114;
-  tagEls.forEach((t,i) => {
-    const mine = i===S.target, a = anchors[i];
-    let tgt = 0;
-    if(a && p.z > -215 && (st===2 || st===3)) tgt = mine ? 1 : (st===2 ? .4 : .2);
-    if(S.danger > .5) tgt *= .35;
-    t.op += (tgt - t.op)*k;
-    t.g.setAttribute('opacity', t.op.toFixed(3)); t.g.style.display = t.op < .01 ? 'none' : '';
-    if(!a) return;
-    const h = fs+14, x = xs[i], y = tagY;
-    t.txt.setAttribute('x',x); t.txt.setAttribute('y', y+fs*.36); t.txt.setAttribute('font-size', (mine?fs:fs*.85).toFixed(1));
-    t.txt.textContent = DEST[i].name; t.txt.setAttribute('fill', mine ? C_NOW : '#ffffff');
-    t.rect.setAttribute('x', x-w[i]/2); t.rect.setAttribute('y', y-h/2); t.rect.setAttribute('width', w[i]); t.rect.setAttribute('height', h);
-    t.rect.setAttribute('fill', mine ? C_NOW : 'none'); t.rect.setAttribute('fill-opacity', mine ? '.14' : '0');
-    t.rect.setAttribute('stroke', mine ? C_NOW : 'none'); t.rect.setAttribute('stroke-width', mine ? 2 : 0);
-    t.sub.textContent = mine ? '내 지선' : ''; t.sub.setAttribute('x',x); t.sub.setAttribute('y', y-h/2-6); t.sub.setAttribute('fill', C_NOW);
-    t.line.setAttribute('x1',x); t.line.setAttribute('y1',y+h/2); t.line.setAttribute('x2',a[0]); t.line.setAttribute('y2',a[1]);
-    t.line.setAttribute('stroke', mine ? C_NOW : '#ffffff'); t.line.setAttribute('stroke-opacity', mine ? '.9' : '.35');
-  });
+  /* 뒤차: 초보자는 옆·뒤를 잘 안 보므로 가운데로 끌어온다 — 목표 차로 아래쪽에 빨간 차 + 앞으로 지나가면 도로 위에 */
+  const dz = S.danger, cb = $('#carBehind'), ca = $('#carAhead');
+  $('#edgeL').setAttribute('opacity', S.target===0 ? dz*.8 : 0);
+  $('#edgeR').setAttribute('opacity', S.target===2 ? dz*.8 : 0);
+  const q = S.car && S.car.pos ? proj(S.car.pos.x, S.car.pos.z) : null;
+  if(q && dz > .05){ ca.setAttribute('x', q[0]-8*q[2]*2); ca.setAttribute('y', q[1]-12*q[2]); ca.setAttribute('width', 16*q[2]*2); ca.setAttribute('height', 12*q[2]*2); ca.setAttribute('opacity', dz); }
+  else ca.setAttribute('opacity', 0);
+  cb.setAttribute('opacity', (S.car && !q ? dz : 0).toFixed(2));
+  cb.setAttribute('transform', `translate(${(HX + sgn*80).toFixed(1)} 222) scale(${(0.8 + dz*.5).toFixed(2)})`);
 
-  // 지금 할 행동 / 다음 행동 + 남은 시간·거리
-  const sideIcon = S.target===0 ? 'icoLeft' : S.target===2 ? 'icoRight' : 'icoUp';
-  let now = '', next = '', icon = null, cdDist = null, cdTotal = 1, nowSize = 29, nowColor = C_NOW;
-  if(st===1){ icon='icoFork'; now='세 갈래 분기점'; next=`다음  ${d.side} 지선 (${d.name})`; cdDist = p.z-FORK_Z; cdTotal = 230; }
-  else if(st===2){ icon=sideIcon; now=`${d.side} 지선으로`; next= S.target===1 ? '다음  현재 차로 유지' : `다음  ${d.side} 차로로 이동`; cdDist = p.z-FORK_Z; cdTotal = 230; }
-  else if(st===3){
-    if(S.target===1){ icon='icoUp'; now='현재 차로 유지'; next=`다음  ${d.name} 지선 진입`; cdDist = p.z-FORK_Z; cdTotal = 115; }
-    else { icon=sideIcon; now=`${d.side} 차로로 이동`; next=`다음  ${d.name} 지선 진입`; cdDist = p.z-CHANGE_END; cdTotal = 90; }
-  }
-  else if(st===4){
-    if(p.z < -238){ icon='icoCheck'; now='진입 완료'; next='다음  경로 따라 직진'; }
-    else { icon=sideIcon; now=`${d.name} 진입`; next='다음  경로 따라 직진'; }
-  }
-  else { icon=null; now='경로 안내 중'; next=''; nowSize = 17; nowColor = 'rgba(255,255,255,.55)'; }
-
-  // 정체 대응 (핵심 차별점): 분기점 전 구간에서 미리 이동 / 대기 / 끼어들기 위험을 대신 판단
-  if(S.jam > 0 && S.q && S.q.backZ !== null && st >= 1 && st <= 3 && p.z > -206){
-    const inLane = Math.abs(p.x - tx) < 1.2, distBack = p.z - S.q.backZ;
-    if(S.target !== 1 && !inLane && distBack > 2){
-      icon = sideIcon; cdDist = Math.max(0, distBack); cdTotal = 60; nowSize = 28;
-      if(S.q.mergeNear){ now = `지금 ${d.side}으로!`; next = '틈 열림 · 지금 차로 이동'; nowColor = C_NOW; }
-      else { now = `${d.side}으로 미리`; next = `${d.side} 차로 정체 · 늦으면 끼어들기 위험`; nowColor = C_WARN; }
-    } else if(S.target !== 1 && !inLane){
-      icon = 'icoWarn'; now = '서행하며 틈 대기'; next = '무리한 끼어들기 금지'; nowColor = C_WARN; cdDist = null; nowSize = 26;
-    } else {
-      icon = 'icoUp'; now = '여기서 대기'; next = `앞차 따라 서행 · ${d.name} 정체`; nowColor = C_NOW; cdDist = null; nowSize = 27;
-    }
-  }
-
-  // 위험 경고: 모든 안내보다 우선
-  if(S.danger > .5){
-    icon='icoWarn'; now=`${d.side} 뒤 차량 접근`; next='지나간 뒤 차로를 옮기세요'; nowColor = C_WARN; cdDist = null;
-  }
-  showIcon(icon, nowColor);
-  const nt = $('#nowText'); nt.textContent = now; nt.setAttribute('fill', nowColor); nt.setAttribute('font-size', nowSize);
-  nt.setAttribute('x', icon ? 78 : 40); nt.setAttribute('y', icon ? 46 : 40);
-  $('#nextText').textContent = next;
-
-  // 애니메이션(목적형): 긴급할 때만 아이콘 맥박 + 이동 안내 시 경로 흐름
-  const urgent = (S.danger > .5) || (S.jam > 0 && /지금 |서행하며/.test(now));
-  const halo = $('#nowHalo');
-  halo.classList.toggle('on', urgent && !!icon);
-  halo.setAttribute('stroke', nowColor);
-  if(!(urgent && icon)) halo.setAttribute('opacity', '0');
-  const moving = st===2 || st===3 || (S.jam > 0 && /미리|지금|이동/.test(now));
-  band.classList.toggle('flow', moving && !warn);
-  band.setAttribute('stroke-dasharray', moving ? (warn ? '6 5' : '10 8') : (warn ? '6 5' : 'none'));
-  const cd = $('#cd');
-  if(cdDist !== null && cdDist > 0 && !(S.testing && S.qType === 'danger')){
-    cd.style.display = '';
-    const sec = cdDist/SPEED, urg = sec < 3;
-    $('#cdSec').textContent = sec < 10 ? `${sec.toFixed(1)}초` : `${Math.round(sec)}초`;
-    $('#cdSec').setAttribute('font-size', urg ? 32 : 26);
-    $('#cdM').textContent = `${Math.round(cdDist)}m`;
-    $('#cdBar').setAttribute('width', (138*clamp(cdDist/cdTotal)).toFixed(1));
-  } else cd.style.display = 'none';
-
-  // 위험 표시: 가장자리 빛 + 차량 표시
-  const dz = S.danger;
-  $('#edgeL').setAttribute('opacity', S.target===0 ? dz : 0);
-  $('#edgeR').setAttribute('opacity', S.target===2 ? dz : 0);
-  const cb = $('#carBehind');
-  if(S.car && S.car.pos){
-    const q = proj(S.car.pos.x, S.car.pos.z), ca = $('#carAhead');
-    // 앞으로 지나가면 도로 위에, 뒤에 있으면 하단 마커로 — 다가올수록 커짐
-    if(q && dz > .05){ ca.setAttribute('x', q[0]-8*q[2]*2); ca.setAttribute('y', q[1]-12*q[2]); ca.setAttribute('width', 16*q[2]*2); ca.setAttribute('height', 12*q[2]*2); ca.setAttribute('opacity', dz); }
-    else ca.setAttribute('opacity', 0);
-    cb.setAttribute('opacity', (!q ? dz : 0).toFixed(2));
-    const sc = (0.85 + dz*0.9).toFixed(2);   // 가까울수록 크게
-    cb.setAttribute('transform', `translate(${S.target===0 ? 150 : 354} 214) scale(${sc})`);
-  } else { cb.setAttribute('opacity',0); $('#carAhead').setAttribute('opacity',0); }
-
-  // 부수 정보 흐리게
-  const infoT = S.danger > .5 ? .12 : ({1:.55, 2:.35, 3:.2, 4:.4, 5:.85})[st];
-  S.info += (infoT - S.info)*k;
-  $('#info').setAttribute('opacity', S.info.toFixed(3));
+  /* ④ 속도 */
   $('#spdA').textContent = kmh;
-  $('#remainA').textContent = `남은 거리 ${remainKm}km`;
-}
-
-/* ---------- 기존 HUD (대조군) ---------- */
-function drawNav(st, p, d, kmh, remainKm, dangerOn){
-  const dist = Math.max(0, Math.round(p.z - FORK_Z));
-  const rot = st >= 5 ? 0 : [-40,0,40][S.target];
-  $('#navTurn').setAttribute('transform', `translate(196 54) rotate(${rot})`);
-  $('#navText').textContent = st >= 5 ? '경로 안내 중' : `${dist > 0 ? dist+'m' : '진입'}  |  ${d.name} 방향${S.jam > 0 ? ' · 정체' : ''}`;
-  $('#navLanes').setAttribute('opacity', st <= 3 ? 1 : 0);
-  navLaneEls.forEach(a => { const on = +a.dataset.i===S.target; a.setAttribute('fill', on ? C_NOW : '#f2f7fa'); a.setAttribute('fill-opacity', on ? 1 : .55); });
-  $('#spdN').textContent = kmh;
-  const now = new Date(Date.now() + (3.4 - (S.s-40)/1000)/65*3600000);
-  $('#navInfo').textContent = `남은 거리 ${remainKm}km   도착 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}   연비 16.2km/L`;
-  $('#navBsd').setAttribute('opacity', dangerOn ? 1 : 0);
-  $('#navBsd').setAttribute('transform', S.target===0 ? 'translate(152 196)' : 'translate(356 196)');
 }

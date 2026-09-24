@@ -6,12 +6,16 @@
 /* ---------- 운전석 영역 ---------- */
 .cab{ position:relative; flex:1; min-width:0; border-radius:14px; overflow:hidden; background:#0b0d10; }
 #view, #view canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+#view::after{ content:""; position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 95% at 50% 42%, transparent 58%, rgba(0,0,0,.28)); }
+/* 앞유리 윗테 + A필러: 차 안에서 보는 느낌 (안내 정보 아님) */
+#frame{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .cab-label{ position:absolute; top:12px; left:12px; background:rgba(255,255,255,.92); color:var(--ink); font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px; }
 #dash{ position:absolute; left:-10%; right:-10%; bottom:0; height:21%; pointer-events:none;
-  background:linear-gradient(#cfd3d7 0, #aeb3b9 6px, #3a3e44 10px, #1c1f23 45%, #0d0e10);
+  background:linear-gradient(#50555c 0, #2b2f34 3px, #1f2227 14px, #16181b 45%, #0b0c0e);
   border-radius:50% 50% 0 0 / 22% 22% 0 0; }
-#dash::after{ content:""; position:absolute; left:50%; top:24%; width:13%; height:7%; transform:translateX(-50%);
-  background:#07080a; border-radius:4px; box-shadow:inset 0 2px 5px rgba(0,0,0,.9); }
+/* 핸들: 아래쪽은 화면 밖으로 잘림. 회전은 main.js updateWheel() */
+#wheel{ position:absolute; left:50%; bottom:0; height:25%; aspect-ratio:400/230; transform:translateX(-50%);
+  overflow:visible; pointer-events:none; filter:drop-shadow(0 -3px 12px rgba(0,0,0,.5)); }
 
 /* HUD: 유리에 비친 빛처럼 screen 합성 */
 #hudWrap{ position:absolute; left:50%; bottom:23%; transform:translateX(-50%); width:min(400px,44%); pointer-events:none; }
@@ -38,12 +42,12 @@
 /* ---------- HUD 애니메이션 (목적형): 긴급 맥박 헤일로 · 경로 흐름 ---------- */
 @keyframes hudHalo{ 0%{ opacity:.55; r:18; } 100%{ opacity:0; r:34; } }
 #nowHalo.on{ animation: hudHalo 1s ease-out infinite; }
-@keyframes hudFlow{ to{ stroke-dashoffset:-36; } }
-#band.flow{ animation: hudFlow .7s linear infinite; }
+@keyframes hudFlow{ to{ stroke-dashoffset:-38; } }
+#moveArrow.flow{ animation: hudFlow .7s linear infinite; }
 
 @media (prefers-reduced-motion: reduce){
   *{ transition:none !important; }
   #nowHalo.on{ animation:none; opacity:0; }
-  #band.flow{ animation:none; }
+  #moveArrow.flow{ animation:none; }
   #jamHatch animateTransform{ display:none; }
 }
