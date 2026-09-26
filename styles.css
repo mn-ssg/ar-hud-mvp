@@ -18,7 +18,7 @@
   --hud-go: #3ddc84;
   --ok: #1f9d62;
   --bad: #d64545;
-  --font: "IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font: "Pretendard Variable","Pretendard","IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --page:#e9ecef; } }
 :root[data-theme="dark"]{ --page:#e9ecef; }
@@ -40,11 +40,17 @@ button:focus-visible, input:focus-visible{ outline:2px solid var(--btn); outline
 .hint{ font-weight:400; color:var(--sub); font-size:11px; }
 #scenario{ display:flex; flex-direction:column; gap:6px; transition:opacity .2s; }
 #scenario .seg button{ font-size:12px; padding:7px 4px; }
+#mapSeg button{ display:flex; flex-direction:column; align-items:center; gap:1px; font-size:10px; line-height:1.25; padding:6px 0; letter-spacing:-.04em; white-space:nowrap; min-width:0; }
+#mapSeg button b{ font-size:15px; font-weight:600; }
+.map-name{ margin:0 2px; font-size:12px; color:var(--sub); }
 .seg{ display:flex; background:#eef1f4; border-radius:9px; padding:3px; }
 .seg button{ flex:1; border:0; background:transparent; padding:8px 6px; border-radius:7px; font-size:13px; color:var(--sub); }
 .seg button[aria-pressed="true"]{ background:#fff; color:var(--ink); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.12); }
 .seg button:disabled{ opacity:.5; cursor:not-allowed; }
 .actions{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.mode-desc{ margin:8px 2px 0; font-size:12px; color:var(--sub); line-height:1.5; min-height:18px; }
+.btn.toggle{ width:100%; margin-top:8px; }
+.btn.toggle[aria-pressed="true"]{ background:var(--btn); border-color:var(--btn); color:#fff; font-weight:600; }
 .btn{ border:1px solid var(--rule); background:#fff; padding:9px 10px; border-radius:9px; font-size:13px; }
 .btn.primary{ background:var(--btn); border-color:var(--btn); color:#fff; font-weight:600; }
 .btn:disabled{ opacity:.5; cursor:not-allowed; }

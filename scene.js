@@ -1,6 +1,6 @@
 /* ============================================================
-   scene.js — 3D 도로 장면 (렌더러 · 하늘 · 지형 · 도로 · 도로시설 · 나무 · 차량 · 고스트카)
-   config.js 다음에 로드. 매 프레임 main.js가 renderScene()을 부른다.
+   scene.js — 3D 도로 장면 (렌더러 · 하늘 · 지형 · 도로 · 도로시설 · 나무 · 차량)
+   config.js · maps.js 다음에 로드. 매 프레임 main.js가 renderScene()을 부른다. 맵별 장면은 buildMapScene() / showMap().
    실험에 걸린 것(차로·분기점 위치, 표지판 위치와 문구, 카메라 시야각, 차 길이 ≤4.8m)은 그대로 두고 겉모습만 다룬다.
    그래픽은 전부 코드로 생성 — 외부 3D 모델·이미지 없음(저작권 문제 없음).
    ============================================================ */
@@ -112,54 +112,12 @@ scene.add(sun, sun.target);
   scene.environment = pm.fromScene(s).texture; pm.dispose();
 })();
 
-/* ---------- 도로 곡선 · 도로까지 거리 ---------- */
-// 지선은 화면 끝까지 이어지게 마지막 방향으로 600m 늘린 '보이는 용도' 곡선을 따로 둔다 (주행 경로 branchCurves는 그대로)
-const branchVis = BRANCH_PTS.map(pts => {
-  const n = pts.length, [x1,z1] = pts[n-1], [x0,z0] = pts[n-2], l = Math.hypot(x1-x0, z1-z0);
-  const ext = pts.map(a => V(a[0],a[1]));
-  for(let k=1;k<=10;k++) ext.push(V(x1 + (x1-x0)/l*60*k, z1 + (z1-z0)/l*60*k));
-  return curveOf(ext, 1200);
-});
-const BUCKET = 70, buckets = new Map();
-(() => {
-  const put = (x,z) => { const k = Math.floor(x/BUCKET)+','+Math.floor(z/BUCKET); if(!buckets.has(k)) buckets.set(k, []); buckets.get(k).push([x,z]); };
-  for(let z=60; z>=-236; z-=4) put(0, z);
-  branchVis.forEach(c => { const L = c.getLength(); for(let s=0; s<=L; s+=4){ const p = c.getPointAt(s/L); put(p.x, p.z); } });
-})();
-function roadDist(x,z){   // 가장 가까운 도로 중심선까지 거리(최대 70m)
-  const bx = Math.floor(x/BUCKET), bz = Math.floor(z/BUCKET); let d2 = BUCKET*BUCKET;
-  for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){
-    const arr = buckets.get((bx+i)+','+(bz+j)); if(!arr) continue;
-    for(const p of arr){ const dx = p[0]-x, dz = p[1]-z, dd = dx*dx+dz*dz; if(dd < d2) d2 = dd; }
-  }
-  return Math.sqrt(d2);
-}
-function terrainH(x,z){   // 도로 옆 16m까지는 평평, 70m까지 완만하게 올라 언덕
-  const t = clamp((roadDist(x,z) - 16)/54);
-  return -0.35 + t*t*(3-2*t) * (fbm(x*.011, z*.011)*46 - 9);
-}
-
-/* ---------- 지형 ---------- */
+/* ---------- 공용 재질 · 텍스처 (맵마다 같이 씀) ---------- */
 const grassTex = canvasTex(256, 256, (g,w,h) => {
   g.fillStyle = '#87907a'; g.fillRect(0,0,w,h);
   for(let i=0;i<6000;i++){ const v = 110 + Math.random()*110 | 0; g.fillStyle = `rgba(${v*.78|0},${v},${v*.55|0},.35)`; g.fillRect(Math.random()*w, Math.random()*h, 1.4, 1.5 + Math.random()*3.5); }
 }, true);
-(() => {
-  const tg = new THREE.PlaneGeometry(2200, 2200, 220, 220); tg.rotateX(-Math.PI/2); tg.translate(0, 0, -300);
-  const tp = tg.attributes.position, cols = [], c = new THREE.Color();
-  const lush = lin('#41552c'), dry = lin('#7a744e'), rock = lin('#67655e');
-  for(let i=0;i<tp.count;i++){
-    const x = tp.getX(i), z = tp.getZ(i), y = terrainH(x,z); tp.setY(i, y);
-    c.copy(lush).lerp(dry, clamp((fbm(x*.03+50, z*.03)-.45)*2.4)*.7).lerp(rock, clamp((y-16)/14)*.5).multiplyScalar(.8 + .35*vnoise(x*.15, z*.15));
-    cols.push(c.r, c.g, c.b);
-  }
-  tg.setAttribute('color', new THREE.Float32BufferAttribute(cols,3)); tg.computeVertexNormals();
-  const tex = grassTex.clone(); tex.needsUpdate = true; tex.repeat.set(280, 280);
-  const terrain = new THREE.Mesh(tg, new THREE.MeshStandardMaterial({map:tex, vertexColors:true, roughness:.96}));
-  terrain.receiveShadow = true; scene.add(terrain);
-})();
-
-/* ---------- 도로 ---------- */
+const terrainMat = (() => { const tex = grassTex.clone(); tex.needsUpdate = true; tex.repeat.set(280, 280); return new THREE.MeshStandardMaterial({map:tex, vertexColors:true, roughness:.96}); })();
 function ribbonGeo(n){
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*6),3));
@@ -188,116 +146,30 @@ const asphalt = worldUV(new THREE.MeshStandardMaterial({map:asphaltTex, roughnes
 const verge = worldUV(new THREE.MeshStandardMaterial({map:grassTex, color:lin('#53683a'), roughness:.97, side:THREE.DoubleSide,
   polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}), .15);
 const paint = new THREE.MeshStandardMaterial({color:lin('#e9e9e3'), roughness:.55, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
-const addMesh = (geo, mat, shadow = 'r') => { const m = new THREE.Mesh(geo, mat); m.receiveShadow = shadow.includes('r'); m.castShadow = shadow.includes('c'); scene.add(m); return m; };
-
-const mainRoad = addMesh(new THREE.PlaneGeometry(11.6,275), asphalt);
-mainRoad.rotation.x = -Math.PI/2; mainRoad.position.set(0,0,(40-235)/2);
-const mainLine = curveOf([V(0,60), V(0,-236)], 50);
-for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(40), mainLine, 0, 1, s*5.8, s*9.4, -0.01, -0.45), verge);
-// 바퀴 자국: 차로마다 두 줄 살짝 어둡게
-(() => {
-  const mat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.06, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
-  for(const lx of [-LANE,0,LANE]) for(const o of [-.85,.85]){ const m = addMesh(new THREE.PlaneGeometry(.75, 268), mat); m.rotation.x = -Math.PI/2; m.position.set(lx+o, .002, -94); }
-})();
-// 차선: 위치는 이전과 같다 (hud.js 미니 도로와 맞물림)
-(() => {
-  const arr = [];
-  const quad = (x0,z0,x1,z1,y) => arr.push(x0,y,z0, x1,y,z0, x0,y,z1, x1,y,z0, x1,y,z1, x0,y,z1);
-  for(const x of [-LANE/2, LANE/2]) for(let z=38; z>-222; z-=9) quad(x-.075,z,x+.075,z-3,.01);
-  for(const x of [-5.4,5.4]) quad(x-.08,40,x+.08,-228,.01);
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr,3)); g.computeVertexNormals();
-  addMesh(g, paint);
-})();
-branchVis.forEach((c,i) => {
-  addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, -2.3, 2.3, .003+i*.002), asphalt);
-  for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, s*2.3, s*5.6, -0.02, -0.45), verge);
-  const inner = .08*branchCurves[i].getLength()/c.getLength();   // 안쪽 차선은 이전처럼 분기 뒤 약 30m부터
-  for(const [off,start] of [[-2.25, i===0?0:inner],[2.25, i===2?0:inner]]) addMesh(fillRibbon(ribbonGeo(300), c, start, 1, off-.08, off+.08, .013), paint);
-});
-
-/* ---------- 도로 시설 ----------
-   가는 물체(가로등·표지판 기둥·가드레일)는 그림자를 드리우지 않는다: 도로 위에 선·띠 그림자가 생기면 부자연스럽고 차선으로 오인될 수 있음 */
+const trackMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.06, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
+// 가는 물체(가로등·표지판 기둥·가드레일)는 그림자를 드리우지 않는다: 도로 위에 선·띠 그림자가 생기면 부자연스럽고 차선으로 오인될 수 있음
 const steel = new THREE.MeshStandardMaterial({color:lin('#c3c8ce'), metalness:.8, roughness:.35, side:THREE.DoubleSide});
 const galv = new THREE.MeshStandardMaterial({color:lin('#8e949b'), metalness:.6, roughness:.5});
+const reflMat = new THREE.MeshStandardMaterial({color:lin('#ffb347'), emissive:lin('#ff9a1f'), emissiveIntensity:.35});
+const lampMat = new THREE.MeshStandardMaterial({color:lin('#e8eef2'), emissive:lin('#fff6e0'), emissiveIntensity:.15, roughness:.3});
+const footMat = new THREE.MeshStandardMaterial({color:lin('#9a9a95'), roughness:.9});
 // 가드레일: W자 단면 + 지주 + 반사체
-(() => {
+const railBeam = (() => {
   const sh = new THREE.Shape([[0,0],[.07,.05],[.07,.12],[.03,.155],[.07,.19],[.07,.26],[0,.31],[-.006,.31],[.064,.262],[.064,.192],[.024,.155],[.064,.118],[.064,.052],[-.006,0]].map(p => new THREE.Vector2(p[0],p[1])));
-  const beam = new THREE.ExtrudeGeometry(sh, {depth:268, bevelEnabled:false});
-  const posts = [], refl = [];
-  for(const x of [-6.2, 6.2]){
-    const m = addMesh(beam, steel); m.position.set(x, .45, -228); if(x > 0) m.scale.x = -1;   // 볼록한 면이 도로 쪽
-    for(let z=38; z>-228; z-=4){ posts.push([x + Math.sign(x)*.1, z]); if(((Math.round(z) % 20) + 20) % 20 === 18) refl.push([x - Math.sign(x)*.05, z]); }
-  }
-  const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(.1,.8,.14), galv, posts.length), d = new THREE.Object3D();
-  posts.forEach(([x,z],i) => { d.position.set(x,.4,z); d.updateMatrix(); pm.setMatrixAt(i, d.matrix); });
-  pm.receiveShadow = true; scene.add(pm);
-  const rm = new THREE.InstancedMesh(new THREE.BoxGeometry(.03,.09,.07), new THREE.MeshStandardMaterial({color:lin('#ffb347'), emissive:lin('#ff9a1f'), emissiveIntensity:.35}), refl.length);
-  refl.forEach(([x,z],i) => { d.position.set(x,.83,z); d.updateMatrix(); rm.setMatrixAt(i, d.matrix); });
-  scene.add(rm);
+  return new THREE.ExtrudeGeometry(sh, {depth:268, bevelEnabled:false});
 })();
-// 가로등: 양쪽에 엇갈려
-(() => {
-  const pole = new THREE.CylinderGeometry(.08,.13,10,10), arm = new THREE.CylinderGeometry(.045,.045,2.4,6), head = new THREE.BoxGeometry(.75,.14,.3);
-  const lampMat = new THREE.MeshStandardMaterial({color:lin('#e8eef2'), emissive:lin('#fff6e0'), emissiveIntensity:.15, roughness:.3});
-  for(const [x, z0] of [[7.3, 25], [-7.3, 1]]) for(let z=z0; z>-225; z-=48){
-    const s = Math.sign(x);
-    const p = addMesh(pole, galv); p.position.set(x, 5, z);
-    const a = addMesh(arm, galv, ''); a.rotation.z = Math.PI/2; a.position.set(x - s*1.2, 9.95, z);
-    const h = addMesh(head, lampMat, ''); h.position.set(x - s*2.35, 9.9, z);
-  }
-})();
-// 분기점 표지판: 문구·위치는 이전과 같고(실험 자극), 해상도와 구조물만 바꿈
-(() => {
-  const tex = canvasTex(2400, 400, g => {
-    g.scale(4/3, 4/3);
-    g.fillStyle = '#dfe4e1'; g.fillRect(0,0,1800,300);
-    DEST.forEach((d,i) => {
-      const x = i*600;
-      g.fillStyle = '#0d6b3c'; g.fillRect(x+12,12,576,276);
-      g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeRect(x+28,28,544,244);
-      g.fillStyle = '#fff'; g.font = `700 92px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(d.name, x+300, 118);
-      g.save(); g.translate(x+300,222);
-      g.beginPath(); g.moveTo(0,38); g.lineTo(24,6); g.lineTo(9,6); g.lineTo(9,-34); g.lineTo(-9,-34); g.lineTo(-9,6); g.lineTo(-24,6); g.closePath(); g.fill();
-      g.restore();
-    });
-  });
-  const board = addMesh(new THREE.PlaneGeometry(13.8,2.3), new THREE.MeshStandardMaterial({map:tex, roughness:.5}));
-  board.position.set(0,7,-150);
-  const back = addMesh(new THREE.BoxGeometry(14.0,2.46,.1), galv); back.position.set(0,7,-150.07);
-  for(const x of [-7.6,7.6]){
-    const p = addMesh(new THREE.CylinderGeometry(.24,.28,8.8,14), galv); p.position.set(x,4.4,-150.4);
-    const b = addMesh(new THREE.BoxGeometry(1,.25,1), new THREE.MeshStandardMaterial({color:lin('#9a9a95'), roughness:.9})); b.position.set(x,.12,-150.4);
-  }
-  // 트러스: 위·아래 현재 + 사선 부재
-  for(const y of [6.1, 7.9]){ const c = addMesh(new THREE.CylinderGeometry(.09,.09,15.2,8), galv, ''); c.rotation.z = Math.PI/2; c.position.set(0,y,-150.45); }
-  for(let i=0;i<10;i++){
-    const x0 = -7.2 + i*1.6, d = addMesh(new THREE.CylinderGeometry(.04,.04,Math.hypot(1.6,1.8),6), galv, '');
-    d.position.set(x0+.8, 7, -150.45); d.rotation.z = (i%2 ? 1 : -1)*Math.atan2(1.6,1.8);
-  }
-})();
-// 갈림목 코(gore)마다 노란 충격흡수대
-(() => {
-  const samples = branchVis.map(c => Array.from({length:500}, (_,i) => c.getPointAt(i/499)));
-  const xAt = (i,z) => { let best = samples[i][0]; for(const p of samples[i]) if(Math.abs(p.z-z) < Math.abs(best.z-z)) best = p; return best.x; };
+const lampGeo = {pole:new THREE.CylinderGeometry(.08,.13,10,10), arm:new THREE.CylinderGeometry(.045,.045,2.4,6), head:new THREE.BoxGeometry(.75,.14,.3)};
+// 갈림목 충격흡수대: 노랑 + 검은 사선
+const goreMats = (() => {
   const stripes = canvasTex(128, 128, g => {
     g.fillStyle = '#f2c230'; g.fillRect(0,0,128,128); g.fillStyle = '#1b1b1b';
     for(let k=-128;k<256;k+=40){ g.beginPath(); g.moveTo(k,128); g.lineTo(k+20,128); g.lineTo(k+84,0); g.lineTo(k+64,0); g.fill(); }
   });
   const yellow = new THREE.MeshStandardMaterial({color:lin('#f2c230'), roughness:.6}), face = new THREE.MeshStandardMaterial({map:stripes, roughness:.6});
-  for(const [a,b] of [[0,1],[1,2]]) for(let z=-236; z>-340; z-=1){
-    const xa = xAt(a,z), xb = xAt(b,z);
-    if(xb - xa < 6.4) continue;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(.9,.95,2.4), [yellow,yellow,yellow,yellow,face,yellow]);
-    const mx = (xa+xb)/2, dx = (xAt(a,z-6)+xAt(b,z-6))/2 - mx;   // 6m 앞 가운데선 쪽으로 향함
-    m.position.set(mx, .47, z - 1.2); m.rotation.y = Math.atan2(-dx, 6);
-    m.castShadow = m.receiveShadow = true; scene.add(m); break;
-  }
+  return [yellow,yellow,yellow,yellow,face,yellow];
 })();
-
-/* ---------- 나무 ---------- */
-// 그린 나무 그림을 세 방향으로 교차시킨 판(앞뒤 따로) — 멀리서 보면 입체로 보이고 그림자도 잎 모양으로 진다
-(() => {
+// 나무: 그린 나무 그림을 세 방향으로 교차시킨 판(앞뒤 따로) — 멀리서 보면 입체로 보이고 그림자도 잎 모양으로 진다
+const treeKinds = (() => {
   const pineTex = canvasTex(256, 512, (g,w,h) => {
     g.fillStyle = '#3b2a1e'; g.fillRect(w/2-6, h*.62, 12, h*.38);
     const top = 10, bot = h*.9;
@@ -331,28 +203,19 @@ const galv = new THREE.MeshStandardMaterial({color:lin('#8e949b'), metalness:.6,
     for(let i=0;i<p.count;i++){ v.set(p.getX(i), (p.getY(i) - h*.55)*.7 + h*.6, p.getZ(i)).normalize(); n.setXYZ(i, v.x, v.y, v.z); }   // 둥글게 음영
     return g;
   };
-  const spots = [];
-  for(let k=0; k<60000 && spots.length<5200; k++){
-    const x = (rnd()-.5)*1000, z = 90 - rnd()*900;
-    if(roadDist(x,z) < 13 || Math.hypot(x, z+150) < 12) continue;
-    if(fbm(x*.02+3, z*.02) < .33) continue;                             // 숲 덩어리와 빈 들판
-    spots.push([x, terrainH(x,z) - .2, z]);
-  }
-  const d = new THREE.Object3D(), c = new THREE.Color();
-  [[pineTex, cross(.56,1), 10, 7], [leafTex, cross(1,1), 7, 4]].forEach(([map, geo, hMin, hVar], ti) => {
-    const list = spots.filter((_,i) => (hash2(i, 3) < .7) === (ti === 0));   // 침엽 70% · 활엽 30%
+  return [[pineTex, cross(.56,1), 10, 7], [leafTex, cross(1,1), 7, 4]].map(([map, geo, hMin, hVar]) => {
     const mat = new THREE.MeshStandardMaterial({map, alphaTest:.5, roughness:.95});
-    const im = new THREE.InstancedMesh(geo, mat, list.length);
-    im.customDepthMaterial = new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, map, alphaTest:.5});
-    list.forEach(([x,y,z],i) => {
-      const s = hMin + rnd()*hVar; d.position.set(x,y,z); d.rotation.set(0, rnd()*6.3, 0); d.scale.set(s*(.85+rnd()*.3), s, s*(.85+rnd()*.3)); d.updateMatrix();
-      im.setMatrixAt(i, d.matrix); im.setColorAt(i, c.setRGB(.8+rnd()*.35, .85+rnd()*.3, .75+rnd()*.3));
-    });
-    im.castShadow = im.receiveShadow = true; scene.add(im);
+    const depth = new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, map, alphaTest:.5});
+    return {geo, mat, depth, hMin, hVar};
   });
 })();
+const facadeMat = new THREE.MeshStandardMaterial({roughness:.85, map:canvasTex(128, 256, (g,w,h) => {
+  g.fillStyle = '#dcd8cf'; g.fillRect(0,0,w,h);
+  for(let y=8;y<h;y+=10) for(let x=6;x<w-4;x+=12){ g.fillStyle = Math.random() < .12 ? '#94a8b8' : `rgba(64,78,92,${.5+Math.random()*.3})`; g.fillRect(x,y,8,6); }
+  g.fillStyle = '#b6b0a5'; g.fillRect(0,0,w,5);
+})});
 
-/* ---------- 먼 풍경: 겹겹이 산 · 아파트 단지 ---------- */
+/* ---------- 먼 풍경: 겹겹이 산 (맵과 무관) ---------- */
 (() => {
   const C = new THREE.Vector3(0,0,-300);
   [[760,.34,72,'#3e5a45'],[1020,.55,115,'#556f7c'],[1320,.72,175,'#7891a4']].forEach(([R, haze, H, hex], li) => {
@@ -369,17 +232,212 @@ const galv = new THREE.MeshStandardMaterial({color:lin('#8e949b'), metalness:.6,
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({vertexColors:true, fog:false, side:THREE.DoubleSide}));
     m.renderOrder = -1; scene.add(m);
   });
-  const facade = canvasTex(128, 256, (g,w,h) => {
-    g.fillStyle = '#dcd8cf'; g.fillRect(0,0,w,h);
-    for(let y=8;y<h;y+=10) for(let x=6;x<w-4;x+=12){ g.fillStyle = Math.random() < .12 ? '#94a8b8' : `rgba(64,78,92,${.5+Math.random()*.3})`; g.fillRect(x,y,8,6); }
-    g.fillStyle = '#b6b0a5'; g.fillRect(0,0,w,5);
+})();
+
+/* ============================================================
+   맵별 장면 — 도로에 딸린 것(지형 · 도로 · 차선 · 가드레일 · 가로등 · 표지판 · 충격흡수대 · 나무 · 먼 건물)
+   처음 쓸 때 한 번 짓고 보관 → 두 번째부터는 보이기만 바꾼다(showMap). 난수 씨앗을 맵마다 고정해 같은 맵은 늘 같은 모습.
+   ============================================================ */
+let MG = null;   // 지금 짓는 맵 묶음
+const addMesh = (geo, mat, shadow = 'r') => { const m = new THREE.Mesh(geo, mat); m.receiveShadow = shadow.includes('r'); m.castShadow = shadow.includes('c'); MG.add(m); return m; };
+
+// 표지판 판: 칸(lane 몫)마다 녹색 패널 — {from, to: 칸 번호, lines: 방면 글자 줄, arrow: 화살표 각도(0=↓)}
+function signTex(cells, panels){
+  return canvasTex(800*cells, 400, g => {
+    g.scale(4/3, 4/3);
+    g.fillStyle = '#dfe4e1'; g.fillRect(0,0,600*cells,300);
+    panels.forEach(pn => {
+      const x = pn.from*600, w = (pn.to - pn.from + 1)*600;
+      g.fillStyle = '#0d6b3c'; g.fillRect(x+12,12,w-24,276);
+      g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeRect(x+28,28,w-56,244);
+      g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      if(pn.lines.length === 1){ g.font = `700 92px ${FONT}`; g.fillText(pn.lines[0], x+w/2, 118); }
+      else { g.font = `700 62px ${FONT}`; pn.lines.forEach((t, i) => g.fillText(t, x+w/2, 82 + i*70)); }
+      for(let c=pn.from; c<=pn.to; c++){
+        g.save(); g.translate(c*600+300, 222); g.rotate(pn.arrow || 0);
+        g.beginPath(); g.moveTo(0,38); g.lineTo(24,6); g.lineTo(9,6); g.lineTo(9,-34); g.lineTo(-9,-34); g.lineTo(-9,6); g.lineTo(-24,6); g.closePath(); g.fill();
+        g.restore();
+      }
+    });
   });
-  const mat = new THREE.MeshStandardMaterial({map:facade, roughness:.85});
+}
+// 트러스 문형 표지: 중심(cx,cz), 도로 방향(tx,tz), 판 폭 BW
+function gantry(tex, BW, cx, cz, tx, tz){
+  const grp = new THREE.Group(), rotY = Math.atan2(-tx, -tz);
+  const add = (geo, mat, x, y, z, sh = '') => { const m = new THREE.Mesh(geo, mat); m.position.set(x,y,z); m.castShadow = sh.includes('c'); grp.add(m); return m; };
+  add(new THREE.PlaneGeometry(BW,2.3), new THREE.MeshStandardMaterial({map:tex, roughness:.5}), 0,7,0);
+  add(new THREE.BoxGeometry(BW+.2,2.46,.1), galv, 0,7,-.07);
+  for(const x of [-(BW/2+.7), BW/2+.7]){ add(new THREE.CylinderGeometry(.24,.28,8.8,14), galv, x,4.4,-.4); add(new THREE.BoxGeometry(1,.25,1), footMat, x,.12,-.4); }
+  // 트러스: 위·아래 현재 + 사선 부재
+  for(const y of [6.1, 7.9]){ const c = add(new THREE.CylinderGeometry(.09,.09,BW+1.4,8), galv, 0,y,-.45); c.rotation.z = Math.PI/2; }
+  const n = Math.floor((BW+1.2)/1.6);
+  for(let i=0;i<n;i++){ const d = add(new THREE.CylinderGeometry(.04,.04,Math.hypot(1.6,1.8),6), galv, -n*.8 + i*1.6 + .8, 7, -.45); d.rotation.z = (i%2 ? 1 : -1)*Math.atan2(1.6,1.8); }
+  grp.position.set(cx, 0, cz); grp.rotation.y = rotY; MG.add(grp);
+}
+
+function buildMapScene(m){
+  MG = new THREE.Group();
+  seed = 7 + MAPS.indexOf(m)*977;
+  const N = m.lanes, H = m.half;
+
+  /* 도로까지 거리 → 지형 높이 */
+  const BUCKET = 70, buckets = new Map();
+  const put = (x,z) => { const k = Math.floor(x/BUCKET)+','+Math.floor(z/BUCKET); if(!buckets.has(k)) buckets.set(k, []); buckets.get(k).push([x,z]); };
+  for(let z=60; z>=-236; z-=4) put(0, z);
+  m.segs.forEach(e => { const L = e.vis.getLength(); for(let s=0; s<=L; s+=4){ const p = e.vis.getPointAt(s/L); put(p.x, p.z); } });
+  const roadDist = (x,z) => {   // 가장 가까운 도로 중심선까지 거리(최대 70m)
+    const bx = Math.floor(x/BUCKET), bz = Math.floor(z/BUCKET); let d2 = BUCKET*BUCKET;
+    for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){
+      const arr = buckets.get((bx+i)+','+(bz+j)); if(!arr) continue;
+      for(const p of arr){ const dx = p[0]-x, dz = p[1]-z, dd = dx*dx+dz*dz; if(dd < d2) d2 = dd; }
+    }
+    return Math.sqrt(d2);
+  };
+  const terrainH = (x,z) => {   // 도로 옆 16m까지는 평평, 70m까지 완만하게 올라 언덕
+    const t = clamp((roadDist(x,z) - 16)/54);
+    return -0.35 + t*t*(3-2*t) * (fbm(x*.011, z*.011)*46 - 9);
+  };
+
+  /* 지형 */
+  (() => {
+    const tg = new THREE.PlaneGeometry(2200, 2200, 220, 220); tg.rotateX(-Math.PI/2); tg.translate(0, 0, -300);
+    const tp = tg.attributes.position, cols = [], c = new THREE.Color();
+    const lush = lin('#41552c'), dry = lin('#7a744e'), rock = lin('#67655e');
+    for(let i=0;i<tp.count;i++){
+      const x = tp.getX(i), z = tp.getZ(i), y = terrainH(x,z); tp.setY(i, y);
+      c.copy(lush).lerp(dry, clamp((fbm(x*.03+50, z*.03)-.45)*2.4)*.7).lerp(rock, clamp((y-16)/14)*.5).multiplyScalar(.8 + .35*vnoise(x*.15, z*.15));
+      cols.push(c.r, c.g, c.b);
+    }
+    tg.setAttribute('color', new THREE.Float32BufferAttribute(cols,3)); tg.computeVertexNormals();
+    const terrain = new THREE.Mesh(tg, terrainMat); terrain.receiveShadow = true; MG.add(terrain);
+  })();
+
+  /* 본선: 포장 · 갓길 풀 · 바퀴 자국 */
+  const mainRoad = addMesh(new THREE.PlaneGeometry(H*2,275), asphalt);
+  mainRoad.rotation.x = -Math.PI/2; mainRoad.position.set(0,0,(40-235)/2);
+  const mainLine = curveOf([V(0,60), V(0,-236)], 50);
+  for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(40), mainLine, 0, 1, s*H, s*(H+3.6), -0.01, -0.45), verge);
+  for(let i=0;i<N;i++) for(const o of [-.85,.85]){ const t = addMesh(new THREE.PlaneGeometry(.75, 268), trackMat); t.rotation.x = -Math.PI/2; t.position.set(m.laneX(i)+o, .002, -94); }
+
+  /* 차선: 본선 점선 · 가장자리 실선 + 갈림 뒤 구간의 차로 사이 점선 (3m 칠 · 6m 빈칸, hud.js 미니 도로와 같은 간격) */
+  const arr = [];
+  const quad = (x0,z0,x1,z1,y) => arr.push(x0,y,z0, x1,y,z0, x0,y,z1, x1,y,z0, x1,y,z1, x0,y,z1);
+  for(let i=1;i<N;i++){ const x = m.laneX(i) - LANE/2; for(let z=38; z>-222; z-=9) quad(x-.075,z,x+.075,z-3,.01); }
+  for(const x of [-m.edgeX, m.edgeX]) quad(x-.08,40,x+.08,-228,.01);
+  const at = (c, u, off) => { const p = c.getPointAt(clamp(u)), t = c.getTangentAt(clamp(u)); return [p.x - t.z*off, p.z + t.x*off]; };
+  m.segs.forEach(e => {
+    const c = e.vis, Lv = c.getLength(), hw = e.k*LANE/2;
+    addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, -e.half, e.half, .003 + e.layer*.002), asphalt);
+    for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, s*e.half, s*(e.half+3.3), -0.02, -0.45), verge);
+    const inner = 30/Lv;   // 갈림 안쪽 가장자리는 갈림 뒤 약 30m부터
+    for(const [off, start] of [[-(hw+.5), e.outerL ? 0 : inner],[hw+.5, e.outerR ? 0 : inner]]) addMesh(fillRibbon(ribbonGeo(300), c, start, 1, off-.08, off+.08, .013), paint);
+    for(let i=1;i<e.k;i++){
+      const off = -hw + i*LANE;
+      for(let s=8; s<Lv-3; s+=9){
+        const [ax,az] = at(c, s/Lv, off-.075), [bx,bz] = at(c, s/Lv, off+.075), [cx,cz] = at(c, (s+3)/Lv, off-.075), [dx,dz] = at(c, (s+3)/Lv, off+.075);
+        arr.push(ax,.013,az, bx,.013,bz, cx,.013,cz, bx,.013,bz, dx,.013,dz, cx,.013,cz);
+      }
+    }
+  });
+  (() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr,3)); g.computeVertexNormals(); addMesh(g, paint); })();
+
+  /* 가드레일 · 지주 · 반사체 */
+  (() => {
+    const posts = [], refl = [], GX = H + .4;
+    for(const x of [-GX, GX]){
+      const b = addMesh(railBeam, steel); b.position.set(x, .45, -228); if(x > 0) b.scale.x = -1;   // 볼록한 면이 도로 쪽
+      for(let z=38; z>-228; z-=4){ posts.push([x + Math.sign(x)*.1, z]); if(((Math.round(z) % 20) + 20) % 20 === 18) refl.push([x - Math.sign(x)*.05, z]); }
+    }
+    const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(.1,.8,.14), galv, posts.length), d = new THREE.Object3D();
+    posts.forEach(([x,z],i) => { d.position.set(x,.4,z); d.updateMatrix(); pm.setMatrixAt(i, d.matrix); });
+    pm.receiveShadow = true; MG.add(pm);
+    const rm = new THREE.InstancedMesh(new THREE.BoxGeometry(.03,.09,.07), reflMat, refl.length);
+    refl.forEach(([x,z],i) => { d.position.set(x,.83,z); d.updateMatrix(); rm.setMatrixAt(i, d.matrix); });
+    MG.add(rm);
+  })();
+
+  /* 가로등: 양쪽에 엇갈려 */
+  for(const [x, z0] of [[H+1.5, 25], [-(H+1.5), 1]]) for(let z=z0; z>-225; z-=48){
+    const s = Math.sign(x);
+    const p = addMesh(lampGeo.pole, galv); p.position.set(x, 5, z);
+    const a = addMesh(lampGeo.arm, galv, ''); a.rotation.z = Math.PI/2; a.position.set(x - s*1.2, 9.95, z);
+    const h = addMesh(lampGeo.head, lampMat, ''); h.position.set(x - s*2.35, 9.9, z);
+  }
+
+  /* 분기점 표지판 (z = -150, 갈림 80m 앞): 출구마다 해당 차로 위에 패널, 차로마다 ↓ */
+  const panelOf = e => ({from:e.lanes[0], to:e.lanes[e.k-1], lines: e.node ? e.node.exits.map(c => c.dest) : [e.dest]});
+  gantry(signTex(N, m.exits.map(panelOf)), N*LANE*(13.8/10.5), 0, -150, 0, -1);
+  // 램프 위 두 번째 갈림 표지 (갈림 80m 앞, 칸마다 갈 방향 화살표)
+  m.segs.filter(e => e.node).forEach(e => {
+    const u = clamp((e.L - 80)/e.L), p = e.curve.getPointAt(u), t = e.curve.getTangentAt(u);
+    const panels = e.node.exits.map((c, i) => ({from:i, to:i, lines:[c.dest], arrow: c.key === 'L' ? Math.PI*.75 : c.key === 'R' ? -Math.PI*.75 : Math.PI}));
+    gantry(signTex(panels.length, panels), 9.2, p.x, p.z, t.x, t.z);
+  });
+
+  /* 갈림목 코(gore)마다 노란 충격흡수대 */
+  const goreAt = (node, z0) => {
+    const samples = node.exits.map(e => Array.from({length:500}, (_,i) => e.vis.getPointAt(i/499)));
+    const xAt = (i,z) => { let best = samples[i][0]; for(const p of samples[i]) if(Math.abs(p.z-z) < Math.abs(best.z-z)) best = p; return best.x; };
+    for(let a=0; a<node.exits.length-1; a++){
+      const need = node.exits[a].half + node.exits[a+1].half + 1.8;
+      for(let z=z0-6; z>z0-120; z-=1){
+        const xa = xAt(a,z), xb = xAt(a+1,z);
+        if(xb - xa < need) continue;
+        const g = new THREE.Mesh(new THREE.BoxGeometry(.9,.95,2.4), goreMats);
+        const mx = (xa+xb)/2, dx = (xAt(a,z-6)+xAt(a+1,z-6))/2 - mx;   // 6m 앞 가운데선 쪽으로 향함
+        g.position.set(mx, .47, z - 1.2); g.rotation.y = Math.atan2(-dx, 6);
+        g.castShadow = g.receiveShadow = true; MG.add(g); break;
+      }
+    }
+  };
+  goreAt(m, FORK_Z);
+  m.segs.filter(e => e.node).forEach(e => goreAt(e.node, e.node.pt[1]));
+
+  /* 나무 */
+  (() => {
+    const spots = [];
+    for(let k=0; k<60000 && spots.length<5200; k++){
+      const x = (rnd()-.5)*1000, z = 90 - rnd()*900;
+      if(roadDist(x,z) < 13 || Math.hypot(x, z+150) < 14) continue;
+      if(fbm(x*.02+3, z*.02) < .33) continue;                             // 숲 덩어리와 빈 들판
+      spots.push([x, terrainH(x,z) - .2, z]);
+    }
+    const d = new THREE.Object3D(), c = new THREE.Color();
+    treeKinds.forEach(({geo, mat, depth, hMin, hVar}, ti) => {
+      const list = spots.filter((_,i) => (hash2(i, 3) < .7) === (ti === 0));   // 침엽 70% · 활엽 30%
+      const im = new THREE.InstancedMesh(geo, mat, list.length);
+      im.customDepthMaterial = depth;
+      list.forEach(([x,y,z],i) => {
+        const s = hMin + rnd()*hVar; d.position.set(x,y,z); d.rotation.set(0, rnd()*6.3, 0); d.scale.set(s*(.85+rnd()*.3), s, s*(.85+rnd()*.3)); d.updateMatrix();
+        im.setMatrixAt(i, d.matrix); im.setColorAt(i, c.setRGB(.8+rnd()*.35, .85+rnd()*.3, .75+rnd()*.3));
+      });
+      im.castShadow = im.receiveShadow = true; MG.add(im);
+    });
+  })();
+
+  /* 먼 아파트 단지 */
   for(const [cx, cz, n] of [[-330,-760,9],[400,-720,8],[60,-990,7]]) for(let i=0;i<n;i++){
     const w = 34+rnd()*14, h = 55+rnd()*45, x = cx+(rnd()-.5)*220, z = cz+(rnd()-.5)*120;
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w,h,13), mat); b.position.set(x, terrainH(x,z) + h/2 - 2, z); b.rotation.y = (rnd()-.5)*.5; scene.add(b);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w,h,13), facadeMat); b.position.set(x, terrainH(x,z) + h/2 - 2, z); b.rotation.y = (rnd()-.5)*.5; MG.add(b);
   }
-})();
+
+  const g = MG; MG = null; return g;
+}
+
+const builtMaps = {};
+function showMap(m){
+  if(!builtMaps[m.id]){ builtMaps[m.id] = buildMapScene(m); scene.add(builtMaps[m.id]); }
+  Object.entries(builtMaps).forEach(([id, g]) => g.visible = id === m.id);
+}
+// 멈춰 있을 때 남은 맵을 미리 지어 둔다 (맵을 바꿀 때 멈칫하지 않게)
+function prebuildMaps(isIdle){
+  const next = MAPS.find(m => !builtMaps[m.id]);
+  if(!next) return;
+  setTimeout(() => {
+    if(isIdle()){ const g = buildMapScene(next); g.visible = false; builtMaps[next.id] = g; scene.add(g); }
+    prebuildMaps(isIdle);
+  }, 400);
+}
 
 /* ---------- 차량 ---------- */
 // 옆모습 윤곽(s=앞뒤, y=높이)을 옆으로 밀어낸 차체 + 유리 캐빈 + C필러 + 바퀴 + 등화.
@@ -485,35 +543,6 @@ const QTYPES = ['sedan','suv','hatch','sedan','truck','suv','sedan','hatch','suv
 const QCOLORS = ['#f4f5f4','#1c1e22','#a4a9af','#f4f5f4','#f4f5f4','#5b6169','#233b5c','#f4f5f4','#7d2222','#c9ccd0','#f4f5f4','#2e3440','#f4f5f4'];
 const queueCars = Array.from({length:22}, (_,i) => makeCar(QTYPES[i%QTYPES.length], QCOLORS[i%QCOLORS.length], true));
 
-// 고스트카: AR-HUD가 도로 위에 띄운 가상 선행 차량(반투명 청록 + 윤곽선). 세단 윤곽을 그대로 쓴다.
-// 유리에 맺힌 상이라 실제 물체에 가려지지 않는다 → depthTest 끔. 색은 HUD와 같게(톤매핑 끔). 움직임은 main.js updateGhost()
-const ghost = (() => {
-  const g = new THREE.Group(), T = CAR_TYPES.sedan, over = {transparent:true, depthTest:false, depthWrite:false, toneMapped:false};
-  const fill = new THREE.MeshBasicMaterial({color:lin(C_NOW), opacity:.2, ...over});
-  const edge = new THREE.LineBasicMaterial({color:lin('#a8f6ff'), opacity:.95, ...over});
-  const shells = [profileGeo(T.body, T, T.W, false, true), profileGeo(T.cabin, T, T.W - .34, false, false)];
-  shells.forEach(s => g.add(new THREE.Mesh(s, fill), new THREE.LineSegments(new THREE.EdgesGeometry(s, 20), edge)));
-  for(const s of [T.wf, T.wr]) for(const sx of [-1,1]){
-    const w = new THREE.LineSegments(new THREE.EdgesGeometry(tireGeo(T.r), 30), edge); w.position.set(sx*(T.W/2 - .13), T.r, -s); g.add(w);
-  }
-  const glow = new THREE.Mesh(new THREE.PlaneGeometry(3.4,6.4), new THREE.MeshBasicMaterial({map:radialTex('70,230,255',.5), ...over}));
-  glow.rotation.x = -Math.PI/2; glow.position.y = .03; g.add(glow);
-  // 뒷면 등화: 방향지시(주황) 좌·우, 미등/브레이크(빨강)
-  const lamp = (hex, lx) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(.36,.16,.05), new THREE.MeshBasicMaterial({color:lin(hex), opacity:0, ...over}));
-    m.position.set(lx, T.tail, T.tz + .02); g.add(m); return m.material;
-  };
-  // 방향지시등은 22m 밖에서 몇 픽셀뿐이라 번짐을 붙여 '옮기려는 중'이 멀리서도 보이게
-  const amber = radialTex('255,176,32',.9);
-  const blinker = lx => {
-    const halo = new THREE.Mesh(new THREE.PlaneGeometry(1.3,1.3), new THREE.MeshBasicMaterial({map:amber, opacity:0, blending:THREE.AdditiveBlending, ...over}));
-    halo.position.set(lx, T.tail, T.tz + .06); g.add(halo);
-    return [lamp('#ffb020', lx), halo.material];
-  };
-  g.userData = {blinkL:blinker(-.74), blinkR:blinker(.74), brakeL:lamp('#ff3030',-.36), brakeR:lamp('#ff3030',.36)};
-  g.children.forEach(o => o.renderOrder = 10); glow.renderOrder = 9;
-  g.visible = false; scene.add(g); return g;
-})();
 
 /* ---------- 매 프레임 렌더: 하늘은 카메라를 따라가고, 그림자 범위는 카메라 앞 35m를 중심으로 ---------- */
 const _fwd = new THREE.Vector3();
