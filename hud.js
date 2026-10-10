@@ -25,9 +25,13 @@ function taperLine(ax, ay, bx, by, wa, wb){
   const P = [[ax+nx*wa, ay+ny*wa], [bx+nx*wb, by+ny*wb], [bx-nx*wb, by-ny*wb], [ax-nx*wa, ay-ny*wa]];
   return 'M' + P.map(q => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L') + 'Z';
 }
+// 납작한 호(타원 rx × ry), 각도 a0 → a1 시계 방향 (0° = 오른쪽, 90° = 아래)
+const arcE = (cx, cy, rx, ry, a0, a1) => { const p = a => [cx + rx*Math.cos(a*Math.PI/180), cy + ry*Math.sin(a*Math.PI/180)]; const [x0,y0] = p(a0), [x1,y1] = p(a1); return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${rx} ${ry.toFixed(1)} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
 const arcPath = (cx, cy, r, a0, a1) => { const p = a => [cx + r*Math.cos(a*Math.PI/180), cy + r*Math.sin(a*Math.PI/180)]; const [x0,y0] = p(a0), [x1,y1] = p(a1); return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
 function navMarkup(){
-  const waves = [[28, 5, 1], [44, 4.2, .7], [60, 3.4, .42]].map(([r, w, o]) => `<path d="${arcPath(421.7, 247, r, -100, -12)}" fill="none" stroke="${HY.red}" stroke-width="${w}" stroke-opacity="${o}" stroke-linecap="round"/>`).join('');
+  // 후측방 경고 물결: 사진처럼 오른쪽 차선 위 한 점(445, 219)에서 바깥 · 뒤(오른쪽 아래)로 퍼지는 납작한 호 3겹 — 뒤에서 오는 차 쪽을 가리킴.
+  // (v3 ~ v3.1은 차로 안쪽에서 앞 · 위로 퍼져 앞쪽 경고처럼 보였음)
+  const waves = [[22, 5, 1], [37, 4.2, .7], [52, 3.4, .42]].map(([r, w, o]) => `<path d="${arcE(445, 219, r, r*.72, -40, 75)}" fill="none" stroke="${HY.red}" stroke-width="${w}" stroke-opacity="${o}" stroke-linecap="round"/>`).join('');
   return `<g id="nvAll" transform="translate(${NV_ANCHOR[0]} ${NV_ANCHOR[1]}) scale(${NV_SCALE}) translate(${-NV_ANCHOR[0]} ${-NV_ANCHOR[1]})">
     <defs>
       <linearGradient id="nvLineL" gradientUnits="userSpaceOnUse" x1="97" y1="248" x2="262" y2="102"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".3" stop-color="#fff" stop-opacity=".95"/><stop offset="1" stop-color="#fff" stop-opacity=".7"/></linearGradient>
@@ -113,13 +117,16 @@ function drawNav(p, f, C, kmh, remainKm, dangerOn){
   // 차로 안내: 첫 갈림 전 본선에서만 (램프 위 ⑤ 두 번째 갈림엔 없음)
   $('#nvLanes').style.display = before && C.i === 0 ? '' : 'none';
   nvLaneEls.forEach((l, i) => { const c = R.exitLanes.includes(i) ? HY.blue : HY.grey; l.stem.setAttribute('stroke', c); l.head.setAttribute('fill', c); });
-  // 주변 차: 시뮬레이터의 정체 줄 차 · 옆 차로 차를 내 차 기준(앞 거리 d, 옆 차로)으로
-  const rx = -f.z, rz = f.x, cars = [];
-  queueCars.concat([otherCar]).forEach(c => {
+  // 주변 차: 시뮬레이터의 정체 줄 차 · 옆 차로 차를 내 차 기준(앞 거리 d, 옆 차로)으로. 주행 테스트는 실제 교통 전부
+  // 실제 HUD처럼 차로 칸(왼쪽 · 내 차로 · 오른쪽)에 맞춰 놓는다 — 내 차가 보는 방향 기준으로 두면 핸들을 조금만 틀어도
+  // 먼 차가 옆으로 크게 밀려(60m 앞이면 3°에 약 3m) 고정된 차선 그림 밖으로 나감 (D63). 본선은 차로 번호 차, 갈림 뒤는 반올림
+  const rx = -f.z, rz = f.x, cars = [], onMain = p.z > FORK_Z, myLane = laneOf(S.map, p.x);
+  queueCars.concat(S.drive ? flowCars : [otherCar]).forEach(c => {
     if(!c.visible) return;
-    const dx = c.position.x - p.x, dz = c.position.z - p.z, d = dx*f.x + dz*f.z - 2.3, lat = dx*rx + dz*rz;
-    if(d < 3 || d > 90 || Math.abs(lat) > LANE*1.5) return;
-    cars.push({d, lat});
+    const dx = c.position.x - p.x, dz = c.position.z - p.z, main = onMain && c.position.z > FORK_Z - 20;
+    const d = (main ? -dz : dx*f.x + dz*f.z) - 2.3, k = main ? laneOf(S.map, c.position.x) - myLane : Math.round((dx*rx + dz*rz)/LANE);
+    if(d < 3 || d > 90 || Math.abs(k) > 1) return;
+    cars.push({d, lat:k*LANE});
   });
   // 차로마다 가까운 3대까지 (실제 HUD처럼 가까운 차만), 먼 차부터 그려 가까운 차가 위에
   const perLane = {}, near = cars.sort((a, b) => a.d - b.d).filter(c => { const k = Math.round(c.lat/LANE); perLane[k] = (perLane[k]||0) + 1; return perLane[k] <= 3; }).reverse();
@@ -132,9 +139,9 @@ function drawNav(p, f, C, kmh, remainKm, dangerOn){
     el.top.setAttribute('d', `M${(x-w/2+ins).toFixed(1)} ${(yb-h-t).toFixed(1)}H${(x+w/2-ins).toFixed(1)}L${(x+w/2).toFixed(1)} ${(yb-h+2*s).toFixed(1)}H${(x-w/2).toFixed(1)}Z`);
   });
   $('#nvSpd').textContent = kmh;
-  // 후측방 경고: 옮기려는 쪽에 빨간 물결
-  $('#nvBcwL').setAttribute('opacity', dangerOn && R.side < 0 ? 1 : 0);
-  $('#nvBcwR').setAttribute('opacity', dangerOn && R.side > 0 ? 1 : 0);
+  // 후측방 경고: 시연은 옮기려는 쪽에 빨간 물결, 주행 테스트는 실제 BCW처럼 양쪽 각각 (drive.js hudThreat)
+  $('#nvBcwL').setAttribute('opacity', (S.drive ? S.bswL : dangerOn && R.side < 0) ? 1 : 0);
+  $('#nvBcwR').setAttribute('opacity', (S.drive ? S.bswR : dangerOn && R.side > 0) ? 1 : 0);
 }
 
 /* ---------- 우리 HUD: 미니 도로 투영 (v1.4: 글자를 뺀 자리만큼 위·옆으로 키움, y 88~228 · 반폭 126) ---------- */
@@ -198,8 +205,8 @@ function resetHud(){ AS.icon = null; AS.doneUntil = 0; AS.wasMove = false; }
 function drawAr(p, f, C, k, dangerOn, kmh){
   const m = S.map, R = S.route, st = C.st, onMain = C.i === 0;
   const proj = makeProj(p, f), tx = R.tx, sgn = R.side, now = performance.now();
-  // 뒤차 판단: 시연은 다가오는 차가 내 옆을 지나갈 때까지, 테스트는 위험한 경우
-  const block = S.rearActive && (S.testing ? S.rearDanger : (S.rearGap < 45 && S.rearGap > -8));
+  // 뒤차 판단: 시연은 다가오는 차가 내 옆을 지나갈 때까지, 주행 테스트는 실제 옆 차로 차가 위험할 때 (drive.js hudThreat)
+  const block = S.drive ? S.rearBlock : S.rearActive && S.rearGap < 45 && S.rearGap > -8;
   const warn = block || S.danger > .5, inLane = !onMain || Math.abs(p.x - tx) < 1.2;
   const tail = onMain && S.jam > 0 && S.q && S.q.backZ !== null ? S.q.backZ : null;
   const needMove = onMain && !inLane && st <= 3;
@@ -298,14 +305,16 @@ function drawAr(p, f, C, k, dangerOn, kmh){
   $('#slot').setAttribute('opacity', (.7 + .3*Math.sin(now/260)).toFixed(2));
   let gapD = '';
   if(besideQueue && S.q.mergeNear){
-    const zs = queueCars.filter(c => c.visible).map(c => c.position.z).sort((a,b) => b-a);
+    const zs = queueCars.filter(c => c.visible && Math.abs(c.position.x - tx) < 1).map(c => c.position.z).sort((a,b) => b-a);   // 들어갈 차로의 줄만 (주행 테스트는 두 차로 줄도 있음)
     for(let i=0;i<zs.length-1;i++){ if(zs[i]-zs[i+1] > Q_MERGE){ const m = (zs[i]+zs[i+1])/2; if(Math.abs(m - p.z) < 16){ gapD = quadZ(tx-1.45, tx+1.45, m+1.6, m-1.6, proj); break; } } }
   }
   $('#gapMark').setAttribute('d', gapD);
   // 차량: 정체 줄(주황 테) · 뒤에서 와 앞으로 지나간 차(빨강)
   const vs = [];
   if(tail !== null) queueCars.forEach(c => { if(c.visible) vs.push({x:c.position.x, z:c.position.z, q:true}); });
-  if(otherCar.visible) vs.push({x:otherCar.position.x, z:otherCar.position.z, q:false});
+  const rc = S.drive ? S.threatCar && S.threatCar.mesh : otherCar.visible && otherCar;   // 주행 테스트: 옮길 쪽 차로의 가장 가까운 차
+  if(rc) vs.push({x:rc.position.x, z:rc.position.z, q:false});
+  vs.sort((a, b) => Math.abs(a.z - p.z) - Math.abs(b.z - p.z));   // 칸(24)이 모자라면 가까운 차부터
   vehEls.forEach((r,i) => {
     const v = vs[i], a = v && proj(v.x, v.z+2.25), b = v && proj(v.x, v.z-2.25), c = v && proj(v.x, v.z);
     if(!a || !b || !c){ r.setAttribute('opacity', 0); return; }
@@ -319,7 +328,7 @@ function drawAr(p, f, C, k, dangerOn, kmh){
   const dz = Math.max(S.danger, warn && S.rearActive ? .7 : 0), cb = $('#carBehind');
   $('#edgeL').setAttribute('opacity', sgn < 0 ? S.danger*.8 : 0);
   $('#edgeR').setAttribute('opacity', sgn > 0 ? S.danger*.8 : 0);
-  const behind = S.rearActive && !otherCar.visible || (S.rearActive && S.rearGap > 0);
+  const behind = S.drive ? S.rearActive && S.rearGap > -3 : S.rearActive && !otherCar.visible || (S.rearActive && S.rearGap > 0);
   cb.setAttribute('opacity', (behind && sgn !== 0 && !inLane ? dz*(.85 + .15*Math.sin(now/170)) : 0).toFixed(2));   // 맥박 바닥을 높여 늘 대비 3:1 이상
   cb.setAttribute('transform', `translate(${(HX + sgn*LANE*PXM).toFixed(1)} 222) scale(${(0.8 + dz*.45).toFixed(2)})`);   // 옆 차로 한가운데
 

@@ -39,7 +39,7 @@
   </div>
 
   <div class="group" id="scenario">
-    <h2>시연 상황 <span class="hint">· 테스트는 맵을 섞어 한 바퀴씩</span></h2>
+    <h2>시연 상황 <span class="hint">· 주행 테스트는 맵 · 상황이 랜덤</span></h2>
     <div class="seg" id="mapSeg">
       <button data-m="Y3" aria-pressed="true"><b>①</b>세 갈래</button>
       <button data-m="ICR" aria-pressed="false"><b>②</b>IC 진출</button>
@@ -58,7 +58,7 @@
 
   <div class="actions">
     <button class="btn primary" id="demoSide">시연 보기</button>
-    <button class="btn" id="testSide">판단 테스트</button>
+    <button class="btn" id="testSide">주행 테스트</button>
     <button class="btn" id="pauseBtn">일시정지</button>
     <button class="btn" id="logBtn">기록 <span id="logCount">0</span></button>
   </div>
@@ -207,48 +207,50 @@
     </div>
   </div>
 
-  <!-- 질문 카드: 방향은 화살표 그림만(키보드 화살표와 같음), 뒤차 질문은 ‖ 기다림 / ▶ 옮김 (키는 그대로 ↑ / →) -->
-  <div class="overlay" id="quiz" hidden>
+  <!-- 주행 테스트 진행 카드: 참가자 ID · 판 결과 · 쉬는 화면 · 요약 (내용은 session.js sesCard) -->
+  <div class="overlay" id="sess" hidden>
     <div class="card">
-      <h2 id="quizTitle">어느 쪽?</h2>
-      <div class="choices icons" id="choicesBranch">
-        <button data-c="0" data-ico="L" aria-label="왼쪽"></button>
-        <button data-c="1" data-ico="S" aria-label="직진"></button>
-        <button data-c="2" data-ico="R" aria-label="오른쪽"></button>
-      </div>
-      <div class="choices two icons" id="choicesDanger" hidden>
-        <button data-a="wait" data-ico="wait">기다림<kbd>↑</kbd></button>
-        <button data-a="go" data-ico="play">옮김<kbd>→</kbd></button>
+      <div class="card-head"><span id="sesIcon"></span><h2 id="sesTitle"></h2></div>
+      <div id="sesBody"></div>
+      <div class="row">
+        <button class="btn primary" id="sesBtn"></button>
+        <button class="btn" id="sesBtn2" hidden></button>
       </div>
     </div>
   </div>
-  <div id="toast" hidden></div>
+  <!-- 주행 테스트: 3 · 2 · 1 과 키 안내 -->
+  <div id="count" hidden>3</div>
+  <div id="keyHint" hidden><span><kbd>←</kbd><kbd>→</kbd> 핸들</span><span><kbd>↑</kbd> 가속</span><span><kbd>↓</kbd> 브레이크</span></div>
 </main>
 </div>
 
-<aside id="drawer" aria-label="판단 테스트 기록">
-  <header><h2>판단 테스트 기록</h2><button class="btn" id="closeDrawer">닫기</button></header>
-  <label>참가자 <input type="text" id="pid" value="P1" autocomplete="off"></label>
+<aside id="drawer" aria-label="주행 테스트 기록">
+  <header><h2>주행 테스트 기록</h2><button class="btn" id="closeDrawer">닫기</button></header>
+  <label>다음 참가자 <input type="text" id="pid" value="P1" autocomplete="off"></label>
   <div id="summary"></div>
   <div class="tablewrap"><table>
-    <thead><tr><th>참가자</th><th>HUD</th><th>시간대</th><th>맵</th><th>상황</th><th>정답</th><th>선택</th><th>결과</th><th>시간(초)</th></tr></thead>
+    <thead><tr><th>참가자</th><th>HUD</th><th>맵</th><th>상황</th><th>결과</th><th>옮긴 지점(m)</th><th>반응(초)</th><th>위험</th><th>이탈</th><th>시간(초)</th></tr></thead>
     <tbody id="logBody"></tbody>
-  </table><div class="empty" id="logEmpty">아직 기록이 없습니다. 판단 테스트를 시작하면 여기에 쌓입니다.</div></div>
-  <textarea id="csvBox" hidden readonly></textarea>
+  </table><div class="empty" id="logEmpty">아직 기록이 없습니다. 주행 테스트를 하면 여기에 쌓입니다.</div></div>
   <div class="row">
-    <button class="btn" id="copyCsv">CSV 복사</button>
+    <button class="btn" id="allXlsx">엑셀 (전체)</button>
+    <button class="btn" id="oldCsv" hidden>예전 클릭 기록</button>
     <button class="btn" id="clearLog">기록 지우기</button>
   </div>
 </aside>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<!-- 순서 중요: 상수 → 맵 → 3D장면 → 실내 → HUD → 로직 -->
+<!-- 엑셀 내보내기: SheetJS 0.18.5 (Apache-2.0). 못 불러오면 session.js가 CSV로 대신 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- 순서 중요: 상수 → 맵 → 3D장면 → 실내 → HUD → 주행 → 로직 → 주행 테스트 진행 -->
 <script src="config.js"></script>
 <script src="maps.js"></script>
 <script src="scene.js"></script>
 <script src="cabin.js"></script>
 <script src="hud.js"></script>
+<script src="drive.js"></script>
 <script src="main.js"></script>
+<script src="session.js"></script>
 <script src="explain.js"></script>
 </body>
 </html>

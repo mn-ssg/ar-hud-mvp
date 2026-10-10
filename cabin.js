@@ -104,7 +104,7 @@ const cKey = new THREE.DirectionalLight(lin('#ffffff'), 1.15); cKey.position.set
 const cFill = new THREE.DirectionalLight(lin('#ffffff'), .45); cFill.position.set(-1, .9, .9); cabin.add(cFill, cFill.target);
 const cGlow = new THREE.PointLight(lin('#a9c6ff'), 0, .9, 2); cGlow.position.set(-.05, -.18, -.66); cabin.add(cGlow);
 
-/* ---------- 화면 내용 (글자는 최소, 실제 차 화면처럼. 내비 지도 없음 — 판단 테스트에 다른 단서가 생기지 않게) ---------- */
+/* ---------- 화면 내용 (글자는 최소, 실제 차 화면처럼. 내비 지도 없음 — 주행 테스트에 다른 단서가 생기지 않게) ---------- */
 const CF = '"Pretendard Variable","Pretendard",' + FONT;
 let cabinNight = false, lastKmh = -1, lastMin = -1;
 const two = n => String(n).padStart(2, '0');
