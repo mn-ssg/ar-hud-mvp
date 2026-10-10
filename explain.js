@@ -6,22 +6,23 @@
 (() => {
   const btn = $('#explainBtn'), cabEl = $('#cab'), layer = $('#explain'), desc = $('#modeDesc');
   const MODE_DESC = {
-    ar: '초보자용 정보 위계 — 지금 할 한 가지 → 언제 → 어디로 → 속도',
-    nav: '현대·기아 순정 HUD 구성을 재현한 비교 기준'
+    ar: '초보자용 정보 위계 — 들어갈 차로·경로 → 갈 방향 → 다음 행동까지 → 속도. 상태는 글자 없이 차로 강조·막대 길이와 색으로',
+    nav: '현대 HUD 화면을 그대로 재현한 비교 기준(대조군)'
   };
   // side: 이름표를 HUD 왼쪽/오른쪽 어디에 둘지
   const NOTES = {
     ar: [
-      {sel:'#act', n:'1', t:'지금 할 한 가지', s:'아이콘 + 한 단어 · 신호등 색', side:'L'},
-      {sel:'#cd', n:'2', t:'언제까지', s:'남은 시간 막대 · 숫자 없음', side:'R'},
-      {sel:'#laneFill', n:'3', t:'어디로', s:'내 차로 · 옮길 방향 · 주변 차', side:'L'},
-      {sel:'#info', n:'4', t:'속도', s:'작게 — 거리·방면은 계기판 몫', side:'R'}
+      {sel:'#laneFill', n:'1', t:'들어갈 차로 · 경로', s:'가장 크고 진하게 · 화살표가 상태', side:'L'},
+      {sel:'#act', n:'2', t:'갈 방향', s:'다음 갈림에서 갈 쪽 · 글자 없음', side:'L'},
+      {sel:'#cd', n:'3', t:'다음 행동까지', s:'길이 = 남은 거리 · 색 = 여유', side:'R'},
+      {sel:'#info', n:'4', t:'속도', s:'작고 흐리게 — 보조 정보', side:'R'}
     ],
     nav: [
-      {sel:'#nvFork', t:'주행 경로 안내', s:'분기 그림 · 거리 · 방면', side:'L'},
-      {sel:'#nvLanes', t:'차로 안내', s:'권장 차로를 파랑으로', side:'R'},
-      {sel:'#nvSpd', t:'차속', s:'가운데 크게', side:'L'},
-      {sel:'#navHud circle', t:'도로 정보', s:'제한속도', side:'R'}
+      {sel:'#nvTbt', t:'경로 안내', s:'회전 화살표 · 거리 · 목적지', side:'L'},
+      {sel:'#nvLanes', t:'차로 안내', s:'권장 차로 화살표를 파랑으로', side:'R'},
+      {sel:'#nvLimit', t:'제한속도', s:'왼쪽', side:'L'},
+      {sel:'#nvRoad', t:'주변 차량 · 차로 유지', s:'옆 차로 · 앞차 · 초록 핸들', side:'R'},
+      {sel:'#nvSpd', t:'차속 · 주행 보조', s:'크게 아래 · HDA · 설정 속도', side:'R'}
     ]
   };
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -69,7 +70,7 @@
       out += `<circle cx="${ax}" cy="${ay}" r="3.5" fill="#ffffff"/>`;
       out += `<g transform="translate(${it.lx} ${it.ly})"><rect width="${W}" height="${H}" rx="12" fill="#0c1016" fill-opacity=".86" stroke="#ffffff" stroke-opacity=".16"/>`;
       const tx = n.n ? 44 : 14;
-      if(n.n) out += `<circle cx="24" cy="${H/2}" r="12" fill="#46e6ff"/><text x="24" y="${H/2+4.5}" text-anchor="middle" font-size="13" font-weight="800" fill="#0c1016">${n.n}</text>`;
+      if(n.n) out += `<circle cx="24" cy="${H/2}" r="12" fill="${C_NOW}"/><text x="24" y="${H/2+4.5}" text-anchor="middle" font-size="13" font-weight="800" fill="#0c1016">${n.n}</text>`;
       out += `<text x="${tx}" y="22" font-size="14" font-weight="700" fill="#ffffff">${esc(n.t)}</text>`;
       out += `<text x="${tx}" y="40" font-size="12" fill="#b8c4d0">${esc(n.s)}</text></g>`;
     });

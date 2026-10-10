@@ -37,7 +37,7 @@ function navCtx(s){
 /* ---------- 상태 ---------- */
 const S = {mode:'ar', map:null, route:null, target:0, startLane:1, running:false, paused:false, s:40, testing:false, asked:false, t0:0,
   fill:0, danger:0, car:null, lastTrial:null, jam:0, speedFactor:1, q:null, jamHoldT:0, streak:0, qIdx:0, qS:0,
-  qType:'branch', rearDanger:false, rearDist:0, rearGap:56, rearActive:false, demoMap:'Y3', demoTarget:2, demoJam:0};
+  qType:'branch', rearDanger:false, rearDist:0, rearGap:56, rearActive:false, demoMap:'Y3', demoTarget:2, demoJam:0, light:'day'};
 let path = null;
 const pick = a => a[Math.floor(Math.random()*a.length)];
 const mapLabel = id => { const m = mapById(id); return m ? `${m.no} ${m.name}` : '-'; };
@@ -57,6 +57,15 @@ function setTarget(i, lane){
   S.fill = 0; S.danger = 0; S.jamHoldT = 0;
   S.car = null; otherCar.visible = false;
   resetHud();
+}
+// 주간 · 야간: 3D 장면(scene.js) + HUD 밤 밝기(hud.css .night) + 페이지 다크 테마(styles.css [data-light])
+function setLight(l){
+  S.light = l; const night = l === 'night';
+  document.documentElement.dataset.light = l;
+  $('#cab').classList.toggle('night', night);
+  setSceneLight(night); setCabinLight(night);
+  $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임
+  $$('#lightSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.light === l)));
 }
 function setMode(m){
   S.mode = m;
@@ -84,13 +93,24 @@ function renderScenario(){
 // 시연 중에 시연 상황을 바꾸면 시연을 멈추고 바로 바꾼다 (판단 테스트 중에는 잠금)
 function stopDemo(){
   if(S.testing) return false;
-  if(S.running){ S.running = false; S.paused = false; $('#pauseBtn').textContent = '일시정지'; $('#cardTitle').style.color = ''; $('#demoBtn').textContent = '시연 보기'; $('#testBtn').textContent = '판단 테스트'; $('#intro').hidden = false; }
+  if(S.running){ S.running = false; S.paused = false; $('#pauseBtn').textContent = '일시정지'; setCard({title:mapLabel(S.demoMap)}); $('#intro').hidden = false; }
   return true;
 }
 function prepDemo(){
   loadMap(mapById(S.demoMap)); renderScenario();
   S.jam = S.demoJam; setTarget(S.demoTarget);
-  if(!S.running){ $('#cardTitle').style.color = ''; }
+}
+
+/* ---------- 안내 카드: 아이콘 + 짧은 말 ----------
+   tone: '' | 'ok' | 'bad'. chips: 짧은 꼬리표(아이콘 HTML 허용). 버튼은 [아이콘, 한 단어] */
+const btnSet = (el, [icon, word]) => { el.innerHTML = ico(icon) + `<span>${word}</span>`; };
+function setCard({icon = '', tone = '', title, chips = [], demo = ['play','시연'], test = ['test','테스트']}){
+  $('#cardIcon').innerHTML = icon ? ico(icon) : '';
+  $('#cardIcon').className = icon ? 'card-icon ' + tone : '';
+  $('#cardTitle').textContent = title;
+  $('#cardText').innerHTML = chips.map(c => `<span class="chip">${c}</span>`).join('');
+  $('#cardText').hidden = !chips.length;
+  btnSet($('#demoBtn'), demo); btnSet($('#testBtn'), test);
 }
 
 /* ---------- 정체 대기열 ----------
@@ -122,15 +142,13 @@ function updateQueue(p, dt){
 
 /* ---------- 핸들 ----------
    곡률을 바로 쓰면 경로 제어점마다 각도가 튀어서, 1초 앞 지점을 겨누는 방식(pure pursuit)으로 부드럽게.
-   판단 테스트 질문 시점(갈림 150m 앞)까지는 경로가 곧아 0° → 핸들이 정답을 흘리지 않는다. */
-const wheelTurn = $$('#wheel .turn');
+   판단 테스트 질문 시점(갈림 150m 앞)까지는 경로가 곧아 0° → 핸들이 정답을 흘리지 않는다. 3D 핸들은 cabin.js */
 let steer = 0;
 function updateWheel(p, f, dt){
   const q = path.curve.getPointAt(clamp((S.s + STEER_LOOK)/path.L));
   const dx = q.x - p.x, dz = q.z - p.z, sinA = (f.x*dz - f.z*dx)/(Math.hypot(dx,dz)||1); // + = 오른쪽
   const deg = Math.atan(2*WHEELBASE*sinA/STEER_LOOK)*STEER_RATIO*STEER_GAIN*180/Math.PI;
   steer += (deg - steer)*Math.min(1, dt*4);
-  wheelTurn.forEach(g => g.setAttribute('transform', `rotate(${steer.toFixed(2)} 200 200)`));
 }
 
 /* ---------- 매 프레임 ---------- */
@@ -150,7 +168,9 @@ function update(dt){
   const u = clamp(S.s/path.L);
   const p = path.curve.getPointAt(u), f = path.curve.getTangentAt(u);
   const ahead = path.curve.getPointAt(clamp((S.s+22)/path.L));
-  camera.position.set(p.x,1.25,p.z); camera.lookAt(ahead.x,1.05,ahead.z);
+  // 운전자 눈: 차 중심(p)에서 왼쪽으로 DRIVER_X (좌핸들). 보는 방향은 차 진행 방향과 나란히
+  const lx = f.z*DRIVER_X, lz = -f.x*DRIVER_X;
+  camera.position.set(p.x + lx, EYE_Y, p.z + lz); camera.lookAt(ahead.x + lx, EYE_Y - .2, ahead.z + lz);
   updateWheel(p, f, dt);
 
   const C = navCtx(S.s), k = Math.min(1, dt*4), R = S.route;
@@ -196,7 +216,8 @@ function update(dt){
   const remainKm = Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1);
 
   if(S.mode === 'ar') drawAr(p, f, C, k, dangerOn, kmh);
-  else drawNav(C, kmh, remainKm, dangerOn);
+  else drawNav(p, f, C, kmh, remainKm, dangerOn);
+  updateCabin(steer, kmh);
 }
 
 let prev = performance.now();
@@ -250,7 +271,7 @@ function start(testing){
   qShift = 0;
   $('#scenario').style.opacity = testing ? '.4' : '';   // 테스트 중엔 시연 설정 비활성 느낌
   $$('#scenario button').forEach(b => b.disabled = testing);
-  $$('#modeSeg button').forEach(b => b.disabled = testing);
+  $$('#modeSeg button, #lightSeg button').forEach(b => b.disabled = testing);
   S.running = true; S.paused = false; $('#pauseBtn').textContent = '일시정지';
   update(1);
 }
@@ -258,40 +279,26 @@ function finish(){
   S.running = false;
   const wasTest = S.testing; S.testing = false;
   $('#scenario').style.opacity = ''; $$('#scenario button').forEach(b => b.disabled = false);
-  $$('#modeSeg button').forEach(b => b.disabled = false);
+  $$('#modeSeg button, #lightSeg button').forEach(b => b.disabled = false);
   if(wasTest && S.lastTrial){
-    const t = S.lastTrial;
-    let why = '';
-    if(!t.correct){
-      if(t.type === 'danger') why = t.rearDanger ? ' — 뒤차가 접근 중이라 기다려야 했어요.' : ' — 뒤차가 없어 옮겨도 됐어요.';
-      else why = ` — 정답은 ${KEY_WORD[t.target]}이었어요.`;
+    const t = S.lastTrial, sec = (t.ms/1000).toFixed(2) + '초', no = mapById(t.map)?.no || '';
+    if(t.correct){
+      const rating = t.ms < 900 ? '아주 빠름' : t.ms < 1600 ? '좋음' : '조금 늦음';
+      setCard({icon:'check', tone:'ok', title:sec, chips:[no, rating].concat(S.streak >= 2 ? [`${S.streak}연속`] : []), test:['next','다음']});
+    } else {
+      const ans = t.type === 'danger' ? (t.rearDanger ? ico('wait') + '기다림' : ico('play') + '옮김') : ico('LSR'[t.target]);
+      setCard({icon:'cross', tone:'bad', title:sec, chips:[no, '정답 ' + ans], test:['next','다음']});
     }
-    const rating = !t.correct ? '' : t.ms < 900 ? '아주 빠름 · ' : t.ms < 1600 ? '좋아요 · ' : '조금 늦음 · ';
-    const streakTxt = (t.correct && S.streak >= 2) ? ` · ${S.streak}연속` : '';
-    $('#cardTitle').textContent = t.correct ? '정답' : '오답';
-    $('#cardTitle').style.color = t.correct ? 'var(--ok)' : 'var(--bad)';
-    $('#cardText').textContent = t.correct
-      ? `${mapLabel(t.map)} · ${rating}판단 시간 ${(t.ms/1000).toFixed(2)}초${streakTxt}`
-      : `${mapLabel(t.map)} · 판단 시간 ${(t.ms/1000).toFixed(2)}초${why}`;
-    $('#demoBtn').textContent = '시연 보기'; $('#testBtn').textContent = '다음 테스트';
-  } else if(S.jam > 0){
-    $('#cardTitle').style.color = '';
-    $('#cardTitle').textContent = '줄 뒤에서 대기';
-    $('#cardText').textContent = '정체 구간, 줄 맨 뒤에 안전하게 정지했습니다.';
-    $('#demoBtn').textContent = '다시 보기'; $('#testBtn').textContent = '판단 테스트';
   } else {
-    $('#cardTitle').style.color = '';
-    $('#cardTitle').textContent = '주행 완료';
-    $('#cardText').textContent = `${mapLabel(S.map.id)} · 다시 볼 수 있습니다.`;
-    $('#demoBtn').textContent = '다시 보기'; $('#testBtn').textContent = '판단 테스트';
+    // 시연 끝: '도착 · 완료' 같은 글자 없이 맵 이름 + 다시 보기만 (끝난 건 HUD 경로가 짧아지며 초록으로 사라지는 것으로 보여 줌, D49)
+    setCard({title:mapLabel(S.map.id), demo:['replay','다시']});
   }
   $('#intro').hidden = false;
 }
 function askQuestion(){
   S.asked = true; S.paused = true; S.t0 = performance.now();
   const danger = S.qType === 'danger', keys = S.route.nodes[S.qIdx].keys;
-  $('#quizTitle').textContent = danger ? `${S.route.side < 0 ? '왼쪽' : '오른쪽'} 차로로 지금 옮겨도 될까요?` : '어느 쪽으로 가야 하나요?';
-  $('#quizSub').textContent = danger ? 'HUD를 보고 판단하세요.' : 'HUD를 보고 최대한 빨리 고르세요.';
+  $('#quizTitle').textContent = danger ? '지금 옮길까?' : '어느 쪽?';
   // 그 갈림에 있는 갈래만 보인다 (② ↑ → · ③ ← ↑ · ④⑤ ← →)
   $$('#choicesBranch button').forEach(b => b.hidden = !keys.includes('LSR'[+b.dataset.c]));
   $('#choicesBranch').classList.toggle('two', keys.length === 2);
@@ -302,7 +309,7 @@ function askQuestion(){
 function answer(val){
   if($('#quiz').hidden) return;
   const ms = performance.now() - S.t0, node = S.route.nodes[S.qIdx];
-  const base = {p:($('#pid').value||'P1').trim(), mode:S.mode, map:S.map.id, jam:S.jam, ms:Math.round(ms), at:new Date().toISOString()};
+  const base = {p:($('#pid').value||'P1').trim(), mode:S.mode, light:S.light, map:S.map.id, jam:S.jam, ms:Math.round(ms), at:new Date().toISOString()};
   let trial;
   if(S.qType === 'danger'){
     if(val !== 'wait' && val !== 'go') return;          // 뒤차: ↑ 기다린다 / → 옮긴다
@@ -320,24 +327,25 @@ function answer(val){
 }
 
 /* ---------- 기록 ----------
-   v2: 맵 · 선택지 수 추가 (맵 5종, D29). v1 기록은 브라우저에 그대로 남는다 */
+   v2: 맵 · 선택지 수 추가 (맵 5종, D29). v1 기록은 브라우저에 그대로 남는다
+   시간대(주간 · 야간) 추가 (6주, D48) — 그 전 기록엔 칸이 없고 모두 주간 */
 const KEY = 'hud-mvp-trials-v2';
 let trials = [];
 try{ trials = JSON.parse(localStorage.getItem(KEY) || '[]'); if(!Array.isArray(trials)) trials = []; }catch(e){ trials = []; }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(trials)); }catch(e){} }
-const modeName = m => m==='ar' ? '우리 HUD' : m==='nav' ? '기존 HUD' : m;
+const modeName = m => m==='ar' ? '우리 HUD' : m==='nav' ? '현대 HUD' : m;   // 'nav' = 현대 HUD(대조군). 6주 전까지 화면 이름은 '기존 HUD'
 const jamName = j => ({0:'없음',1:'보통',2:'심함'})[j] ?? '-';
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cells = t => {
   const dg = t.type === 'danger';
-  return {situ: dg ? '뒤차' : jamName(t.jam), ans: dg ? (t.rearDanger ? '대기' : '이동') : KEY_WORD[t.target], cho: dg ? (t.choice === 'wait' ? '대기' : '이동') : KEY_WORD[t.choice]};
+  return {light: t.light === 'night' ? '야간' : '주간', situ: dg ? '뒤차' : jamName(t.jam), ans: dg ? (t.rearDanger ? '대기' : '이동') : KEY_WORD[t.target], cho: dg ? (t.choice === 'wait' ? '대기' : '이동') : KEY_WORD[t.choice]};
 };
 function renderLog(){
   $('#logCount').textContent = trials.length;
   $('#logEmpty').hidden = trials.length > 0;
   $('#logBody').innerHTML = trials.slice().reverse().map(t => {
     const c = cells(t), m = mapById(t.map);
-    return `<tr><td>${esc(t.p)}</td><td>${modeName(t.mode)}</td><td>${m ? m.no : '-'}</td><td>${c.situ}</td><td>${c.ans}</td><td>${c.cho}</td><td class="${t.correct?'ok':'bad'}">${t.correct?'정답':'오답'}</td><td>${(t.ms/1000).toFixed(2)}</td></tr>`;
+    return `<tr><td>${esc(t.p)}</td><td>${modeName(t.mode)}</td><td>${c.light}</td><td>${m ? m.no : '-'}</td><td>${c.situ}</td><td>${c.ans}</td><td>${c.cho}</td><td class="${t.correct?'ok':'bad'}">${t.correct?'정답':'오답'}</td><td>${(t.ms/1000).toFixed(2)}</td></tr>`;
   }).join('');
   $('#summary').innerHTML = ['ar','nav'].map(m => {
     const list = trials.filter(t => t.mode===m), ok = list.filter(t => t.correct);
@@ -347,10 +355,10 @@ function renderLog(){
   }).join('');
 }
 function csv(){
-  const rows = [['참가자','HUD','맵','상황','정답','선택','선택지 수','결과','판단시간(초)','기록시각']];
+  const rows = [['참가자','HUD','시간대','맵','상황','정답','선택','선택지 수','결과','판단시간(초)','기록시각']];
   trials.forEach(t => {
     const c = cells(t);
-    rows.push([t.p, modeName(t.mode), mapLabel(t.map), c.situ, c.ans, c.cho, t.n, t.correct?'정답':'오답', (t.ms/1000).toFixed(3), t.at]);
+    rows.push([t.p, modeName(t.mode), c.light, mapLabel(t.map), c.situ, c.ans, c.cho, t.n, t.correct?'정답':'오답', (t.ms/1000).toFixed(3), t.at]);
   });
   return rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
 }
@@ -359,10 +367,11 @@ function csv(){
 $('#demoBtn').onclick = $('#demoSide').onclick = () => start(false);
 $('#testBtn').onclick = $('#testSide').onclick = () => start(true);
 $$('#modeSeg button').forEach(b => b.onclick = () => { setMode(b.dataset.mode); update(1); });
+$$('#lightSeg button').forEach(b => b.onclick = () => { setLight(b.dataset.light); update(1); });
 $$('#mapSeg button').forEach(b => b.onclick = () => {
   if(!stopDemo()) return;
   S.demoMap = b.dataset.m; S.demoTarget = defaultLeaf(mapById(S.demoMap)); prepDemo();
-  $('#cardTitle').textContent = mapLabel(S.demoMap); $('#cardText').textContent = 'HUD가 가야 할 지선을 안내합니다.';
+  setCard({title:mapLabel(S.demoMap)});
   update(1);
 });
 $$('#jamSeg button').forEach(b => b.onclick = () => { if(stopDemo()){ S.demoJam = +b.dataset.j; prepDemo(); update(1); } });
@@ -395,7 +404,9 @@ addEventListener('keydown', e => {
 });
 
 /* ---------- 시작 ---------- */
-setMode('ar'); prepDemo(); renderLog(); update(1);
-$('#cardTitle').textContent = mapLabel(S.demoMap);
+$$('[data-ico]').forEach(el => el.insertAdjacentHTML('afterbegin', ico(el.dataset.ico)));   // 버튼 아이콘 채우기
+$('#hudWrap').style.bottom = (cowlBottomPct() + .2).toFixed(1) + '%';   // HUD 아래끝 = 대시보드 윗선 바로 위
+setMode('ar'); setLight('day'); prepDemo(); renderLog(); update(1);
+setCard({title:mapLabel(S.demoMap)});
 requestAnimationFrame(frame);
 prebuildMaps(() => !S.running);   // 멈춰 있을 때 나머지 맵을 미리 지어 둔다

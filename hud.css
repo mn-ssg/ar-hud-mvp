@@ -7,20 +7,24 @@
 .cab{ position:relative; flex:1; min-width:0; border-radius:14px; overflow:hidden; background:#0b0d10; }
 #view, #view canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
 #view::after{ content:""; position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 95% at 50% 42%, transparent 58%, rgba(0,0,0,.28)); }
-/* 앞유리 윗테 + A필러: 차 안에서 보는 느낌 (안내 정보 아님) */
-#frame{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
-.cab-label{ position:absolute; top:12px; left:12px; background:rgba(255,255,255,.92); color:var(--ink); font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px; }
-#dash{ position:absolute; left:-10%; right:-10%; bottom:0; height:21%; pointer-events:none;
-  background:linear-gradient(#50555c 0, #2b2f34 3px, #1f2227 14px, #16181b 45%, #0b0c0e);
-  border-radius:50% 50% 0 0 / 22% 22% 0 0; }
-/* 핸들: 아래쪽은 화면 밖으로 잘림. 회전은 main.js updateWheel() */
-#wheel{ position:absolute; left:50%; bottom:0; height:25%; aspect-ratio:400/230; transform:translateX(-50%);
-  overflow:visible; pointer-events:none; filter:drop-shadow(0 -3px 12px rgba(0,0,0,.5)); }
+.cab-label{ position:absolute; top:12px; left:12px; background:var(--label); color:var(--ink); font-size:12px; font-weight:600; padding:5px 10px; border-radius:6px; }
 
-/* HUD: 유리에 비친 빛처럼 screen 합성 */
-#hudWrap{ position:absolute; left:50%; bottom:23%; transform:translateX(-50%); transform-origin:50% 100%; width:min(400px,44%); pointer-events:none; transition:transform .35s ease; }
+/* HUD: 유리에 비친 빛처럼 screen 합성. v1.7: 실내(대시보드)가 생겨 지난 크기의 75%로 줄이고,
+   아래끝을 대시보드 윗선(카울) 바로 위에 둔다 — bottom은 main.js가 cabin.js cowlBottomPct()로 맞춤 */
+#hudWrap{ position:absolute; left:50%; bottom:32.6%; transform:translateX(-50%); transform-origin:50% 100%; width:min(300px,33%); pointer-events:none; transition:transform .35s ease; }
 #hudWrap svg{ display:block; width:100%; height:auto; overflow:visible; mix-blend-mode:screen; filter:drop-shadow(0 0 3px rgba(255,255,255,.16)); }
 .tnum{ font-variant-numeric:tabular-nums; }
+/* 야간: HUD 전체 밝기 · 채도 · 빛 번짐을 낮춤 — 우리 HUD · 기존 HUD 똑같이 (실제 순정 HUD의 밤 자동 감광처럼).
+   빛 번짐 반경은 main.js setLight가 #glow 흐림(2.4 → 1.1)으로 줄임 */
+.cab.night #hudWrap svg{ filter:brightness(.9) saturate(.9) drop-shadow(0 0 1.5px rgba(255,255,255,.05)); }
+/* 우리 HUD 야간 위계: 경로는 그대로 두고 맥락(도로 윤곽) · 보조(속도) · 큰 빛(내 차 · 뒤차 번짐)을 더 낮춤 */
+.cab.night #roadEdges{ fill-opacity:.34; }
+.cab.night #roadDash{ fill-opacity:.22; }
+.cab.night #roadSurf{ fill-opacity:.03; }
+.cab.night #lgA{ stop-opacity:.5; } .cab.night #lgB{ stop-opacity:.24; } .cab.night #lgC{ stop-opacity:.08; }
+.cab.night #ego{ opacity:.78; }
+.cab.night #carBehind circle{ opacity:.5; }
+.cab.night #info{ opacity:.55; }
 /* 발표용 'HUD 설명 보기': HUD를 키우고 층마다 이름표 (explain.js) */
 .cab.explain #hudWrap{ transform:translateX(-50%) scale(1.3); }
 #explain{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; display:none; font-family:var(--font); }
@@ -29,30 +33,38 @@
 
 /* 안내용 카드·질문·토스트 (밝은 카드 = HUD가 아님) */
 .overlay{ position:absolute; inset:0; display:grid; place-items:center; padding:20px; pointer-events:none; }
-.card{ pointer-events:auto; background:#fff; color:var(--ink); border-radius:14px; padding:24px; max-width:400px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,.35); }
-.card h2{ margin:0 0 6px; font-size:20px; }
-.card p{ margin:0 0 16px; font-size:14px; color:var(--sub); line-height:1.6; }
-.card .row{ display:flex; gap:8px; }
-.card .btn{ padding:10px 16px; font-size:14px; }
+.card{ pointer-events:auto; background:var(--raised); color:var(--ink); border-radius:14px; padding:22px; max-width:360px; width:100%; box-shadow:0 12px 40px rgba(0,0,0,.35); }
+.card h2{ margin:0; font-size:22px; letter-spacing:-.02em; }
+.card .row{ display:flex; gap:8px; margin-top:18px; }
+.card .btn{ flex:1; padding:11px 14px; font-size:15px; display:flex; align-items:center; justify-content:center; gap:7px; }
+.card .btn .ico{ width:18px; height:18px; }
+/* 카드: 아이콘 + 짧은 말 */
+.card-head{ display:flex; align-items:center; gap:12px; }
+.card-icon{ width:42px; height:42px; border-radius:50%; display:grid; place-items:center; flex:none; background:var(--field); color:var(--ink); }
+.card-icon .ico{ width:24px; height:24px; stroke-width:2.6; }
+.card-icon.ok{ background:var(--ok); color:#fff; } .card-icon.bad{ background:var(--bad); color:#fff; }
+.card-icon:empty{ display:none; }
+.chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.chip{ display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:999px; background:var(--field); color:var(--sub); font-size:13px; font-weight:600; }
+.chip .ico{ width:16px; height:16px; }
 #quiz{ place-items:start center; padding-top:9%; }
 #quiz .card{ text-align:center; }
-.choices{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.choices{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:16px; }
 .choices.two{ grid-template-columns:repeat(2,1fr); }
-.choices button{ border:1px solid var(--rule); background:#f6f7f9; border-radius:10px; padding:14px 4px; font-size:16px; font-weight:600; }
+.choices button{ border:1px solid var(--rule); background:var(--field); border-radius:12px; padding:14px 4px; font-size:16px; font-weight:600; display:flex; flex-direction:column; align-items:center; gap:4px; }
 .choices button:hover{ border-color:var(--btn); }
-.choices kbd{ display:block; font-family:inherit; font-size:11.5px; color:var(--sub); font-weight:400; margin-top:4px; }
-#toast{ position:absolute; top:12%; left:50%; transform:translateX(-50%); background:#fff; padding:10px 20px; border-radius:10px; font-size:17px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.3); pointer-events:none; }
+.choices .ico{ width:40px; height:40px; stroke-width:2.4; }
+.choices.two .ico{ width:30px; height:30px; }
+.choices kbd{ display:block; font-family:inherit; font-size:11.5px; color:var(--sub); font-weight:400; }
+#toast{ position:absolute; top:12%; left:50%; transform:translateX(-50%); background:var(--raised); padding:10px 20px; border-radius:10px; font-size:17px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.3); pointer-events:none; }
 #toast.ok{ color:var(--ok); } #toast.bad{ color:var(--bad); }
 
-/* ---------- HUD 애니메이션 (목적형): 긴급 맥박 헤일로 · 경로 흐름 ---------- */
-@keyframes hudHalo{ 0%{ opacity:.55; r:18; } 100%{ opacity:0; r:34; } }
-#nowHalo.on{ animation: hudHalo 1s ease-out infinite; }
-@keyframes hudFlow{ to{ stroke-dashoffset:-38; } }
+/* ---------- HUD 애니메이션 (목적형): 경로 흐름 (v1.4: 행동 단계 글자와 함께 맥박 헤일로 삭제) ---------- */
+@keyframes hudFlow{ to{ stroke-dashoffset:-52; } }   /* hud.js 흐름 점선 '12 14'의 2주기 */
 #moveArrow.flow{ animation: hudFlow .7s linear infinite; }
 
 @media (prefers-reduced-motion: reduce){
   *{ transition:none !important; }
-  #nowHalo.on{ animation:none; opacity:0; }
   #moveArrow.flow{ animation:none; }
   #jamHatch animateTransform{ display:none; }
 }
