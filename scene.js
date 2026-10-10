@@ -261,13 +261,13 @@ let MG = null;   // 지금 짓는 맵 묶음
 const addMesh = (geo, mat, shadow = 'r') => { const m = new THREE.Mesh(geo, mat); m.receiveShadow = shadow.includes('r'); m.castShadow = shadow.includes('c'); MG.add(m); return m; };
 
 // 표지판 판: 칸(lane 몫)마다 녹색 패널 — {from, to: 칸 번호, lines: 방면 글자 줄, arrow: 화살표 각도(0=↓)}
-function signTex(cells, panels){
+function signTex(cells, panels, bg = '#0d6b3c'){   // bg: 고속도로 녹색 · 일반도로 파랑(city.js)
   return canvasTex(800*cells, 400, g => {
     g.scale(4/3, 4/3);
     g.fillStyle = '#dfe4e1'; g.fillRect(0,0,600*cells,300);
     panels.forEach(pn => {
       const x = pn.from*600, w = (pn.to - pn.from + 1)*600;
-      g.fillStyle = '#0d6b3c'; g.fillRect(x+12,12,w-24,276);
+      g.fillStyle = bg; g.fillRect(x+12,12,w-24,276);
       g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeRect(x+28,28,w-56,244);
       g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
       if(pn.lines.length === 1){ g.font = `700 92px ${FONT}`; g.fillText(pn.lines[0], x+w/2, 118); }
@@ -451,7 +451,7 @@ function buildMapScene(m){
 
 const builtMaps = {};
 function showMap(m){
-  if(!builtMaps[m.id]){ builtMaps[m.id] = buildMapScene(m); scene.add(builtMaps[m.id]); }
+  if(!builtMaps[m.id]){ builtMaps[m.id] = m.city ? buildCityScene(m) : buildMapScene(m); scene.add(builtMaps[m.id]); }   // 일반도로는 city.js
   Object.entries(builtMaps).forEach(([id, g]) => g.visible = id === m.id);
 }
 // 멈춰 있을 때 남은 맵을 미리 지어 둔다 (맵을 바꿀 때 멈칫하지 않게)
@@ -459,7 +459,7 @@ function prebuildMaps(isIdle){
   const next = MAPS.find(m => !builtMaps[m.id]);
   if(!next) return;
   setTimeout(() => {
-    if(isIdle()){ const g = buildMapScene(next); g.visible = false; builtMaps[next.id] = g; scene.add(g); }
+    if(isIdle()){ const g = next.city ? buildCityScene(next) : buildMapScene(next); g.visible = false; builtMaps[next.id] = g; scene.add(g); }
     prebuildMaps(isIdle);
   }, 400);
 }
@@ -605,6 +605,7 @@ function setSceneLight(night){
   signMats.forEach(mt => mt.emissiveIntensity = L.sign); facadeMat.emissiveIntensity = L.win;
   carMats.tail.emissiveIntensity = L.tail;
   nightOnly.forEach(o => o.visible = night);
+  if(typeof cityLight === 'function') cityLight(night);   // 일반도로 건물 창 · 노란 칠 · 길바닥 화살표 (city.js)
 }
 setSceneLight(false);
 

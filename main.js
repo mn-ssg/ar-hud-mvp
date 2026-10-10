@@ -6,11 +6,15 @@
 /* ---------- 경로 ----------
    시작 차로 → (옮길 차로) → 첫 갈림 → 목적지. 갈림 뒤는 maps.js makeRoute()의 after(내 차로 선) */
 function buildPath(R, jam){
-  const x0 = R.x0, tx = R.tx;
+  const x0 = R.x0, tx = R.tx, m = R.m;
   let pts, mergeZ = -128;
-  if(jam > 0 && tx !== x0){
+  if(m.city){
+    // 일반도로 (D69): 맵마다 정한 구간(laneChange)에서 옮김 — ④는 좌회전 줄 뒤 · 백색실선 전, ⑤는 정류장 버스를 지난 뒤 · 백색실선 전
+    const [za, zb] = m.laneChange;
+    pts = tx !== x0 ? [V(x0,40), V(x0,0), V(x0,za+40), V(x0,za), V((x0+tx)/2,(za+zb)/2), V(tx,zb), V(tx,zb-12), V(tx,-222)] : [V(x0,40), V(x0,0), V(x0,-100), V(x0,-222)];
+  } else if(jam > 0 && tx !== x0){
     // 정체 시: 대기열 뒤끝(back)보다 더 뒤(양의 z)에서 합류를 끝낸다 → 줄 맨 뒤에 붙음(관통 없음)
-    const mEnd = JAM_LV[jam].back + 20, mStart = Math.min(0, mEnd + 50);
+    const mEnd = jamBackOf(m, jam) + 20, mStart = Math.min(0, mEnd + 50);
     mergeZ = mStart;
     pts = [V(x0,40), V(x0,mStart), V((x0+tx)/2,(mStart+mEnd)/2), V(tx,mEnd), V(tx,-218)];
   } else {
@@ -24,7 +28,9 @@ function buildPath(R, jam){
     samples.forEach((q, s) => { const d = i === 0 ? Math.abs(q.z - FORK_Z) : Math.hypot(q.x - n.pt[0], q.z - n.pt[1]); if(d < bd){ bd = d; best = s; } });
     return best;
   });
-  return {curve, L, sStart:40, mergeZ, nodeS, P:resample(samples.map(q => [q.x, q.z]), 1)};   // P: 주행 테스트에서 내 차를 경로 위로 옮겨 잴 때
+  const cwI = m.cw ? samples.findIndex(q => q.x >= m.cw.x0 && q.z < FORK_Z) : -1;   // ⑤ 경로가 횡단보도에 닿는 곳(s)
+  // sStart: 일반도로는 60m 앞에서 출발(50km/h라 접근이 길어져서). P: 주행 테스트에서 내 차를 경로 위로 옮겨 잴 때
+  return {curve, L, sStart:m.city ? 100 : 40, mergeZ, nodeS, cwS:cwI >= 0 ? cwI : null, P:resample(samples.map(q => [q.x, q.z]), 1)};
 }
 // 다음 갈림: 번호 i · 남은 거리 d(경로 위 m) · 진행 단계 st(1 접근 · 2 지선 구분 · 3 차로 옮김 · 4 진입 · 5 도착)
 function navCtx(s){
@@ -38,17 +44,19 @@ function navCtx(s){
 // testing = 주행 테스트 진행 중(결과 카드 · 쉬는 화면 포함, 설정 잠금) · drive = 내 차를 키보드로 모는 중 (drive.js D)
 const S = {mode:'ar', map:null, route:null, target:0, startLane:1, running:false, paused:false, s:40, testing:false, drive:false,
   fill:0, danger:0, car:null, jam:0, speedFactor:1, q:null, jamHoldT:0,
-  rearGap:56, rearActive:false, rearBlock:false, threatCar:null, bswL:false, bswR:false, demoMap:'Y3', demoTarget:2, demoJam:0, light:'day'};
+  rearGap:56, rearActive:false, rearBlock:false, threatCar:null, bswL:false, bswR:false, demoMap:'ICR', demoTarget:1, demoJam:0, light:'day',
+  cityT:0, sigT:0, pedPlan:null, cityLim:Infinity};   // 일반도로(D69): 판 시작부터 시간 · 좌회전 화살표 켜지는 시각 · 보행자 계획 · 시연에서 설 곳(s)
 let path = null;
 const pick = a => a[Math.floor(Math.random()*a.length)];
-const mapLabel = id => { const m = mapById(id); return m ? `${m.no} ${m.name}` : '-'; };
+const mapLabel = id => { const m = mapById(id) || MAPS_OFF.find(o => o.id === id); return m ? `${m.no} ${m.name}` : '-'; };   // 뺀 맵(D68)은 예전 기록용
 
 function loadMap(m){
   if(S.map === m) return;
-  S.map = m; showMap(m); buildNavLanes(m);
+  S.map = m; showMap(m); buildNavLanes(m); setLimitSign(m);
+  $$('#jamSeg button').forEach(b => b.disabled = !!m.city);   // 일반도로는 상황이 맵에 딸려 있음(정체 고르기 없음)
 }
 // 시연에서 기본 목적지: 차로를 옮겨야 하는 마지막 목적지(뒤차가 지나가는 상황을 볼 수 있게)
-const defaultLeaf = m => { const c = leafIdxs(m, (l, i) => makeRoute(m, i, m.start[0]).side !== 0); return c.length ? c[c.length-1] : 0; };
+const defaultLeaf = m => { const c = leafIdxs(m, (l, i) => (!m.city || l.quiz) && makeRoute(m, i, m.start[0]).side !== 0); return c.length ? c[c.length-1] : 0; };   // 일반도로: 테스트 목적지(골목 · 우회전)
 
 function setTarget(i, lane){
   // 시연은 정체 시 줄 뒤로 합류하는 경로, 주행 테스트는 경로를 HUD에만 쓰므로 정체 경로 없음
@@ -80,6 +88,7 @@ function renderScenario(){
   $$('#mapSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === S.demoMap)));
   $('#mapName').textContent = `${m.no} ${m.name}`;
   const seg = $('#targetSeg');
+  seg.hidden = $('#jamSeg').hidden = !!m.city;   // 일반도로(④ 좌회전 · ⑤ 우회전)는 맵이 곧 상황 — 목적지 · 정체 고르기 없음 (D71)
   if(seg.dataset.map !== m.id){
     seg.dataset.map = m.id; seg.innerHTML = '';
     m.leaves.forEach((l, i) => {
@@ -98,8 +107,13 @@ function stopDemo(){
   return true;
 }
 function prepDemo(){
-  loadMap(mapById(S.demoMap)); renderScenario();
-  S.jam = S.demoJam; setTarget(S.demoTarget);
+  const m = mapById(S.demoMap);
+  loadMap(m); renderScenario();
+  S.jam = m.city ? (m.queue ? 1 : 0) : S.demoJam; setTarget(S.demoTarget);
+  // 일반도로 시연: 좌회전 화살표는 17초에 켜짐(줄 뒤에서 몇 초 기다림), ⑤ 보행자 3명이 내 차가 닿을 무렵 건넘
+  S.cityT = 0; S.sigT = 17;
+  S.pedPlan = m.cw ? [{x:17.2, dir:1, v:1.35, t0:11.5}, {x:18.8, dir:1, v:1.5, t0:13}, {x:18, dir:-1, v:1.5, t0:1}] : null;
+  cityFrame(0);
 }
 
 /* ---------- 안내 카드: 아이콘 + 짧은 말 ----------
@@ -118,22 +132,28 @@ function setCard({icon = '', tone = '', title, chips = [], demo = ['play','시�
    줄이 분기점 쪽으로 천천히 빠진다(qShift). 카메라는 update()의 하드 클램프로
    '맨 뒤차 뒤'에 고정돼 줄을 따라 서행할 뿐 절대 통과하지 않는다. */
 let qShift = 0; // 대기열 누적 전진량(주행마다 0)
-function tailZ(){ return JAM_LV[S.jam] ? JAM_LV[S.jam].back - qShift : null; } // 현재 맨 뒤차 z
+function tailZ(){ const b = S.jam > 0 ? jamBackOf(S.map, S.jam) : null; return b !== null ? b - qShift : null; } // 현재 맨 뒤차 z
 function updateQueue(p, dt){
-  const lv = JAM_LV[S.jam];
-  if(!lv || !S.running){ queueCars.forEach(c => c.visible = false); return {backZ:null, mergeNear:false}; }
-  if(!S.paused) qShift += 6*dt; // 정체 서서히 해소
-  const tx = S.route.tx, t = performance.now()/1000, back = lv.back - qShift;
-  const n = Math.min(queueCars.length, Math.max(1, Math.round((lv.back - Q_FRONT)/Q_SPACE)));
+  const m = S.map, back0 = S.jam > 0 ? jamBackOf(m, S.jam) : null, QF = qFrontOf(m);
+  if(back0 === null || !S.running){ queueCars.forEach(c => c.visible = false); return {backZ:null, mergeNear:false}; }
+  // 정체 서서히 해소. 일반도로 좌회전 줄은 화살표가 켜져야 움직이고, 정지선을 지난 차는 좌회전 길을 따라 꺾어 나감
+  if(!S.paused && (!m.city || sigOf('L', S.cityT) === 'green')) qShift += 6*dt;
+  const tx = S.route.tx, t = performance.now()/1000, back = back0 - qShift;
+  const lanes = m.city ? m.queue.lanes : [laneOf(m, tx)], per = Math.floor(queueCars.length/lanes.length);   // 일반도로: 좌회전 차로들
+  const n = Math.min(per, Math.max(1, Math.round((back0 - QF)/Q_SPACE)));
   const zs = [];
-  for(let k=0;k<queueCars.length;k++){
-    const c = queueCars[k];
+  for(let idx=0;idx<queueCars.length;idx++){
+    const c = queueCars[idx], k = Math.floor(idx/lanes.length), lane = lanes[idx % lanes.length], x = m.laneX(lane);
     if(k >= n){ c.visible = false; continue; }
-    const z = back - k*Q_SPACE + Q_WAVE*Math.sin(t*1.4 + k*0.7); // 늘어선 줄 + 서행 물결
-    if(z < Q_FRONT - 4){ c.visible = false; continue; } // 분기점 지난 차는 빠져나감
-    zs.push(z);
-    if(Math.abs(tx - p.x) < 1.4 && Math.abs(z - p.z) < 7){ c.visible = false; continue; } // 안전망: 카메라 클리핑 방지
-    c.visible = true; c.position.set(tx, 0, z); c.rotation.y = 0;
+    const z = back - k*Q_SPACE + (m.city ? 0 : Q_WAVE*Math.sin(t*1.4 + k*0.7)); // 늘어선 줄 + 서행 물결
+    if(z < QF - 4){
+      if(!m.city || LANE_START - z > LANE_START - FORK_Z + 150){ c.visible = false; continue; } // 분기점 지난 차는 빠져나감 (일반도로: 꺾은 뒤 멀리 가서 사라짐)
+      const [px, pz, ptx, ptz] = pathAt(lanePath(m, lane, idx % 2), LANE_START - z);       // 일반도로: 꺾어 나감
+      c.visible = true; c.position.set(px, 0, pz); c.rotation.y = Math.atan2(-ptx, -ptz); continue;
+    }
+    if(Math.abs(x - tx) < .1) zs.push(z);
+    if(Math.abs(x - p.x) < 1.4 && Math.abs(z - p.z) < 7){ c.visible = false; continue; } // 안전망: 카메라 클리핑 방지
+    c.visible = true; c.position.set(x, 0, z); c.rotation.y = 0;
   }
   const backZ = zs.length ? Math.max(...zs) : null;
   let mergeNear = false;
@@ -160,12 +180,20 @@ function update(dt){
   // 정체(시연): 맨 뒤차(빠지면서 앞으로 이동)보다 앞으로 못 가게 하드 클램프.
   // 줄을 따라 서행하다 정체가 풀리면 다시 주행.
   const tz = tailZ();
-  const jamActive = S.jam > 0 && S.running && tz !== null && tz > Q_FRONT;
+  const jamActive = S.jam > 0 && S.running && tz !== null && tz > qFrontOf(S.map) && (!S.map.city || S.map.queue.lanes.includes(S.route.tl));   // 일반도로: 줄 차로로 갈 때만
   const guardZ = tz + 9; // 맨 뒤차보다 9m 뒤
   if(jamActive){
     let z = path.curve.getPointAt(clamp(S.s/path.L)).z, g = 0;
     while(z < guardZ && S.s > 0 && g++ < 80){ S.s -= 1; z = path.curve.getPointAt(clamp(S.s/path.L)).z; }
-    if(z <= guardZ + 2.5){ S.jamHoldT += dt; if(S.jamHoldT > 5){ finish(); } } // 5초 서행 뒤 마무리
+    if(!S.map.city && z <= guardZ + 2.5){ S.jamHoldT += dt; if(S.jamHoldT > 5){ finish(); } } // 5초 서행 뒤 마무리 (일반도로는 신호 따라 끝까지)
+  }
+  // 일반도로 시연: 빨간불이면 정지선 앞, 보행자가 건너면 횡단보도 앞에 선다 (이미 지났으면 무시)
+  S.cityLim = Infinity;
+  if(S.map.city && S.running){
+    const n0 = path.nodeS[0];
+    if(S.s < n0 - 2 && sigOf(S.route.leaf.path[0].key, S.cityT) === 'red') S.cityLim = n0 - 3.3;
+    if(path.cwS !== null && S.s < path.cwS - 2.5 && pedBlock(S.cityT)) S.cityLim = Math.min(S.cityLim, path.cwS - 3.5);
+    S.s = Math.min(S.s, S.cityLim);
   }
 
   const u = clamp(S.s/path.L);
@@ -173,7 +201,9 @@ function update(dt){
   const ahead = path.curve.getPointAt(clamp((S.s+22)/path.L));
   // 운전자 눈: 차 중심(p)에서 왼쪽으로 DRIVER_X (좌핸들). 보는 방향은 차 진행 방향과 나란히
   const lx = f.z*DRIVER_X, lz = -f.x*DRIVER_X;
-  camera.position.set(p.x + lx, EYE_Y, p.z + lz); camera.lookAt(ahead.x + lx, EYE_Y - .2, ahead.z + lz);
+  // 일반도로는 차가 향한 방향을 봄 — 22m 앞 경로 점을 보면 90도로 꺾을 때 차보다 먼저 고개가 돌아가 어색했음 (고속도로는 완만해서 그대로)
+  camera.position.set(p.x + lx, EYE_Y, p.z + lz);
+  if(S.map.city) camera.lookAt(p.x + f.x*22 + lx, EYE_Y - .2, p.z + f.z*22 + lz); else camera.lookAt(ahead.x + lx, EYE_Y - .2, ahead.z + lz);
   updateWheel(p, f, dt);
 
   const C = navCtx(S.s), k = Math.min(1, dt*4), R = S.route;
@@ -184,6 +214,10 @@ function update(dt){
   if(jamActive){
     const df = p.z - guardZ;
     if(df < 30) S.speedFactor = clamp(df/30, 0, 1); // 줄 뒤 30m부터 서서히 감속
+  }
+  if(S.map.city){
+    if(Math.abs(S.s - (path.nodeS[0] + 8)) < 28) S.speedFactor = Math.min(S.speedFactor, .45);   // 꺾을 땐 천천히
+    if(S.cityLim < Infinity) S.speedFactor = Math.min(S.speedFactor, clamp((S.cityLim - S.s)/25, 0, 1));
   }
 
   // 뒤차 이벤트(시연): 뒤에서 다가와 옆 차로로 실제 지나감 — 가운데 도로 HUD로만 표시(옆 레이더 없음). 관통 없음.
@@ -207,12 +241,13 @@ function update(dt){
 
   showStage(C.st);
 
-  const kmh = S.running && !S.paused ? Math.round(SPEED*3.6 + Math.sin(performance.now()/900)) : 0;
+  const kmh = S.running && !S.paused ? Math.max(0, Math.round(cruiseOf(S.map)*(S.speedFactor ?? 1)*3.6 + Math.sin(performance.now()/900))) : 0;
   const remainKm = Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1);
 
-  if(S.mode === 'ar') drawAr(p, f, C, k, dangerOn, kmh);
+  if(S.mode === 'ar') drawAr(p, f, C, k, dangerOn);
   else drawNav(p, f, C, kmh, remainKm, dangerOn);
   updateCabin(steer, kmh);
+  cityFrame(S.cityT);
 }
 
 /* ---------- 주행 테스트 한 판 (session.js가 부름) ----------
@@ -220,7 +255,8 @@ function update(dt){
 let pathHint = -1;
 function startDrive(cfg){
   $('#intro').hidden = true; $('#drawer').classList.remove('open');
-  loadMap(cfg.map); S.jam = cfg.type === 'jam' ? cfg.jam : 0; S.rearActive = false;
+  loadMap(cfg.map); S.jam = cfg.type === 'jam' ? cfg.jam : cfg.map.city && cfg.map.queue ? 1 : 0; S.rearActive = false;
+  S.cityT = 0; S.sigT = cfg.sigT ?? 0;   // 일반도로: 신호 시각 (보행자 계획은 driveReset이 교통 번호로)
   S.drive = true; setTarget(cfg.leaf, cfg.lane);
   driveReset(cfg); pathHint = -1; qShift = 0;
   S.running = true; S.paused = false; $('#pauseBtn').textContent = '일시정지';
@@ -234,18 +270,19 @@ function updateDrive(dt){
   // 운전자 눈: 차 중심에서 왼쪽 DRIVER_X (좌핸들), 차가 보는 방향 그대로
   const lx = f.z*DRIVER_X, lz = -f.x*DRIVER_X;
   camera.position.set(p.x + lx, EYE_Y, p.z + lz); camera.lookAt(p.x + f.x*22 + lx, EYE_Y - .2, p.z + f.z*22 + lz);
-  const r = project(path.P, p.x, p.z, pathHint); pathHint = r.i; S.s = r.s;
+  const r = project(path.P, p.x, p.z, pathHint); pathHint = r.i; S.s = r.s; S.cityT = D.t;
   const C = navCtx(S.s), k = Math.min(1, dt*4), kmh = Math.round(D.v*3.6);
   showStage(C.st);
-  if(S.mode === 'ar') drawAr(p, f, C, k, S.rearBlock, kmh);
+  if(S.mode === 'ar') drawAr(p, f, C, k, S.rearBlock);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1), S.rearBlock);
   updateCabin(clamp(D.wheel*STEER_RATIO*STEER_GAIN*180/Math.PI, -360, 360), kmh);
+  cityFrame(D.t);
 }
 
 let prev = performance.now();
 function frame(now){
   const dt = Math.min(.05,(now-prev)/1000); prev = now;
-  if(S.running && !S.paused && !S.drive) S.s += SPEED*(S.speedFactor||1)*dt;
+  if(S.running && !S.paused && !S.drive){ S.s += cruiseOf(S.map)*(S.speedFactor ?? 1)*dt; S.cityT += dt; }
   update(dt);
   renderScene();
   requestAnimationFrame(frame);
@@ -257,7 +294,7 @@ function start(){
   // 시연: 사용자가 왼쪽에서 고른 맵·목적지·정체 그대로
   prepDemo();
   // 옮겨야 하는 목적지 + 정체 없음이면 뒤차가 뒤에서 다가와 옆으로 지나가는 상황
-  S.rearActive = (S.route.side !== 0 && S.demoJam === 0);
+  S.rearActive = (S.route.side !== 0 && S.demoJam === 0 && !S.map.city);   // 일반도로는 맵에 딸린 상황(줄 · 버스 · 보행자)
   if(S.rearActive) S.rearGap = 45;
   qShift = 0;
   S.running = true; S.paused = false; $('#pauseBtn').textContent = '일시정지';

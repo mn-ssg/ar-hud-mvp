@@ -38,7 +38,9 @@ try{ document.fonts && document.fonts.load('700 60px "IBM Plex Sans KR"'); }catc
 const DRIVER_X = .37, EYE_Y = 1.25;
 const LANE = 3.5, FORK_Z = -230, CHANGE_END = -205, SPEED = 18, CAR_SPEED = 27;
 // 정체(교통 혼잡): 목표 차로 대기열. 레벨별 대기열 뒤끝 z(운전자 쪽으로 얼마나 길게 밀리는지)
-const JAM_LV = {0:null, 1:{back:-150}, 2:{back:-70}};
+// D67: '정체 없음 · 정체' 두 가지만. 정체 = 예전 보통(-150)과 심함(-70)의 중간 — 심함은 끼어들 때 줄이 너무 길어 급하게 서야 했음(사용자).
+// 시연 · 주행 테스트가 같은 값. 번호 3은 예전 기록(1 보통 · 2 심함)과 섞이지 않게 새로 붙임 (session.js situName)
+const JAM_LV = {0:null, 3:{back:-110}};
 const Q_FRONT = -214, Q_SPACE = 6.8, Q_WAVE = 2.6, Q_MERGE = 9.8;
 // 핸들: 1초 앞(18m) 경로 지점을 겨눠 조향. 실제 조향비 15:1 그대로면 차로 변경 때 5° 안팎이라 안 보여 2.5배 과장
 const WHEELBASE = 2.8, STEER_RATIO = 15, STEER_GAIN = 2.5, STEER_LOOK = 18;
@@ -71,5 +73,11 @@ const HARD = {
   qMean: .5, qMeanFor: 1.5,   // 옆에서 끼어들려 하면 앞차에 바짝 붙어 틈을 막는 줄 차 비율 · 그만큼(초) 버티면 양보
   joinN: [1, 4], joinDv: [10, 25]   // 정체 판: 목표 차로 뒤에서 줄 끝으로 달려와 붙는 차 대수 · 나보다 빠른 km/h (첫 차 도착 · 간격은 rearArrive · rearGap)
 };
+/* 맵마다 다른 값 (일반도로 D69 — 설계 11_시뮬레이터_맵_설계.md 2-4절) */
+const cruiseOf = m => (m && m.cruise) || DRV.cruise;                  // 손 떼면 순항: 고속도로 65 · 일반도로 50 km/h
+const changeEndOf = m => (m && m.changeEnd) || CHANGE_END;            // 차로를 옮겨 있어야 하는 곳 (일반도로: 백색실선 시작)
+const qFrontOf = m => m && m.city ? FORK_Z + 3 : Q_FRONT;             // 정체 줄 맨 앞 차 중심 z (일반도로: 정지선 바로 뒤)
+const jamBackOf = (m, jam) => m && m.city ? (m.queue ? m.queue.back : null) : (JAM_LV[jam] ? JAM_LV[jam].back : null);
+const CITY_DRV = {timeout:90, endAfter:30};                          // 일반도로: 한 판 최대(초) · 꺾은 뒤 끝나는 거리(m) (AI 꺾는 속도는 drive.js curveV)
 const V = (x,z) => new THREE.Vector3(x,0,z);
 const curveOf = (pts,div) => { const c = new THREE.CatmullRomCurve3(pts,false,'centripetal'); c.arcLengthDivisions = div; return c; };

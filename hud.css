@@ -17,14 +17,14 @@
 /* 야간: HUD 전체 밝기 · 채도 · 빛 번짐을 낮춤 — 우리 HUD · 기존 HUD 똑같이 (실제 순정 HUD의 밤 자동 감광처럼).
    빛 번짐 반경은 main.js setLight가 #glow 흐림(2.4 → 1.1)으로 줄임 */
 .cab.night #hudWrap svg{ filter:brightness(.9) saturate(.9) drop-shadow(0 0 1.5px rgba(255,255,255,.05)); }
-/* 우리 HUD 야간 위계: 경로는 그대로 두고 맥락(도로 윤곽) · 보조(속도) · 큰 빛(내 차 · 뒤차 번짐)을 더 낮춤 */
+/* 우리 HUD 야간 위계: 경로는 그대로 두고 맥락(도로 윤곽) · 보조(제한속도 흰 표지) · 큰 빛(내 차 · 뒤차 번짐)을 더 낮춤 */
 .cab.night #roadEdges{ fill-opacity:.34; }
 .cab.night #roadDash{ fill-opacity:.22; }
 .cab.night #roadSurf{ fill-opacity:.03; }
 .cab.night #lgA{ stop-opacity:.5; } .cab.night #lgB{ stop-opacity:.24; } .cab.night #lgC{ stop-opacity:.08; }
 .cab.night #ego{ opacity:.78; }
 .cab.night #carBehind circle{ opacity:.5; }
-.cab.night #info{ opacity:.55; }
+.cab.night #info{ opacity:.72; }   /* v1.8: 표지가 커져 밤엔 흰 면이 눈부시지 않게 */
 /* 발표용 'HUD 설명 보기': HUD를 키우고 층마다 이름표 (explain.js) */
 .cab.explain #hudWrap{ transform:translateX(-50%) scale(1.3); }
 #explain{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; display:none; font-family:var(--font); }
@@ -61,7 +61,6 @@ kbd{ display:inline-grid; place-items:center; min-width:24px; height:24px; paddi
 .rate button{ border:1px solid var(--rule); background:var(--field); border-radius:10px; padding:12px 0; font-size:18px; font-weight:700; color:var(--ink); }
 .rate button[aria-pressed="true"]{ background:var(--btn); border-color:var(--btn); color:var(--on-btn); }
 .rate-ends{ display:flex; justify-content:space-between; margin-top:4px; font-size:12px; color:var(--sub); }
-#sesNote{ width:100%; margin-top:12px; border:1px solid var(--rule); border-radius:8px; padding:9px 11px; font:inherit; font-size:14px; background:var(--field); color:var(--ink); }
 .ses-sum{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px; }
 .ses-sum div{ background:var(--soft); border-radius:10px; padding:10px 12px; font-size:12.5px; color:var(--sub); line-height:1.7; }
 .ses-sum strong{ display:block; color:var(--ink); font-size:14px; }

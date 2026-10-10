@@ -41,18 +41,17 @@
   <div class="group" id="scenario">
     <h2>시연 상황 <span class="hint">· 주행 테스트는 맵 · 상황이 랜덤</span></h2>
     <div class="seg" id="mapSeg">
-      <button data-m="Y3" aria-pressed="true"><b>①</b>세 갈래</button>
-      <button data-m="ICR" aria-pressed="false"><b>②</b>IC 진출</button>
-      <button data-m="ICL" aria-pressed="false"><b>③</b>왼쪽 진출</button>
-      <button data-m="JC4" aria-pressed="false"><b>④</b>JC 4차로</button>
-      <button data-m="SEQ" aria-pressed="false"><b>⑤</b>연속 분기</button>
+      <button data-m="ICR" aria-pressed="true"><b>①</b>IC 진출</button>
+      <button data-m="JC4" aria-pressed="false"><b>②</b>JC 4차로</button>
+      <button data-m="SEQ" aria-pressed="false"><b>③</b>연속 분기</button>
+      <button data-m="CL2" aria-pressed="false"><b>④</b>좌회전</button>
+      <button data-m="CRT" aria-pressed="false"><b>⑤</b>우회전</button>
     </div>
     <p class="map-name" id="mapName"></p>
     <div class="seg" id="targetSeg"></div>
     <div class="seg" id="jamSeg">
       <button data-j="0" aria-pressed="true">정체 없음</button>
-      <button data-j="1" aria-pressed="false">정체</button>
-      <button data-j="2" aria-pressed="false">심한 정체</button>
+      <button data-j="3" aria-pressed="false">정체</button>
     </div>
   </div>
 
@@ -131,7 +130,7 @@
               옮길 화살표(초록 흐름 = 옮겨도 됨 / 주황 = 서두름 · 주황 점 = 틈 대기 / 빨간 점 + 멈춤 막대 = 대기) · 정체 차량과 틈 · 뒤차
            ② 갈 방향: 가운데 위, 다음 갈림에서 갈 쪽 화살표만. 경로색 하나로 고정(상태를 담지 않음)
            ③ 언제: 숫자 없는 막대(초록→주황→빨강 연속) + 미니 도로 마감선. 뒤차로 기다리는 동안엔 회색으로 흐리게
-           ④ 속도: 맨 아래 작고 흐리게. 도로 윤곽선도 흐리게 → 경로가 먼저 보이도록 ===== -->
+           ④ 제한속도: 왼쪽 위, 표지 모양 그대로 (v1.8: 차속 삭제 · 맨 아래 → 왼쪽 위 · 반지름 8.5 → 21). 도로 윤곽선은 흐리게 → 경로가 먼저 보이도록 ===== -->
       <g id="arHud">
         <g mask="url(#roadMask)">
           <path id="roadSurf" fill="#ffffff" fill-opacity=".045"/>
@@ -145,6 +144,9 @@
           <path id="gapMark" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
           <path id="slot" fill="#00e5ff" fill-opacity=".2" stroke="#00e5ff" stroke-width="2" stroke-linejoin="round"/>
           <path id="gate" filter="url(#glow)"/>
+          <!-- 일반도로 (D69): 멈출 곳(빨간불 정지선 · 보행자 앞 횡단보도) 빨간 막대 + 보행자 점 -->
+          <path id="cityStop" fill="#ff4d4d" filter="url(#glow)"/>
+          <path id="pedDots" fill="#ffffff" fill-opacity=".9"/>
         </g>
         <g id="moveGrp" filter="url(#glow)">
           <path id="moveArrow" fill="none" stroke="url(#arrowGrad)" stroke-width="8" stroke-linecap="round"/>
@@ -179,11 +181,11 @@
           <rect id="cdBg" x="200" y="62" width="120" height="6" rx="3" fill-opacity=".16"/>
           <rect id="cdBar" x="200" y="62" width="120" height="6" rx="3"/>
         </g>
-        <!-- ④ 속도 · 제한속도: 보조 정보라 작고 흐리게. 단위 글자(km/h) 없이 숫자만 (v1.5) -->
-        <g id="info" opacity=".5">
-          <circle cx="249" cy="253" r="8.5" fill="#fff" fill-opacity=".8" stroke="#e04848" stroke-width="2.2"/>
-          <text x="249" y="256" text-anchor="middle" font-size="8" font-weight="700" fill="#111" class="hud-t">80</text>
-          <text id="spdA" class="hud-t tnum" x="262" y="257.5" font-size="13" font-weight="500" fill="#ffffff">0</text>
+        <!-- ④ 제한속도 (v1.8): 차속은 HUD에서 빼고 계기판으로. 표지는 실제 표지 모양 그대로, 왼쪽 위(갈 방향과 같은 줄) —
+             가운데 세로줄(갈 방향 → 막대 → 미니 도로)은 경로만, 규정은 옆으로. 근거 01_프로젝트/10_HUD_GUI_설계.md 0-4절 -->
+        <g id="info" transform="translate(112 34)">
+          <circle r="21" fill="#fff" fill-opacity=".92" stroke="#e5262b" stroke-width="5"/>
+          <text id="limA" y="6.8" text-anchor="middle" font-size="19" font-weight="700" fill="#111" class="hud-t tnum">80</text>
         </g>
       </g>
 
@@ -229,7 +231,7 @@
   <label>다음 참가자 <input type="text" id="pid" value="P1" autocomplete="off"></label>
   <div id="summary"></div>
   <div class="tablewrap"><table>
-    <thead><tr><th>참가자</th><th>HUD</th><th>맵</th><th>상황</th><th>결과</th><th>옮긴 지점(m)</th><th>반응(초)</th><th>위험</th><th>이탈</th><th>시간(초)</th></tr></thead>
+    <thead><tr><th>참가자</th><th>HUD</th><th>시간대</th><th>맵</th><th>상황</th><th>결과</th><th>마감선 앞(m)</th><th>반응(초)</th><th>위험</th><th>보행자</th></tr></thead>
     <tbody id="logBody"></tbody>
   </table><div class="empty" id="logEmpty">아직 기록이 없습니다. 주행 테스트를 하면 여기에 쌓입니다.</div></div>
   <div class="row">
@@ -242,13 +244,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <!-- 엑셀 내보내기: SheetJS 0.18.5 (Apache-2.0). 못 불러오면 session.js가 CSV로 대신 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- 순서 중요: 상수 → 맵 → 3D장면 → 실내 → HUD → 주행 → 로직 → 주행 테스트 진행 -->
+<!-- 순서 중요: 상수 → 맵 → 3D장면 → 실내 → HUD → 주행 → 일반도로(교차로 · 신호 · 보행자) → 로직 → 주행 테스트 진행 -->
 <script src="config.js"></script>
 <script src="maps.js"></script>
 <script src="scene.js"></script>
 <script src="cabin.js"></script>
 <script src="hud.js"></script>
 <script src="drive.js"></script>
+<script src="city.js"></script>
 <script src="main.js"></script>
 <script src="session.js"></script>
 <script src="explain.js"></script>

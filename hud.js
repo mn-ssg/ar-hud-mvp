@@ -1,7 +1,7 @@
 /* ============================================================
    hud.js — 유리 위 HUD 상자(SVG) 그리기
    · 현대 HUD(대조군): 사용자가 준 현대 HUD 사진을 그대로 재현 — 근거는 01_프로젝트/13_현대HUD_재현.md
-   · 우리 HUD v1.4: 정보 위계대로 ① 들어갈 차로·경로(미니 도로, 가장 크고 진하게) ② 갈 방향(화살표만) ③ 언제(막대·마감선) ④ 속도(작고 흐리게)
+   · 우리 HUD v1.4: 정보 위계대로 ① 들어갈 차로·경로(미니 도로, 가장 크고 진하게) ② 갈 방향(화살표만) ③ 언제(막대·마감선) ④ 제한속도(왼쪽 위 표지, v1.8 — 차속은 계기판으로)
      행동 단계 글자는 없다 — 상태는 미니 도로의 옮길 화살표와 막대만으로. 설계 근거는 01_프로젝트/10_HUD_GUI_설계.md
    · 맵 5종(maps.js): 분기 그림·차로 안내 칸·미니 도로를 맵 데이터로 그린다. C = 다음 갈림 정보(main.js navCtx)
    config.js, maps.js, scene.js 다음에 로드. 상태 S·path는 main.js에서 정의(호출 시점엔 존재).
@@ -48,7 +48,7 @@ function navMarkup(){
     </g>
     <g id="nvLanes"></g>
     <!-- 제한속도 -->
-    <g id="nvLimit"><circle cx="49.4" cy="121.5" r="21.6" fill="#fff" stroke="#e5262b" stroke-width="5.6"/><text x="49.4" y="128.2" text-anchor="middle" font-size="18.5" font-weight="700" fill="#111">80</text></g>
+    <g id="nvLimit"><circle cx="49.4" cy="121.5" r="21.6" fill="#fff" stroke="#e5262b" stroke-width="5.6"/><text id="nvLimitN" x="49.4" y="128.2" text-anchor="middle" font-size="18.5" font-weight="700" fill="#111">80</text></g>
     <!-- 원근 도로 · 주변 차 · 차로 유지 보조 -->
     <g id="nvRoad">
       <g filter="url(#glow)">
@@ -82,6 +82,11 @@ function navMarkup(){
 }
 $('#navHud').innerHTML = navMarkup();
 
+// 제한속도 · 고속도로 주행 보조(HDA)는 맵마다: 일반도로 50 · HDA 없음 (D69)
+function setLimitSign(m){
+  $('#limA').textContent = $('#nvLimitN').textContent = m.limit || 80;
+  $('#nvAdas').style.display = m.city ? 'none' : '';
+}
 // 차로 화살표: 본선 차로마다 그 차로가 가는 방향(곧장 ↑ · 오른쪽 ↱ · 왼쪽 ↰), 권장 차로(목적지 출구의 차로)는 파랑, 사이는 점선
 let nvLaneEls = [];
 function buildNavLanes(m){
@@ -121,8 +126,8 @@ function drawNav(p, f, C, kmh, remainKm, dangerOn){
   // 실제 HUD처럼 차로 칸(왼쪽 · 내 차로 · 오른쪽)에 맞춰 놓는다 — 내 차가 보는 방향 기준으로 두면 핸들을 조금만 틀어도
   // 먼 차가 옆으로 크게 밀려(60m 앞이면 3°에 약 3m) 고정된 차선 그림 밖으로 나감 (D63). 본선은 차로 번호 차, 갈림 뒤는 반올림
   const rx = -f.z, rz = f.x, cars = [], onMain = p.z > FORK_Z, myLane = laneOf(S.map, p.x);
-  queueCars.concat(S.drive ? flowCars : [otherCar]).forEach(c => {
-    if(!c.visible) return;
+  queueCars.concat(S.drive ? flowCars : [otherCar], [busMesh]).forEach(c => {
+    if(!c.visible || c.userData.onc) return;   // 마주 오는 차(일반도로)는 그리지 않음
     const dx = c.position.x - p.x, dz = c.position.z - p.z, main = onMain && c.position.z > FORK_Z - 20;
     const d = (main ? -dz : dx*f.x + dz*f.z) - 2.3, k = main ? laneOf(S.map, c.position.x) - myLane : Math.round((dx*rx + dz*rz)/LANE);
     if(d < 3 || d > 90 || Math.abs(k) > 1) return;
@@ -202,7 +207,7 @@ const AS = {icon:null, since:0, doneUntil:0, wasMove:false};
 function resetHud(){ AS.icon = null; AS.doneUntil = 0; AS.wasMove = false; }
 
 /* ---------- 우리 HUD v1.4 ---------- */
-function drawAr(p, f, C, k, dangerOn, kmh){
+function drawAr(p, f, C, k, dangerOn){
   const m = S.map, R = S.route, st = C.st, onMain = C.i === 0;
   const proj = makeProj(p, f), tx = R.tx, sgn = R.side, now = performance.now();
   // 뒤차 판단: 시연은 다가오는 차가 내 옆을 지나갈 때까지, 주행 테스트는 실제 옆 차로 차가 위험할 때 (drive.js hudThreat)
@@ -211,7 +216,7 @@ function drawAr(p, f, C, k, dangerOn, kmh){
   const tail = onMain && S.jam > 0 && S.q && S.q.backZ !== null ? S.q.backZ : null;
   const needMove = onMain && !inLane && st <= 3;
   const besideQueue = tail !== null && needMove && p.z <= tail + 2;          // 이미 줄 옆까지 와 버림
-  const gateZ = tail !== null ? tail + 10 : CHANGE_END;                      // 여기까지는 옮겨 있어야 함
+  const gateZ = tail !== null ? tail + 10 : changeEndOf(m);                  // 여기까지는 옮겨 있어야 함 (일반도로: 백색실선 시작)
   const frac = clamp((p.z - gateZ)/(0 - gateZ));
   const zNear = Math.min(p.z - 2, 40);
 
@@ -299,7 +304,7 @@ function drawAr(p, f, C, k, dangerOn, kmh){
   } else { ma.setAttribute('d', ''); mh.setAttribute('d', ''); ms.setAttribute('d', ''); $('#moveStopCore').setAttribute('d', ''); ma.classList.remove('flow'); }
   // 정체: 막힌 구간 빗금 + 줄 맨 뒤 '설 칸' + 줄 옆이면 끼어들 틈
   const jb = $('#jamBand');
-  if(tail !== null){ const dj = bandX(tx-1.7, tx+1.7, Math.min(tail, zNear), Q_FRONT, proj); jb.setAttribute('d', dj); jb.setAttribute('opacity', dj ? '.45' : '0'); }   // 차량이 함께 그려지므로 옅게
+  if(tail !== null){ const dj = bandX(tx-1.7, tx+1.7, Math.min(tail, zNear), qFrontOf(m), proj); jb.setAttribute('d', dj); jb.setAttribute('opacity', dj ? '.45' : '0'); }   // 차량이 함께 그려지므로 옅게
   else jb.setAttribute('opacity','0');
   $('#slot').setAttribute('d', tail !== null && p.z > tail + 14 ? quadZ(tx-1.3, tx+1.3, tail+10, tail+5, proj) : '');
   $('#slot').setAttribute('opacity', (.7 + .3*Math.sin(now/260)).toFixed(2));
@@ -332,6 +337,19 @@ function drawAr(p, f, C, k, dangerOn, kmh){
   cb.setAttribute('opacity', (behind && sgn !== 0 && !inLane ? dz*(.85 + .15*Math.sin(now/170)) : 0).toFixed(2));   // 맥박 바닥을 높여 늘 대비 3:1 이상
   cb.setAttribute('transform', `translate(${(HX + sgn*LANE*PXM).toFixed(1)} 222) scale(${(0.8 + dz*.45).toFixed(2)})`);   // 옆 차로 한가운데
 
-  /* ④ 속도 */
-  $('#spdA').textContent = kmh;
+  /* 일반도로 (D69): 멈춰야 할 곳에 빨간 막대(대기와 같은 색) — 빨간불이면 정지선(들어갈 차로들 폭), 사람이 건너거나 건너려 하면 횡단보도 앞.
+     보행자는 흰 점. 현대 HUD(대조군)엔 없음 — 실제 순정 HUD처럼 */
+  let cs = '', pd = '';
+  if(m.city){
+    const t = S.cityT, e1 = R.leaf.path[0];
+    if(onMain && p.z > FORK_Z - 1 && sigOf(e1.key, t) === 'red') cs += quadZ(m.laneX(e1.lanes[0]) - 1.75, m.laneX(e1.lanes[e1.k-1]) + 1.75, FORK_Z + .6, FORK_Z - .6, proj);
+    if(m.cw){
+      if(pedBlock(t) && p.x < m.cw.x0) cs += quadW([[m.cw.x0 - 1.5, CZ.near], [m.cw.x0 - .4, CZ.near], [m.cw.x0 - .4, CZ.mid], [m.cw.x0 - 1.5, CZ.mid]], proj);
+      pedsAt(t).forEach(q => { const c = proj(q.x, q.z); if(!c) return; const r = Math.max(1.8, 4.5*c[2]);
+        pd += `M${(c[0] - r).toFixed(1)} ${c[1].toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2*r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2*r).toFixed(1)} 0Z`; });
+    }
+  }
+  $('#cityStop').setAttribute('d', cs); $('#pedDots').setAttribute('d', pd);
 }
+// 월드 좌표 사각형(네 꼭짓점)을 미니 도로에
+function quadW(pts, proj){ const q = pts.map(a => proj(a[0], a[1])); return q.every(Boolean) ? 'M' + q.map(fmt).join('L') + 'Z' : ''; }
