@@ -19,7 +19,7 @@ const grainTex = (base, amp, n) => canvasTex(256, 256, (g, w, h) => {
 const softTex = grainTex('#8a8d93', .06, 9000); softTex.repeat.set(8, 8);      // 대시보드 소프트 플라스틱(무광 결)
 const leatherTex = grainTex('#8a8b90', .12, 7000); leatherTex.repeat.set(24, 2);
 const CM = {
-  dash:  new THREE.MeshStandardMaterial({map:softTex, color:lin('#3a3c41'), roughness:.9, envMapIntensity:.2}),
+  dash:  new THREE.MeshStandardMaterial({map:softTex, color:lin('#3b3d42'), roughness:.92, envMapIntensity:.18}),
   dashLow: new THREE.MeshStandardMaterial({map:softTex, color:lin('#2b2d31'), roughness:.88, envMapIntensity:.2}),
   piano: new THREE.MeshStandardMaterial({color:lin('#07080a'), roughness:.1, metalness:.4, envMapIntensity:1}),        // 디스플레이 테 · 버튼 판(유광 검정)
   satin: new THREE.MeshStandardMaterial({color:lin('#b4b9c0'), roughness:.3, metalness:.95, envMapIntensity:.9}),       // 송풍구 날개 · 핸들 장식
@@ -52,13 +52,29 @@ function extrudeX(pts, x0, x1, mat){
    윗면은 운전자 쪽으로 낮아지며(계기판 자리) 둥글게 꺾여 앞면으로. 앞면엔 가로 금속 띠 + 얇은 송풍구 (요즘 국산 중형 세단 구성) */
 const COWL = {y:-.205, z:-1.05};
 extrudeX([[COWL.z, COWL.y], [-.90, -.222], [-.80, -.245], [-.70, -.262], [-.615, -.272, -.585, -.29], [-.572, -.31, -.574, -.335],
-  [-.574, -.36], [-1.1, -.36]], -.62, 1.36, CM.dash);
-extrudeX([[-.574, -.36], [-.55, -.47], [-.47, -.62], [-.62, -.82], [-1.1, -.82], [-1.1, -.36]], -.62, 1.36, CM.dashLow);
+  [-.574, -.36], [-1.1, -.36]], -1.1, 1.36, CM.dash);   // 왼쪽 끝 −1.1: 문 안쪽까지 (2026-10-29 — 예전 −0.62에서 끝나 왼쪽 아래로 도로가 보였음)
+extrudeX([[-.574, -.36], [-.55, -.47], [-.47, -.62], [-.62, -.82], [-1.1, -.82], [-1.1, -.36]], -1.1, 1.36, CM.dashLow);
 cadd(new THREE.BoxGeometry(1.9, .016, .012), CM.band, .37, -.318, -.576);                     // 가로 금속 띠
 
 cadd(new THREE.BoxGeometry(1.9, .013, .012), CM.piano, .37, -.336, -.577);                     // 얇은 송풍구 틈
 for(const x of [-.38, .2, .55, 1.0]) for(let k=0;k<4;k++) cadd(new THREE.BoxGeometry(.003, .011, .014), CM.satin, x + k*.022, -.336, -.574);   // 송풍구 날개
 cadd(new THREE.BoxGeometry(1.9, .0022, .004), CM.ambient, .37, -.3055, -.5765);                // 무드등 띠
+
+/* 2026-10-29: 대시보드 표면 소재 구분 — 윗면 패드(가죽 결 · 박음질 두 줄) / 앞유리 밑 서리 제거 송풍구 / 유리 아래끝 검은 세라믹 띠 */
+const padTex = canvasTex(256, 256, (g, w, h) => {   // 가죽 결: 작은 주름 점
+  g.fillStyle = '#7e8187'; g.fillRect(0, 0, w, h);
+  for(let i = 0; i < 5200; i++){ const v = Math.random() < .5 ? 40 : 200; g.fillStyle = `rgba(${v},${v},${v},${Math.random()*.08})`; g.beginPath(); g.ellipse(Math.random()*w, Math.random()*h, 1 + Math.random()*1.6, .6 + Math.random(), Math.random()*3, 0, 6.3); g.fill(); }
+}, true); padTex.repeat.set(10, 6);
+CM.pad = new THREE.MeshStandardMaterial({map:padTex, color:lin('#34363a'), roughness:.78, envMapIntensity:.25});
+CM.stitch = new THREE.MeshStandardMaterial({color:lin('#55585e'), roughness:.8});
+CM.frit = new THREE.MeshBasicMaterial({map:canvasTex(8, 64, (g, w, h) => { const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, 'rgba(6,7,9,1)'); gr.addColorStop(.55, 'rgba(6,7,9,.9)'); gr.addColorStop(1, 'rgba(6,7,9,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }), transparent:true, depthWrite:false});
+// 윗면 패드: 대시보드 윗면 모양을 따라 1.5mm 위에 얹은 판 (운전자 앞 ~ 조수석 앞)
+extrudeX([[-.93, -.2155], [-.90, -.2205], [-.80, -.2435], [-.70, -.2605], [-.64, -.2685], [-.64, -.2725], [-.93, -.2195]], -.6, 1.34, CM.pad);
+for(const [z, y] of [[-.905, -.2185], [-.648, -.2672]]) for(let x = -.58; x < 1.33; x += .012) cadd(new THREE.BoxGeometry(.006, .0011, .0018), CM.stitch, x, y + .001, z);   // 박음질 (패드와 비슷한 색 — 도로 선처럼 튀지 않게)
+// 서리 제거 송풍구: 앞유리 밑 가로 홈 + 날개
+cadd(new THREE.BoxGeometry(1.5, .003, .03), CM.piano, .37, -.2122, -.985);   // 서리 제거 송풍구 홈 (날개는 홈 안에 숨어 보이지 않음)
+// 앞유리 아래끝 검은 세라믹 띠 (위로 갈수록 옅어짐)
+cadd(new THREE.PlaneGeometry(2.6, .035), CM.frit, .37, COWL.y + .016, COWL.z - .005, -.25);
 
 /* ---------- 파노라마 디스플레이: 계기판(운전자 정면) + 센터 화면(오른쪽)을 한 유리로 ---------- */
 const PANEL = {x:.22, y:-.205, z:-.74, tilt:-.12};

@@ -15,7 +15,18 @@ const PROPS = (() => {
   });
   const leafMat = new THREE.MeshStandardMaterial({map:leafFallback, alphaTest:.42, side:THREE.DoubleSide, roughness:.9, envMapIntensity:.25});
   const leafDepth = new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, map:leafFallback, alphaTest:.42});
-  loadTex('assets/tex/leaves.png', t => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; leafMat.map = t; leafDepth.map = t; leafMat.needsUpdate = leafDepth.needsUpdate = true; });
+  // 잎 덩어리 판이 네모로 보이지 않게: 불러온 잎 그림에 들쭉날쭉한 둥근 가장자리(잡음 섞인 원)를 곱함
+  loadTex('assets/tex/leaves.png', t => {
+    const img = t.image, c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height), W = c.width, H = c.height;
+    for(let y = 0; y < H; y++) for(let x = 0; x < W; x++){
+      const dx = (x - W/2)/(W/2), dy = (y - H/2)/(H/2), a = Math.atan2(dy, dx), r = Math.hypot(dx, dy), edge = .78 + .14*Math.sin(a*5 + 1.3) + .08*Math.sin(a*11);
+      if(r > edge) d.data[(y*W + x)*4 + 3] = 0; else if(r > edge - .12) d.data[(y*W + x)*4 + 3] *= (edge - r)/.12;
+    }
+    g.putImageData(d, 0, 0);
+    const ct = new THREE.CanvasTexture(c); ct.encoding = THREE.sRGBEncoding; ct.anisotropy = MAX_ANISO;
+    leafMat.map = ct; leafDepth.map = ct; leafMat.needsUpdate = leafDepth.needsUpdate = true;
+  });
 
   // 나무 한 그루 모양 (원점 = 밑동, 높이 ≈ 8m). r: 이 모양만의 난수
   function treeShape(R){

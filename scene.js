@@ -542,11 +542,17 @@ function profileGeo(pts, T, depth, bevel, arches){
   return g;
 }
 const carGeoCache = {};
+// 옆면 기울기 (2026-10-29): 밀어낸 판이라 옆면이 수직 벽이었음 → 허리선(belt) 위로 갈수록 안쪽으로(텀블홈), 유리 캐빈은 더 많이 좁힘
+function tumble(g, y0, y1, k){
+  const p = g.attributes.position;
+  for(let i = 0; i < p.count; i++){ const y = p.getY(i), t = clamp((y - y0)/(y1 - y0)); p.setX(i, p.getX(i)*(1 - k*t)); }
+  p.needsUpdate = true; g.computeVertexNormals(); return g;
+}
 function carGeo(type){
   if(carGeoCache[type]) return carGeoCache[type];
-  const T = CAR_TYPES[type], cw = T.W - .34, out = {};
-  out.body = profileGeo(T.body, T, T.W - .1, true, true);
-  out.cabin = profileGeo(T.cabin, T, cw, true, false);
+  const T = CAR_TYPES[type], cw = T.W - .26, out = {}, belt = T.cabin[0][1] - .02, top = Math.max(...T.cabin.map(q => q[1]));
+  out.body = tumble(profileGeo(T.body, T, T.W - .1, true, true), belt - .35, belt, .05);
+  out.cabin = tumble(profileGeo(T.cabin, T, cw, true, false), belt, top, .24);
   // 뒷유리 양옆 C필러 + 윗테 (차체색) — 뒤에서 봤을 때 유리 덩어리가 아니라 창으로 보이게
   const [p0, p1] = T.cabin, ds = p1[0]-p0[0], dy = p1[1]-p0[1], len = Math.hypot(ds,dy), nx = -dy/len, ny = ds/len;
   const off = .065, mid = [(p0[0]+p1[0])/2 + nx*off, (p0[1]+p1[1])/2 + ny*off], rot = Math.atan2(-ds, dy);
@@ -596,9 +602,14 @@ function carParts(type){
     P.glass.push([geo.cabin, I]);
     P.trim.push([box(T.W-.24, .13, .08), at(0,.38,T.pz-.04)]);
     const [fx, fy] = T.cabin[3];
-    for(const sx of [-1,1]) P.paint.push([box(.2, .12, .1), at(sx*(T.W/2+.06), fy+.06, -(fx-.15))]);
+    // 문 거울: 앞 유리 기둥 밑, 받침(검정) + 덮개(차체색)
+    for(const sx of [-1,1]){ P.trim.push([box(.12, .05, .08), at(sx*(T.W/2 + .02), fy + .04, -(fx - .22))]); P.paint.push([box(.1, .13, .19), at(sx*(T.W/2 + .1), fy + .1, -(fx - .2))]); }
+    // 뒤 범퍼 아래 검은 띠 · 바퀴집 아래 옆 검은 띠
+    P.trim.push([box(T.W - .1, .16, .1), at(0, .3, T.pz - .02)]);
+    for(const sx of [-1,1]) P.trim.push([box(.04, .1, Math.abs(T.wf - T.wr) - .9), at(sx*(T.W/2 - .03), .3, -(T.wf + T.wr)/2)]);
   }
-  for(const sx of [-1,1]) P.lamp.push([box(.4, .13, .05), at(sx*(T.W/2-.3), T.tail, T.tz)]);
+  for(const sx of [-1,1]) P.lamp.push([box(.46, .12, .05), at(sx*(T.W/2-.31), T.tail, T.tz)]);
+  if(type !== 'truck') P.lamp.push([box(T.W - 1.2, .025, .04), at(0, T.tail + .03, T.tz)]);   // 가운데 이어진 미등 선
   P.plate.push([box(.52, .12, .02), at(0,.52,T.pz)]);
   // 앞: 전조등 2 · 주간등 띠 · 그릴 · 앞 번호판 · 범퍼 아래 검은 띠 → 미러 · 마주 오는 차에서 앞모습이 읽힘
   for(const sx of [-1,1]){ P.head.push([box(.42, .11, .06), at(sx*(T.W/2-.32), T.hy, T.hz)]); P.head.push([box(.3, .025, .065), at(sx*(T.W/2-.36), T.hy + .085, T.hz)]); }

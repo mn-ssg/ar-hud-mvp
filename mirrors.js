@@ -46,7 +46,7 @@ const MIR = {
     }`;
   const stemMat = new THREE.MeshBasicMaterial({color:0x101215});
   // 거울을 차에 붙이는 부분 (2026-10-29): 사이드미러 = 화면 가장자리 문 쪽에서 거울 밑으로 오는 검은 받침(도어 삼각 패널), 룸미러 = 앞유리 위 센서 덮개
-  const mountMat = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide, depthTest:false, depthWrite:false});
+  const mountMat = MIR.mountMat = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide, depthTest:false, depthWrite:false});
   const polyGeo = (pts, top, bot) => { const g = new THREE.BufferGeometry(), pos = [], col = [], ymin = Math.min(...pts.map(p => p[1])), ymax = Math.max(...pts.map(p => p[1]));
     for(let i = 1; i < pts.length - 1; i++) [pts[0], pts[i], pts[i+1]].forEach(([x, y]) => { pos.push(x, y, 0); const t = (y - ymin)/Math.max(1, ymax - ymin); col.push(bot[0] + (top[0] - bot[0])*t, bot[1] + (top[1] - bot[1])*t, bot[2] + (top[2] - bot[2])*t); });
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); return g; };
@@ -94,6 +94,7 @@ const MIR = {
     if(!MIR.on || typeof EGO === 'undefined') return;
     MIR.ema += (frameMs - MIR.ema)*.05; MIR.slow = MIR.ema > 24; MIR.frame++;
     const dim = NIGHT ? .92 : 1, sm = renderer.shadowMap.autoUpdate;
+    MIR.mountMat.color.setScalar(NIGHT ? .22 : 1);   // 거울 받침 · 센서 덮개: 밤엔 실내처럼 어둡게
     renderer.shadowMap.autoUpdate = false;
     MIR.list.forEach((M, i) => {
       M.mat.uniforms.dim.value = dim;
