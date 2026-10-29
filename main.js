@@ -420,7 +420,7 @@ addEventListener('keydown', e => {
 
 /* ---------- 시작 ---------- */
 $$('[data-ico]').forEach(el => el.insertAdjacentHTML('afterbegin', ico(el.dataset.ico)));   // 버튼 아이콘 채우기
-$('#hudWrap').style.bottom = (cowlBottomPct() + .2).toFixed(1) + '%';   // HUD 아래끝 = 대시보드 윗선 바로 위
+$('#hudWrap').style.bottom = (cowlBottomPct() + 2.5).toFixed(1) + '%';   // HUD 아래끝 = 대시보드 윗선보다 화면 높이 2.5%만큼 위 (2026-10-29 사용자: 살짝 올림, 예전 +0.2%)
 setMode('ar'); setLight('day'); prepDemo(); update(1); setScreen('home');
 requestAnimationFrame(frame);
 prebuildMaps(() => !S.running);   // 멈춰 있을 때 나머지 맵을 미리 지어 둔다
