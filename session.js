@@ -1,7 +1,7 @@
 /* ============================================================
    session.js — 주행 테스트 진행 · 기록 · 내보내기 (2026-10-29 개편, 예전 D60 · D64 · D65 · D68 · D70 위에)
    흐름: 참가자 정보 → (연습 주행) → HUD A 3판 → 질문 2개 → HUD B 3판 → 질문 2개 → 요약 + 엑셀 자동 저장
-   · 비교: 현대 HUD · 우리 HUD. 순서는 참가자 번호 홀수 현대 먼저 · 짝수 우리 먼저 (연구자 설정에서 고정할 수 있음)
+   · 비교: 현대 HUD · 우리 HUD, 순서는 늘 현대 HUD 먼저 (2026-10-29 — 교대 · 고르기 없음, 1차 실험과 같음)
    · 시나리오(맵 · 상황 · 시간대 · 교통 번호 · 시작 차로 · 목적지 · 신호 시각)는 짝마다 한 번 정해 두 HUD 블록이 그대로 다시 씀
      → HUD만 다르고 교통은 같다 (예전엔 블록마다 교통 번호 · 목적지를 새로 뽑았음)
    · 연습 주행은 HUD 없이, 본 기록(hud-drive-v1)과 따로(hud-drive-practice-v1) 저장 → 결과에 섞이지 않음
@@ -32,20 +32,14 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(
 const envName = () => `환경 ${ENV_VER} · 미러 ${MIR.on ? '켬' : '끔'}`;
 
 /* ---------- 실험 설정 (연구자 설정 패널) ---------- */
-const EXP = Object.assign({order:'auto', practice:true}, (() => { try{ const o = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); return {order:o.order || 'auto', practice:o.practice !== false}; }catch(e){ return {}; } })(), {pair:['nav', 'ar']});   // 비교는 늘 현대 · 우리
+const EXP = Object.assign({practice:true}, (() => { try{ const o = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); return {practice:o.practice !== false}; }catch(e){ return {}; } })(), {pair:['nav', 'ar'], order:'AB'});   // 늘 현대 → 우리
 const saveExp = () => { try{ localStorage.setItem(CFG_KEY, JSON.stringify(EXP)); }catch(e){} renderExp(); };
 function renderExp(){
-  $$('#orderSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.order === EXP.order)));
   $('#practiceChk').checked = EXP.practice;
 }
-$$('#orderSeg button').forEach(b => b.onclick = () => { EXP.order = b.dataset.order; saveExp(); });
 $('#practiceChk').onchange = e => { EXP.practice = e.target.checked; saveExp(); };
-// 제시 순서: 참가자 번호 홀수 A(현대) → B(우리) · 짝수 B → A (번호가 없으면 지금까지 참가자 수로)
-function orderFor(pid){
-  if(EXP.order !== 'auto') return EXP.order;
-  const m = String(pid).match(/(\d+)\s*$/), n = m ? +m[1] : new Set(drives.map(r => r.p)).size + 1;
-  return n % 2 ? 'AB' : 'BA';
-}
+// 제시 순서: 늘 현대 HUD → 우리 HUD ('AB')
+const orderFor = () => 'AB';
 
 /* ---------- 진행 순서 ---------- */
 const SES = {on:false, pid:'', steps:[], i:-1, rows:[], qs:[], prs:[], order:'AB', cur:null, timer:0, seq:0};
@@ -99,14 +93,14 @@ function lockUi(on){
 
 /* ---------- 흐름 ---------- */
 function openSession(){
-  stopDemo();
+  stopDemo(); openSetup(false); setScreen('prep');
   const pid = $('#pid').value || 'P1';
   sesCard({eyebrow:'주행 테스트', title:'참가자 정보', body:`<label class="pid">참가자 ID<input type="text" id="sesPid" value="${esc(pid)}" autocomplete="off"></label>
     <p class="ses-note">HUD를 보고 <b>목적지 출구</b>로 가 주세요. 3회씩 두 번, 모두 6회 주행합니다.</p>${KEY_HINT}
     <p class="ses-meta" id="sesMeta"></p>`,
     btn:['시작', beginSession], btn2:['뒤로', goHome]});
   const meta = () => { const o = orderFor($('#sesPid').value || 'P1'), [x, y] = o === 'AB' ? EXP.pair : EXP.pair.slice().reverse();
-    $('#sesMeta').innerHTML = `연구자 확인 · 순서 <b>${modeShort(x)} → ${modeShort(y)}</b>${EXP.order === 'auto' ? ' (번호로 교대)' : ''} · 연습 주행 ${EXP.practice ? '있음' : '없음'} · ${envName()}`; };
+    $('#sesMeta').innerHTML = `연구자 확인 · 순서 <b>${modeShort(x)} → ${modeShort(y)}</b> · 연습 주행 ${EXP.practice ? '있음' : '없음'} · ${envName()}`; };
   $('#sesPid').oninput = meta; meta();
 }
 function beginSession(){
@@ -222,7 +216,7 @@ function onDriveEnd(){
   }
   drives.push(row); saveArr(DKEY, drives); SES.rows.push(row); renderLog();
   const runs = SES.steps.filter(x => x.kind === 'run'), idx = runs.indexOf(st) + 1;
-  sesCard({icon:good ? 'check' : 'cross', tone:good ? 'ok' : 'bad', eyebrow:`${idx} / ${runs.length} 회`, title:RESULT[res], body:'', btn:['다음', nextStep]});
+  sesCard({icon:good ? 'check' : 'cross', tone:good ? 'ok' : 'bad', eyebrow:`${modeName(st.hud)} ${st.no} / 3 · 전체 ${idx} / ${runs.length}`, title:RESULT[res], body:'', btn:['다음', nextStep]});
 }
 function doneSession(){
   const name = `주행테스트_${SES.pid}_${today()}`, rows = SES.rows, qs = SES.qs, prs = SES.prs;
@@ -287,7 +281,7 @@ const evDetail = e => e.type === 'gate' ? `${GATE_NAME[e.from]} → ${GATE_NAME[
   : e.type === 'cutIn' ? `${e.lane + 1}차로${e.risky ? ' · 위험 (' + e.with + ')' : ''}` : e.type === 'hazardOn' ? `${e.lane + 1}차로 · ${e.with}` : e.type === 'crash' ? e.with : e.type === 'lcAbort' ? `${e.from + 1} → ${e.to + 1}차로` : '';
 const evRows = rows => rows.flatMap(r => (r.events || []).map(e => [r.p, modeName(r.hud), r.scn ?? '', r.seq ?? '', e.t, EV_NAME[e.type] || e.type, evDetail(e)]));
 const EXPLAIN = [['칸','뜻','어떻게 읽나'],
-  ['HUD','현대 HUD = 지금 차에 있는 HUD(대조군) · 우리 HUD = 초보자용으로 만든 HUD. 어느 때의 HUD였는지는 \'HUD 버전\' 칸(빈칸 = 1차 실험 때)','같은 사람이 두 HUD를 3판씩. 2026-10-29부터 순서는 참가자 번호로 교대(홀수 현대 먼저 · 짝수 우리 먼저)'],
+  ['HUD','현대 HUD = 지금 차에 있는 HUD(대조군) · 우리 HUD = 초보자용으로 만든 HUD. 어느 때의 HUD였는지는 \'HUD 버전\' 칸(빈칸 = 1차 실험 때)','같은 사람이 현대 HUD 3판 → 우리 HUD 3판 (순서 고정)'],
   ['시간대','주간 · 야간 (시나리오마다, 같은 시나리오는 두 HUD가 같은 시간대)','야간에 차이가 더 커지는지 볼 수 있음'],
   ['맵 · 상황','고속도로 ① IC 진출 · ② JC 4차로 · ③ 연속 분기 / 일반도로 ④ 이중 좌회전 · ⑤ 우회전 · 횡단보도','같은 상황끼리 HUD를 비교'],
   ['결과','성공 = 목적지 출구로 감 · 다른 출구 · 충돌(무엇과) · 시간 초과 · 신호 위반','성공률이 높을수록 좋음'],

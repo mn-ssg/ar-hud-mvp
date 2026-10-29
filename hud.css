@@ -14,14 +14,19 @@
    실제 순정 HUD 허상은 수평 약 5 ~ 10°(자료마다 다름 — 10_HUD_GUI_설계 0-7절)인데 이 화면의 카메라 수평 시야가 약 90°라
    각도 그대로면 폭 6 ~ 11%로 그림 · 숫자를 읽기 어렵다 → 그 사이 값. 두 HUD가 같은 상자를 써서 비교 조건은 같다 */
 #hudWrap{ position:absolute; left:50%; bottom:32.6%; transform:translateX(-50%); transform-origin:50% 100%; width:clamp(200px, 16.5%, 360px); pointer-events:none; transition:transform .35s ease; }
-#hudWrap svg{ display:block; width:100%; height:auto; overflow:hidden; mix-blend-mode:screen; }
+#hudWrap svg{ display:block; width:100%; height:auto; overflow:hidden; mix-blend-mode:screen; filter:drop-shadow(0 0 3px rgba(255,255,255,.16)); }
 .tnum{ font-variant-numeric:tabular-nums; }
 /* 야간: HUD 전체 밝기 · 채도 · 빛 번짐을 낮춤 — 우리 HUD · 기존 HUD 똑같이 (실제 순정 HUD의 밤 자동 감광처럼).
    빛 번짐 반경은 main.js setLight가 #glow 흐림(2.4 → 1.1)으로 줄임 */
 .cab.night #hudWrap svg{ filter:brightness(.9) saturate(.9) drop-shadow(0 0 1.5px rgba(255,255,255,.05)); }
 /* 우리 HUD 야간: 맥락(도로 윤곽) · 보조(표지) · 내 차를 더 낮춤. 경로 · 위험 · 이동은 그대로 */
-.cab.night #ahEdges{ fill-opacity:.3; } .cab.night #ahDash{ fill-opacity:.18; } .cab.night #ahSurf{ fill-opacity:.03; }
-.cab.night #ahLg0{ stop-opacity:.48; } .cab.night #ahLg1{ stop-opacity:.22; } .cab.night #ahLg2{ stop-opacity:.06; } .cab.night #ahEgo{ opacity:.8; } .cab.night #ahInfo{ opacity:.72; }
+.cab.night #roadEdges{ fill-opacity:.34; }
+.cab.night #roadDash{ fill-opacity:.22; }
+.cab.night #roadSurf{ fill-opacity:.03; }
+.cab.night #lgA{ stop-opacity:.5; } .cab.night #lgB{ stop-opacity:.24; } .cab.night #lgC{ stop-opacity:.08; }
+.cab.night #ego{ opacity:.78; }
+.cab.night #carBehind circle{ opacity:.5; }
+.cab.night #info{ opacity:.72; }   /* v1.8: 표지가 커져 밤엔 흰 면이 눈부시지 않게 */
 /* 발표용 'HUD 설명 보기': HUD를 키우고 층마다 이름표 (explain.js) */
 .cab.explain #hudWrap{ transform:translateX(-50%) scale(1.6); }
 #explain{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; display:none; font-family:var(--font); }
@@ -84,6 +89,12 @@ kbd{ display:inline-grid; place-items:center; min-width:24px; height:24px; paddi
 
 
 
+/* ---------- 우리 HUD 애니메이션 (V1 그대로): 옮길 화살표 흐름 ---------- */
+@keyframes hudFlow{ to{ stroke-dashoffset:-52; } }   /* hud.js 흐름 점선 '12 14'의 2주기 */
+#moveArrow.flow{ animation: hudFlow .7s linear infinite; }
+
 @media (prefers-reduced-motion: reduce){
   *{ transition:none !important; }
+  #moveArrow.flow{ animation:none; }
+  #jamHatch animateTransform{ display:none; }
 }

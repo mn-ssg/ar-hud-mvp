@@ -60,21 +60,6 @@ const AUTOPILOT = () => {
   const vis = id => { const e = document.getElementById(id); return e && e.style.display !== 'none'; };
   window.navSample = () => { const C = navCtx(S.s);
     return {t:+D.t.toFixed(2), d:+C.d.toFixed(1), phase:C.phase, chosen:D.chosen.length, turn:vis('nvTurn'), straight:vis('nvStraight'), dist:document.getElementById('nvDistN').textContent + document.getElementById('nvUnit').textContent, name:document.getElementById('nvName').textContent, v:+D.v.toFixed(2)}; };
-  // 우리 HUD 한 프레임 요약: 판단 상태 + 실제로 그려진 것 (path d · 투명도 · 뒤 띠 차의 자리)
-  const ptsOf = d => { const o = []; (d || '').replace(/(-?[\d.]+) (-?[\d.]+)/g, (_, x, y) => { o.push([+x, +y]); return ''; }); return o; };
-  window.ahSample = () => {
-    const G = S.G, at = id => document.getElementById(id).getAttribute('d') || '', op = id => +(document.getElementById(id).getAttribute('opacity') ?? 1);
-    const rear = [...document.querySelectorAll('#ahRear > g')].filter(g => +g.getAttribute('opacity') > 0).map(g => ({x:+g.getAttribute('transform').match(/translate\((-?[\d.]+)/)[1], hot:g.querySelector('rect').getAttribute('fill') === C_DANGER}));
-    const lanePts = ptsOf(at('ahLane') + at('ahRails'));
-    return {t:+D.t.toFixed(2), z:+D.z.toFixed(1), x:+D.x.toFixed(2), gate:G.gate, need:G.need, side:G.side, intent:G.intent,
-      go:at('ahGo').length > 0, wall:at('ahWall').length > 0 && op('ahWall') > .02, wallOp:op('ahWall'), slot:at('ahSlot').length > 0, queue:at('ahQueue').length > 0,
-      icon:['ahIcoL','ahIcoS','ahIcoR'].find(id => document.getElementById(id).style.display !== 'none') || null,
-      dirSide:G.dir ? G.dir.side : 0, dirZone:G.dir ? G.dir.zone : '', reasonKind:G.reason ? G.reason.kind : '', jam:!!G.jam, beside:G.jam ? G.jam.beside : false,
-      rear, hotRear:rear.filter(r => r.hot), hazAhead:at('ahHazAhead').length > 0, nearRails:[...at('ahNearRails').matchAll(/M(-?[\d.]+)/g)].map(m => +m[1]),
-      laneMaxY:lanePts.length ? Math.max(...lanePts.map(q => q[1])) : null, laneN:lanePts.length,
-      laneXmin:lanePts.length ? Math.min(...lanePts.map(q => q[0])) : null, laneXmax:lanePts.length ? Math.max(...lanePts.map(q => q[0])) : null, turnMark:at('ahTurn').length > 0,
-      blockers:G.A.blockers.map(b => ({kind:b.c.kind, rel:b.rel, lat:+((b.c.x - D.x)).toFixed(1)}))};
-  };
 };
 
 const results = [];
@@ -142,153 +127,37 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     await E(() => stopDrive());
   }
 
-  /* ---------- 2. 뒤차 위험 · 대기 → 확인 → 이동 (우리 HUD, 글자 없이 그래픽만) ---------- */
-  const rear = async (seed, opts = {}) => E(([seed, opts]) => {
-    const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
-    return runDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed, sigT:0}, {hud:'ar', light:opts.light, sample:ahSample, secs:opts.secs || 22, ap:{mode:'lane', lane:1},
-      setup:() => { const lead = D.cars.find(c => c.kind === 'lead'); if(lead) lead.brakeAt = null; }});
-  }, [seed, opts]);
-  // 뒤차가 3대 이상 오는 seed 찾기
+  // 2026-10-29: 우리 HUD를 중간고사 V1(470a8f7)로 되돌려 v2 그래픽 전용 검사(벽 · 꺾쇠 · 정체 띠 등)는 뺌 — 판단 로직은 guide.test.js
   const seeds = await E(() => { const out = []; const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
-    for(let s = 1; s < 400 && out.length < 3; s++){ setMode('ar'); startDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed:s, sigT:0}); if(D.cfg.rearN >= 3) out.push(s); stopDrive(); } return out; });
+    for(let s = 1; s < 400 && out.length < 1; s++){ setMode('ar'); startDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed:s, sigT:0}); if(D.cfg.rearN >= 3) out.push(s); stopDrive(); } return out; });
   {
-    const r = await rear(seeds[0]);
-    const S_ = r.samples, waits = S_.filter(s => s.gate === 'wait' && s.need), gos = S_.filter(s => s.gate === 'go' && s.need);
-    check(`뒤차 무리(seed ${seeds[0]}): 대기가 나옴`, waits.length > 0, `대기 ${waits.length}프레임`);
-    check('대기 · 확인 중에는 초록 꺾쇠(이동)가 절대 같이 나오지 않음', S_.filter(s => (s.gate === 'wait' || s.gate === 'clearing') && s.go).length === 0, '');
-    check('대기 중에는 늘 경계의 주황 벽, 이동 중에는 벽 없음', waits.every(s => s.wall) && gos.every(s => !s.wall && s.go), `대기 중 벽 없음 ${waits.filter(s => !s.wall).length} · 이동 중 벽 ${gos.filter(s => s.wall).length}`);
-    const rearWaits = waits.filter(s => s.dirZone === 'rear');
-    const badDir = rearWaits.filter(s => !(s.dirSide === 1 && s.hotRear.length && s.hotRear.every(h => h.x > 260)));
-    check('대기 이유인 뒤차 = 빨강, 내 차 기준 오른쪽 뒤(뒤 띠의 오른쪽)에 그려짐', rearWaits.length > 0 && badDir.length === 0, badDir.length ? JSON.stringify(badDir[0]).slice(0, 300) : `${rearWaits.length}프레임`);
-    const firstGo = S_.findIndex(s => s.gate === 'go'), lastWait = S_.map(s => s.gate).lastIndexOf('wait');
-    check('뒤차 한 대가 지나가도 다음 차가 위험하면 이동이 나오지 않음 (대기 → 이동은 마지막 위험 뒤에만)', firstGo === -1 || firstGo > lastWait, `첫 이동 ${firstGo} · 마지막 대기 ${lastWait}`);
-    const tr = []; S_.forEach((s, i) => { if(i && s.gate !== S_[i-1].gate) tr.push({t:s.t, from:S_[i-1].gate, to:s.gate}); });
-    const toGo = tr.find(x => x.to === 'go'), clr = tr.filter(x => x.to === 'clearing').pop();
-    check('위험이 풀리면 확인(벽이 옅어짐)을 거쳐 0.8초 뒤 이동', !toGo || (toGo.from === 'clearing' && clr && toGo.t - clr.t >= .75), JSON.stringify(tr.slice(0, 8)));
-    const cl = S_.filter(s => s.gate === 'clearing' && s.need);
-    check('확인 동안 벽 투명도가 줄어듦(한 번, 반복 없음)', cl.length < 2 || cl.every((s, i) => !i || s.wallOp <= cl[i-1].wallOp + 1e-6), cl.map(s => s.wallOp).join(','));
-    check('대기 ↔ 이동이 빠르게 깜빡이지 않음 (전환 10번 이하)', tr.length <= 10, `${tr.length}번 전환`);
-    check('대기 중에도 들어갈 차로(청록) · 갈 방향 아이콘 그대로', waits.every(s => s.icon === 'ahIcoR' && s.laneN > 0), '');
-  }
-  {
-    // 대기인데 그쪽으로 넘어가기 시작하면 벽이 깜빡임 (양산차 후측방 경고의 2단계와 같은 뜻)
+    // 우리 HUD(V1): 뒤차 판에서 대기(빨간 멈춤 막대)가 실제로 그려지는지 — V1 표시가 살아 있는지만
     const r = await E(seed => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
-      return runDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed, sigT:0}, {hud:'ar', sample:ahSample, secs:6, ap:{mode:'lane', lane:1},
-        setup:() => { const lead = D.cars.find(c => c.kind === 'lead'); if(lead) lead.brakeAt = null; },
-        beforeFrame:t => { if(S.G && S.G.gate === 'wait' && t > .5) window.AP.lane = 1.18; }}); }, seeds[0]);   // 오른쪽으로 0.6m 넘어감
-    const w = r.samples.filter(s => s.gate === 'wait' && s.intent);
-    check('대기 중 그쪽으로 넘어가면 벽이 깜빡임(투명도가 바뀜), 화살표는 여전히 없음', w.length > 10 && new Set(w.map(s => s.wallOp)).size > 1 && w.every(s => !s.go), `넘어간 대기 ${w.length}프레임`);
-  }
-  {
-    // 위험 해소 직후 재접근: 이동이 된 뒤 빠른 차를 하나 더 뒤에 넣으면 즉시 대기
-    const r = await E(() => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥'); let injected = false;
-      return runDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed:5, sigT:0}, {hud:'ar', sample:ahSample, secs:20, ap:{mode:'lane', lane:1},
-        setup:() => { const lead = D.cars.find(c => c.kind === 'lead'); if(lead) lead.brakeAt = null; },
-        beforeFrame:t => { if(!injected && S.G && S.G.gate === 'go'){ injected = true;
-          const mesh = flowCars.find(c => !c.visible); const c = {mesh, lane:2, kind:'rear', v:D.v + 9, v0:D.v + 9, base:D.v + 9, T:.4, s0:2, seenV:D.v, len:mesh.userData.L, w:mesh.userData.W, P:lanePath(m, 2, 0), s:LANE_START - (D.z + 22)};
-          D.cars.push(c); mesh.visible = true; placeCars(); window._inj = t; } }}); });
-    const t0 = await E(() => window._inj), after = r.samples.filter(s => s.t > t0 + .02).slice(0, 3);
-    check('위험 해소 뒤 재접근: 다음 프레임에 바로 대기(벽 · 꺾쇠 없음)', t0 !== undefined && after.length && after[0].gate === 'wait' && after[0].wall && !after[0].go, JSON.stringify(after[0]).slice(0, 200));
-  }
-  {
-    // 왼쪽 목표 · 왼쪽 뒤 차: JC4 왼쪽 출구, 2차로에서 출발
-    const r = await E(() => { const m = mapById('JC4'), leaf = m.leaves.findIndex(l => l.dest === '인천·부천'); let s0 = null;
-      for(let s = 1; s < 300; s++){ startDrive({map:m, leaf, lane:2, type:'rear', jam:0, seed:s, sigT:0}); const ok = D.cfg.rearN >= 1; stopDrive(); if(ok){ s0 = s; break; } }
-      return runDrive({map:m, leaf, lane:2, type:'rear', jam:0, seed:s0, sigT:0}, {hud:'ar', sample:ahSample, secs:14, ap:{mode:'lane', lane:2},
-        setup:() => { const lead = D.cars.find(c => c.kind === 'lead'); if(lead) lead.brakeAt = null; }}); });
-    const w = r.samples.filter(s => s.gate === 'wait' && s.dirZone === 'rear');
-    const badL = w.filter(s => !(s.dirSide === -1 && s.hotRear.length && s.hotRear.every(h => h.x < 260)));
-    check('왼쪽 뒤 차량: 빨강 뒤차가 뒤 띠의 왼쪽에 (목적지 방향이 아니라 실제 자리)', w.length > 0 && badL.length === 0, badL.length ? JSON.stringify(badL[0]).slice(0, 300) : `${w.length}프레임`);
-  }
-  {
-    // 이미 목표 차로: 옮길 일이 없으면 꺾쇠 · 벽 없음, 청록 테두리가 내 차를 감쌈(완료 상태)
-    const r = await E(() => { const m = mapById('JC4'), leaf = m.leaves.findIndex(l => l.dest === '의정부·구리');
-      return runDrive({map:m, leaf, lane:2, type:'rear', jam:0, seed:9, sigT:0}, {hud:'ar', sample:ahSample, secs:10, ap:{mode:'lane', lane:2}}); });
-    const enclosed = s => s.nearRails.length >= 2 && Math.min(...s.nearRails) < 260 && Math.max(...s.nearRails) > 260;
-    check('이미 목표 차로: 꺾쇠 · 벽 없음, 청록 테두리가 내 차 양옆까지 (완료 상태)', r.samples.every(s => !s.need && !s.go && !s.wall && s.gate === 'none') && r.samples.filter(s => s.z > -190).every(enclosed), `need ${r.samples.filter(s => s.need).length}`);
-  }
-  {
-    // 차로를 옮기면: 옮기기 전엔 테두리가 옆 차로(내 차를 감싸지 않음) → 옮긴 뒤엔 내 차를 감쌈
-    const r = await E(() => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
-      return runDrive({map:m, leaf, lane:1, type:'practice', jam:0, seed:3, sigT:0}, {hud:'ar', sample:ahSample, secs:12, ap:{mode:'lane', lane:1},
-        setup:() => { D.cars.forEach(c => c.mesh.visible = false); D.cars = []; }, beforeFrame:t => { if(t > 3) window.AP.lane = 2; }}); });
-    const enc = s => s.nearRails.length >= 2 && Math.min(...s.nearRails) < 260 && Math.max(...s.nearRails) > 260;
-    const before = r.samples.filter(s => s.t < 2.5), after = r.samples.filter(s => s.t > 7 && s.z > -190);
-    check('차로 변경 완료가 그래픽으로 구분됨: 전 = 테두리가 옆 차로 · 후 = 내 차를 감쌈 · 꺾쇠 사라짐', before.length && before.every(s => !enc(s) && s.go) && after.length && after.every(s => enc(s) && !s.go && !s.wall), `${before.length}/${after.length}`);
-  }
-  {
-    const r = await rear(seeds[1] || seeds[0]);
-    const stopBar = await E(() => document.getElementById('ahStop').getAttribute('d') || '');
-    check('고속도로 대기 중 지금 차로를 막는 정지 막대가 없음 (대기 ≠ 정지)', r.samples.some(s => s.gate === 'wait') && stopBar === '', '');
+      return runDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed, sigT:0}, {hud:'ar', secs:6, ap:{mode:'lane', lane:1},
+        setup:() => { const l = D.cars.find(c => c.kind === 'lead'); if(l) l.brakeAt = null; },
+        sample:() => ({block:S.rearBlock, stop:(document.getElementById('moveStop').getAttribute('d') || '').length > 0, arrow:(document.getElementById('moveArrow').getAttribute('d') || '').length > 0})}); }, seeds[0]);
+    const b = r.samples.filter(s => s.block);
+    check('우리 HUD(V1): 뒤차 위험이면 V1의 빨간 멈춤 막대가 그려짐', b.length > 0 && b.every(s => s.stop && s.arrow), `${b.length}프레임`);
   }
 
-  /* ---------- 3. 정체: 틈 없음 · 틈 · 다시 닫힘 ---------- */
-  {
-    const r = await E(() => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
-      return runDrive({map:m, leaf, lane:1, type:'jam', jam:3, seed:11, sigT:0}, {hud:'ar', sample:ahSample, secs:28, ap:{mode:'lane', lane:1},
-        setup:() => { const lead = D.cars.find(c => c.kind === 'lead'); if(lead) lead.brakeAt = null; }}); });
-    const beside = r.samples.filter(s => s.jam && s.beside && s.need), noGap = beside.filter(s => s.gate === 'wait');
-    check('정체 줄 옆 틈 없음: 회색 줄 띠 + 주황 벽, 초록 없음', noGap.length > 0 && noGap.every(s => s.queue && s.wall && !s.go && !s.slot), `줄 옆 ${beside.length} · 틈 없음 ${noGap.length}`);
-    check('정체: 판단이 이동이 아니면 초록 틈이 그려지지 않음', r.samples.every(s => !s.slot || s.gate === 'go'), '');
-  }
-  {
-    const r = await E(() => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥'); let phase = 0, t1 = null, t2 = null, held = [];
-      const res = runDrive({map:m, leaf, lane:1, type:'jam', jam:3, seed:11, sigT:0}, {hud:'ar', sample:ahSample, secs:24, ap:{mode:'lane', lane:1},
-        setup:() => { D.cars.filter(c => c.kind === 'lead' || c.kind === 'rear' || c.kind === 'amb').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => !['lead','rear','amb'].includes(c.kind)); },
-        beforeFrame:t => {
-          const q = D.cars.filter(c => c.kind === 'queue' && c.lane === 2);
-          if(phase === 0 && S.G && S.G.jam && S.G.jam.beside && S.G.jam.tail > D.z + 12){
-            phase = 1; t1 = t; held = q.filter(c => Math.abs(c.z - D.z) < 9); held.forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => !held.includes(c));
-            q.forEach(c => { c.base = 3.5; }); }
-          if(phase >= 1){ D.v = 3.5; D.cars.filter(c => c.kind === 'queue').forEach(c => { c.v = 3.5; c.base = 3.5; c.mean = false; }); }
-          if(phase === 1 && t > t1 + 2.5){ phase = 2; t2 = t; const c = held[0]; c.s = LANE_START - (D.z + 1.5); c.v = 3.5; c.mesh.visible = true; D.cars.push(c); placeCars(); }
-          window._jt = {t1, t2};
-        }});
-      return {res, jt:window._jt}; });
-    const {t1, t2} = r.jt, S_ = r.res.samples;
-    const open = S_.filter(s => s.t > t1 + 1 && s.t < t2), closed = S_.filter(s => s.t > t2 + .02).slice(0, 2);
-    check('정체 틈 발생: 실제 간격이 되면 확인 뒤 초록 틈 테 + 꺾쇠', t1 !== null && open.some(s => s.gate === 'go' && s.slot && s.go), `틈 열린 뒤 상태 ${[...new Set(open.map(s => s.gate))].join(',')}`);
-    check('정체 틈이 다시 닫히면 다음 프레임에 대기 · 초록 틈 사라짐', t2 !== null && closed.length && closed[0].gate === 'wait' && !closed[0].slot && !closed[0].go, JSON.stringify(closed[0] || null).slice(0, 200));
-  }
-
-  /* ---------- 3-1. 회전: 우리 HUD 경로가 내 차 아래로 지나가지 않음 · 회전 안내 유지 ---------- */
-  for(const [mapId, dest, lane, key] of [['CRT', '종합병원', 1, 'ahIcoR'], ['CL2', '전통시장', 2, 'ahIcoL']]){
-    const r = await E(([mapId, dest, lane]) => { const m = mapById(mapId), leaf = m.leaves.findIndex(l => l.dest === dest);
-      return runDrive({map:m, leaf, lane, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar', noPeds:true, sample:() => ({...ahSample(), chosen:D.chosen.length, ph:navCtx(S.s).phase, d:navCtx(S.s).d}), secs:40,
-        setup:() => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); }}); }, [mapId, dest, lane]);
-    const near = r.samples.filter(s => s.chosen === 0 && s.d < 30);
-    const under = r.samples.filter(s => s.laneMaxY !== null && s.laneMaxY > 212.01);
-    check(`${mapId} 회전: 접근 · 회전 중 내내 회전 아이콘 유지(확정 전)`, near.length && near.every(s => s.icon === key), `${near.length}프레임`);
-    check(`${mapId} 회전: 경로 그래픽이 가까운 면(y 212) 아래 = 내 차 줄로 내려오지 않음`, under.length === 0, under.length ? JSON.stringify({t:under[0].t, y:under[0].laneMaxY}) : `${r.samples.length}프레임`);
-    // 'ㄱ'자 도로 재발 방지: 회전 전 접근 중 경로 띠는 들어갈 차로 폭 안(가로로 뻗지 않음) + 꺾이는 곳엔 회전 꺾쇠
-    const appr = r.samples.filter(s => s.chosen === 0 && s.ph === 'approach' && s.d > 12 && s.d < 60 && s.laneN);
-    const wide = appr.filter(s => s.laneXmax - s.laneXmin > 150 || s.laneXmin < 150 || s.laneXmax > 370);
-    check(`${mapId} 회전 접근: 경로 띠가 옆으로 꺾여 뻗지 않음 (x 150 ~ 370 · 폭 150 안) · 회전 꺾쇠 표시`, appr.length > 10 && wide.length === 0 && appr.filter(s => s.turnMark).length > appr.length*.8, wide.length ? JSON.stringify({t:wide[0].t, x:[wide[0].laneXmin, wide[0].laneXmax]}) : `${appr.length}프레임 · 꺾쇠 ${appr.filter(s => s.turnMark).length}`);
-  }
-
-  /* ---------- 4. 미러: 같은 차가 같은 쪽 거울에 보임 (그린 픽셀 차이로) ---------- */
+  /* ---------- 4. 미러: 룸미러만 · 같은 차가 거울 같은 쪽에 (그린 픽셀 차이로) ---------- */
   {
     const mir = await E(() => {
       const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
       setMode('ar'); startDrive({map:m, leaf, lane:1, type:'practice', jam:0, seed:1, sigT:0}); D.frozen = true;
       D.cars.forEach(c => c.mesh.visible = false); D.cars = []; update(0);
-      const grab = M => { MIR.aim(M); renderer.setRenderTarget(M.rt); renderer.render(scene, M.cam); const w = M.rt.width, h = M.rt.height, px = new Uint8Array(w*h*4); renderer.readRenderTargetPixels(M.rt, 0, 0, w, h, px); renderer.setRenderTarget(null); return {px, w, h}; };
-      const out = {};
+      const grab = () => { MIR.aim(); renderer.setRenderTarget(MIR.rt); renderer.render(scene, MIR.cam); const w = MIR.rt.width, h = MIR.rt.height, px = new Uint8Array(w*h*4); renderer.readRenderTargetPixels(MIR.rt, 0, 0, w, h, px); renderer.setRenderTarget(null); return {px, w, h}; };
+      const out = {sideMirrors:MIR.list ? MIR.list.length : 0};
       for(const [name, lane] of [['right', 2], ['left', 0]]){
-        const base = MIR.list.map(grab);
-        const car = flowCars[0]; car.position.set(m.laneX(lane), 0, D.z + 14); car.rotation.y = 0; car.visible = true;
-        const withCar = MIR.list.map(grab); car.visible = false;
-        out[name] = MIR.list.map((M, i) => { let n = 0, sx = 0; const {px, w, h} = withCar[i], b = base[i].px;
-          for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){ const k = (y*w + x)*4; if(Math.abs(px[k] - b[k]) + Math.abs(px[k+1] - b[k+1]) + Math.abs(px[k+2] - b[k+2]) > 30){ n++; sx += x; } }
-          return {id:M.id, n, cx:n ? 1 - (sx/n)/w : null};   // 화면에 보이는 x(0 왼쪽 ~ 1 오른쪽) = 가로 뒤집기 뒤
-        });
+        const base = grab(), car = flowCars[0]; car.position.set(m.laneX(lane), 0, D.z + 14); car.rotation.y = 0; car.visible = true;
+        const w = grab(); car.visible = false; let n = 0, sx = 0;
+        for(let y = 0; y < w.h; y++) for(let x = 0; x < w.w; x++){ const k = (y*w.w + x)*4; if(Math.abs(w.px[k] - base.px[k]) + Math.abs(w.px[k+1] - base.px[k+1]) + Math.abs(w.px[k+2] - base.px[k+2]) > 30){ n++; sx += x; } }
+        out[name] = {n, cx:n ? 1 - (sx/n)/w.w : null};
       }
       stopDrive(); return out;
     });
-    const R = Object.fromEntries(mir.right.map(x => [x.id, x])), L = Object.fromEntries(mir.left.map(x => [x.id, x]));
-    check('미러: 오른쪽 뒤 차가 오른쪽 사이드미러에 보이고 왼쪽엔 안 보임', R.right.n > 50 && R.left.n === 0, JSON.stringify(mir.right));
-    check('미러: 오른쪽 뒤 차가 룸미러 오른쪽 절반에 보임(거울 뒤집기)', R.room.n > 20 && R.room.cx > .5, `룸미러 x ${R.room.cx && R.room.cx.toFixed(2)}`);
-    check('미러: 왼쪽 뒤 차가 왼쪽 사이드미러 · 룸미러 왼쪽 절반에 보임', L.left.n > 50 && L.right.n === 0 && L.room.cx < .5, JSON.stringify(mir.left));
+    check('미러: 사이드미러 없음 (룸미러 하나)', !mir.sideMirrors, JSON.stringify(mir.sideMirrors));
+    check('룸미러: 오른쪽 뒤 차 → 거울 오른쪽 절반 · 왼쪽 뒤 차 → 왼쪽 절반 (거울 뒤집기)', mir.right.n > 20 && mir.right.cx > .5 && mir.left.n > 20 && mir.left.cx < .5, JSON.stringify(mir));
   }
 
   /* ---------- 5. 고정 간격 계산: 프레임률이 달라도 같은 결과 ---------- */
@@ -341,7 +210,8 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const p1 = s.sessions.P1, p2 = s.sessions.P2;
     check('세션: 참가자마다 본 주행 6판 기록', p1.rows.length === 6 && p2.rows.length === 6, `P1 ${p1.rows.length} · P2 ${p2.rows.length}`);
     check('세션: 연습 기록은 본 기록에 섞이지 않음 (따로 저장)', s.practiceN === 2 && !s.practiceInDrives && p1.prs === 1, `연습 ${s.practiceN}`);
-    check('세션: 비교는 현대 · 우리 두 HUD뿐, 순서 교대 — P1 현대 먼저 · P2 우리 먼저', p1.rows[0].hud === 'nav' && p2.rows[0].hud === 'ar' && [...p1.rows, ...p2.rows].every(r => r.hud === 'nav' || r.hud === 'ar') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'BA', `${p1.rows[0].hud} / ${p2.rows[0].hud}`);
+    const navFirst = rows => rows.slice(0, 3).every(r => r.hud === 'nav') && rows.slice(3).every(r => r.hud === 'ar');
+    check('세션: 참가자마다 늘 현대 HUD 3판 → 우리 HUD 3판 (교대 · 랜덤 없음)', navFirst(p1.rows) && navFirst(p2.rows) && p1.rows[0].order === 'AB' && p2.rows[0].order === 'AB', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
     check('세션: 같은 시나리오 ID를 두 HUD가 한 번씩 (교통 · 목적지 · 시간대 고정)', pairOk(p1.rows) && pairOk(p2.rows), JSON.stringify(p1.rows.map(r => r.scn)));
     check('세션: 새 필드(시나리오 · HUD 버전 · 환경 · 순서 · 이벤트) 기록', p1.rows.every(r => r.scn && r.ver && r.env && r.order && r.ev > 0), JSON.stringify(p1.rows[0]));
@@ -384,9 +254,11 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
   {
     const r = await E(() => ({modes:$$('#modeSeg button').map(b => b.dataset.mode + ':' + b.textContent.trim()), pair:!!$('#pairSeg'),
       verWords:/v1|v2|개선 전|개선 후|버전/.test(document.body.innerText + $$('#setup button, #intro button').map(b => b.title).join(' ')),
-      arText:$$('#arHud text').map(t => t.id + ':' + t.textContent), arHud2:!!$('#arHud2')}));
-    check('HUD 선택은 현대 HUD · 우리 HUD 두 개뿐, 버전/개선 전후 선택지 없음', JSON.stringify(r.modes) === JSON.stringify(['nav:현대 HUD', 'ar:우리 HUD']) && !r.pair && !r.verWords && !r.arHud2, JSON.stringify(r));
-    check('우리 HUD 안 글자는 제한속도 숫자뿐 (행동 · 상태 설명 없음)', r.arText.length === 1 && /^ahLim:\d+$/.test(r.arText[0]), JSON.stringify(r.arText));
+      arText:$$('#arHud text').map(t => t.id + ':' + t.textContent), arHud2:!!$('#arHud2'), orderUi:!!$('#orderSeg')}));
+    check('시연 HUD 선택은 현대 HUD · 우리 HUD 두 개뿐, 버전 · 순서 선택지 없음', JSON.stringify(r.modes) === JSON.stringify(['nav:현대 HUD', 'ar:우리 HUD']) && !r.pair && !r.verWords && !r.arHud2 && !r.orderUi, JSON.stringify(r));
+    check('우리 HUD(V1) 안 글자는 제한속도 숫자뿐', r.arText.length === 1 && /^limA:\d+$/.test(r.arText[0]), JSON.stringify(r.arText));
+    const prep = await E(() => { openSession(); const o = {screen:$('#app').dataset.screen, setupVisible:!!$('#setup').offsetParent, setupBtn:!!$('#setupBtn').offsetParent, modeBtns:$$('#modeSeg button').filter(b => b.offsetParent).length, meta:$('#sesMeta').textContent}; goHome(); return o; });
+    check('주행 테스트 준비 화면: HUD · 순서 고르기 없음 (연구자 설정도 못 엶)', !prep.setupVisible && !prep.setupBtn && prep.modeBtns === 0 && /현대 → 우리/.test(prep.meta), JSON.stringify(prep));
   }
 
   /* ---------- 8-2. HUD 표시 영역 밖으로 나오지 않음: 같은 프레임을 HUD 켬 / 끔으로 그려 상자 밖 픽셀 비교 ---------- */

@@ -42,6 +42,8 @@ button{ cursor:pointer; }
 .app[data-screen="drive"] .topbar, .app[data-screen="drive"] .setup{ display:none !important; }
 .app[data-screen="drive"] .stage{ padding:0; }
 .app[data-screen="drive"] .cab{ border-radius:0; }
+/* 주행 테스트 준비(참가자 정보) · 끝 카드: 연구자 설정(HUD · 시연 고르기)을 열 수 없게 */
+.app[data-screen="prep"] .setup, .app[data-screen="prep"] #setupBtn{ display:none !important; }
 
 /* ---------- 버튼 · 세그먼트 ---------- */
 .btn{ height:var(--h-btn); display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:0 14px; border:1px solid var(--rule); background:var(--raised); border-radius:var(--r); font-size:14px; font-weight:600; white-space:nowrap; }

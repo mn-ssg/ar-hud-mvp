@@ -90,13 +90,12 @@ function setLight(l){
   document.documentElement.dataset.light = l;
   $('#cab').classList.toggle('night', night);
   setSceneLight(night); setCabinLight(night);
-  $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임 (현대 HUD)
-  $('#ahGlow feGaussianBlur').setAttribute('stdDeviation', night ? .9 : 1.6);   // 우리 HUD
+  $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임
   $$('#lightSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.light === l)));
 }
-// HUD 두 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD (ourhud.js). 'off' = 연습 주행(HUD 없음)
+// HUD 두 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD (중간고사 때 v1.9, hud.js drawAr). 'off' = 연습 주행(HUD 없음)
 // HUD_VER는 기록 식별용 내부 값(엑셀 'HUD 버전' 칸) — 화면에 고르는 버전은 없다. 예전 기록은 이 칸이 비어 있음
-const HUD_VER = {nav:'현대 3.3', ar:'우리 2026-10-29'};
+const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9'};
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
@@ -326,7 +325,7 @@ function update(dt){
 
   setEgo(p.x, p.z, Math.atan2(f.x, -f.z), S.running && !S.paused ? cruiseOf(S.map)*(S.speedFactor ?? 1) : 0);
   guideStep(S.cityT, C);
-  if(S.mode === 'ar') drawAr(p, f, C, k);
+  if(S.mode === 'ar') drawAr(p, f, C, k, dangerOn);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, remainKm, dangerOn);
   updateCabin(steer, kmh);
   cityFrame(S.cityT);
@@ -362,7 +361,7 @@ function updateDrive(dt){
   showStage(C.st);
   setEgo(D.x, D.z, D.psi, D.v);
   guideStep(D.t, C);
-  if(S.mode === 'ar') drawAr(p, f, C, k);
+  if(S.mode === 'ar') drawAr(p, f, C, k, S.rearBlock);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1), S.rearBlock);
   updateCabin(clamp(D.wheel*STEER_RATIO*STEER_GAIN*180/Math.PI, -360, 360), kmh);
   cityFrame(D.t);
