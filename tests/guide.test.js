@@ -24,18 +24,18 @@ test('오른쪽 뒤에서 빠르게 오는 차 → 즉시 대기, 방향은 오�
   assert.equal(G.gateStep(g, 0, true, A), 'wait');
   const d = G.relDir(E, c);
   assert.equal(d.side, 1); assert.equal(d.zone, 'rear');
-  assert.equal(G.gateText('wait', g.reason, d.side, 1, false, d.zone), '오른쪽 뒤 차량 · 대기');
+  assert.equal(g.reason.rel, 'rear');
 });
 
-test('문구의 뒤/옆은 그린 자리(내 차 기준 zone)를 따름: 범퍼가 1m 안이어도 내 차보다 뒤면 "뒤"', () => {
+test('그리는 자리(뒤/옆)는 내 차 기준 zone: 범퍼가 1m 안이어도 내 차보다 뒤면 뒤', () => {
   const E = ego(), c = car(2, HL*2 + .5, 25), A = G.assessLane(E, [c], 2), g = G.makeGate();
   G.gateStep(g, 0, true, A);
   assert.equal(A.primary.rel, 'side');
   const d = G.relDir(E, c);
   assert.equal(d.zone, 'rear');
-  assert.equal(G.gateText('wait', g.reason, d.side, 1, false, d.zone), '오른쪽 뒤 차량 · 대기');
+  assert.equal(d.side, 1);
   const beside = car(2, 1, 20), d2 = G.relDir(E, beside);
-  assert.equal(G.gateText('wait', {rel:'side', kind:'rear'}, d2.side, 1, false, d2.zone), '오른쪽 옆 차량 · 대기');
+  assert.equal(d2.zone, 'side'); assert.equal(d2.side, 1);
 });
 
 test('왼쪽 뒤 차량은 왼쪽으로 표시 (목적지 방향이 아니라 내 차 기준)', () => {
@@ -43,7 +43,7 @@ test('왼쪽 뒤 차량은 왼쪽으로 표시 (목적지 방향이 아니라 �
   G.gateStep(g, 0, true, A);
   const d = G.relDir(E, c);
   assert.equal(d.side, -1);
-  assert.equal(G.gateText('wait', g.reason, d.side, -1, false), '왼쪽 뒤 차량 · 대기');
+  assert.equal(d.zone, 'rear'); assert.equal(g.reason.rel, 'rear');
 });
 
 test('방향은 내 차 자세(ψ) 기준: 차가 오른쪽으로 크게 돌아 있으면 같은 차도 다른 쪽', () => {
@@ -92,14 +92,13 @@ test('경계값에서 깜빡이지 않음: 기준 1배는 안전 · 1.2배는 �
 test('처음부터 비어 있으면 바로 이동, 옮길 필요가 없으면 none', () => {
   const g = G.makeGate();
   assert.equal(G.gateStep(g, 0, true, G.assessLane(ego(), [car(2, 80, 18)], 2)), 'go');
-  assert.equal(G.gateText('go', null, 0, 1, false), '오른쪽으로 이동');
   assert.equal(G.gateStep(g, .1, false, G.assessLane(ego(), [], 2)), 'none');
 });
 
 test('목표 차로 앞차가 너무 가까우면 간격 부족', () => {
   const g = G.makeGate(), A = G.assessLane(ego(), [car(2, -(HL*2 + 2), 15)], 2);
   assert.equal(G.gateStep(g, 0, true, A), 'wait');
-  assert.equal(G.gateText('wait', g.reason, 1, 1, false), '차간 간격 부족 · 대기');
+  assert.equal(g.reason.rel, 'front');
 });
 
 test('정체 줄: 바로 뒤 줄 차가 3m면 틈 없음, 줄 사이가 넉넉하면 틈으로 이동', () => {
@@ -108,11 +107,10 @@ test('정체 줄: 바로 뒤 줄 차가 3m면 틈 없음, 줄 사이가 넉넉�
   const tight = [q(-(HL*2 + 3)), q(HL*2 + 3)];
   G.gateStep(g, 0, true, G.assessLane(E, tight, 2));
   assert.equal(g.state, 'wait');
-  assert.equal(G.gateText('wait', g.reason, 1, 1, true), '틈 없음 · 차로 유지');
+  assert.equal(g.reason.kind, 'queue');
   const wide = [q(-(HL*2 + 6)), q(HL*2 + 6)];
   for(let t = .05; t < 1.5; t += .05) G.gateStep(g, t, true, G.assessLane(E, wide, 2));
   assert.equal(g.state, 'go');
-  assert.equal(G.gateText('go', null, 1, 1, true), '틈으로 이동');
 });
 
 test('안내 단계: 갈림 25m 안이어도 출구를 확정하기 전에는 회전 안내 유지', () => {

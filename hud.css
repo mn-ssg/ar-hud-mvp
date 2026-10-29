@@ -13,23 +13,15 @@
 /* 2026-10-29: 폭을 운전석 폭의 28%로 (예전 min(300px, 33%) — 넓은 화면에서 HUD만 작아져 글자 · 뒤차 표시가 안 읽힘).
    세 HUD가 같은 상자를 쓰므로 비교 조건은 같다. 화면 크기와 상관없이 같은 시야각 */
 #hudWrap{ position:absolute; left:50%; bottom:32.6%; transform:translateX(-50%); transform-origin:50% 100%; width:clamp(300px, 28%, 620px); pointer-events:none; transition:transform .35s ease; }
-#hudWrap svg{ display:block; width:100%; height:auto; overflow:visible; mix-blend-mode:screen; filter:drop-shadow(0 0 3px rgba(255,255,255,.16)); }
+/* 표시 영역 밖으로 아무것도 나가지 않게: svg overflow hidden + 안쪽은 #hudClip (index.html) */
+#hudWrap svg{ display:block; width:100%; height:auto; overflow:hidden; mix-blend-mode:screen; }
 .tnum{ font-variant-numeric:tabular-nums; }
 /* 야간: HUD 전체 밝기 · 채도 · 빛 번짐을 낮춤 — 우리 HUD · 기존 HUD 똑같이 (실제 순정 HUD의 밤 자동 감광처럼).
    빛 번짐 반경은 main.js setLight가 #glow 흐림(2.4 → 1.1)으로 줄임 */
 .cab.night #hudWrap svg{ filter:brightness(.9) saturate(.9) drop-shadow(0 0 1.5px rgba(255,255,255,.05)); }
-/* 우리 HUD 야간 위계: 경로는 그대로 두고 맥락(도로 윤곽) · 보조(제한속도 흰 표지) · 큰 빛(내 차 · 뒤차 번짐)을 더 낮춤 */
-.cab.night #roadEdges{ fill-opacity:.34; }
-.cab.night #roadDash{ fill-opacity:.22; }
-.cab.night #roadSurf{ fill-opacity:.03; }
-.cab.night #lgA{ stop-opacity:.5; } .cab.night #lgB{ stop-opacity:.24; } .cab.night #lgC{ stop-opacity:.08; }
-.cab.night #ego{ opacity:.78; }
-.cab.night #carBehind circle{ opacity:.5; }
-.cab.night #info{ opacity:.72; }
-/* 우리 HUD v2 야간: v1과 같은 비율로 맥락(도로 윤곽) · 보조(표지) · 내 차를 낮춤. 경로 · 위험 · 문구는 그대로 */
-.cab.night #h2Edges{ fill-opacity:.34; } .cab.night #h2Dash{ fill-opacity:.22; } .cab.night #h2Surf{ fill-opacity:.03; }
-.cab.night #h2gA{ stop-opacity:.5; } .cab.night #h2gB{ stop-opacity:.24; } .cab.night #h2gC{ stop-opacity:.08; }
-.cab.night #h2Ego{ opacity:.78; } .cab.night #h2Info{ opacity:.72; } .cab.night #h2RearLines{ fill-opacity:.2; }   /* v1.8: 표지가 커져 밤엔 흰 면이 눈부시지 않게 */
+/* 우리 HUD 야간: 맥락(도로 윤곽) · 보조(표지) · 내 차를 더 낮춤. 경로 · 위험 · 이동은 그대로 */
+.cab.night #ahEdges{ fill-opacity:.3; } .cab.night #ahDash{ fill-opacity:.18; } .cab.night #ahSurf{ fill-opacity:.03; }
+.cab.night #ahLane{ fill-opacity:.24; } .cab.night #ahEgo{ opacity:.8; } .cab.night #ahInfo{ opacity:.72; }
 /* 발표용 'HUD 설명 보기': HUD를 키우고 층마다 이름표 (explain.js) */
 .cab.explain #hudWrap{ transform:translateX(-50%) scale(1.3); }
 #explain{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; display:none; font-family:var(--font); }
@@ -89,11 +81,9 @@ kbd{ display:inline-grid; place-items:center; min-width:24px; height:24px; paddi
 .abort:hover, .abort:focus-visible{ opacity:1; }
 
 /* ---------- HUD 애니메이션 (목적형): 경로 흐름 (v1.4: 행동 단계 글자와 함께 맥박 헤일로 삭제) ---------- */
-@keyframes hudFlow{ to{ stroke-dashoffset:-52; } }   /* hud.js 흐름 점선 '12 14'의 2주기 */
-#moveArrow.flow, #h2Arrow.flow{ animation: hudFlow .7s linear infinite; }
+
+
 
 @media (prefers-reduced-motion: reduce){
   *{ transition:none !important; }
-  #moveArrow.flow, #h2Arrow.flow{ animation:none; }
-  #jamHatch animateTransform{ display:none; }
 }

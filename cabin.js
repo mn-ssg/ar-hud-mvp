@@ -73,23 +73,31 @@ const clusterMat = screenMat(clusterCv), infoMat = screenMat(infoCv);
 cadd(new THREE.PlaneGeometry(.292, .092), clusterMat, -.22, -.002, .0145, 0, 0, 0, panel);   // 계기판: 눈 정면(x≈0)
 cadd(new THREE.PlaneGeometry(.418, .092), infoMat, .143, -.002, .0145, 0, 0, 0, panel);
 
-/* ---------- 핸들: 지름 37cm, 기둥 기울기 22° (윗부분이 앞으로 누움). 돌리는 건 wheelSpin ----------
+/* ---------- 핸들: 림 지름 37cm, 기둥 기울기 22° (윗부분이 앞으로 누움). 돌리는 건 wheelSpin ----------
    v1.7.1: 눈 앞 0.52 m · 아래 0.385 m(실제 자세에 가깝게). 테 윗부분이 계기판 아래끝 바로 밑(화면 위에서 ≈ 85%)에 와서
    계기판과 겹치지 않고, 화면 아래엔 테 윗부분만 크게 보인다. 가운데 패드 · 살은 화면 밖 */
 const wheel = new THREE.Group(); wheel.position.set(0, -.385, -.52); wheel.rotation.x = -.384; cabin.add(wheel);
 const wheelSpin = new THREE.Group(); wheel.add(wheelSpin);
 (() => {
-  cadd(new THREE.TorusGeometry(.17, .0178, 22, 120), CM.leather, 0, 0, 0, 0, 0, 0, wheelSpin);
-  cadd(new THREE.TorusGeometry(.17, .0185, 8, 120, Math.PI*.18), CM.piano, 0, 0, 0, 0, 0, Math.PI*1.41, wheelSpin);   // 6시 쪽 유광 장식
-  cadd(rrBox(.135, .1, .045, .03), CM.leather, 0, -.01, .03, 0, 0, 0, wheelSpin);                 // 가운데 패드
-  cadd(rrBox(.06, .028, .006, .01), CM.piano, 0, -.004, .056, 0, 0, 0, wheelSpin);                // 패드 가운데 장식(로고 없음)
-  for(const sx of [-1, 1]){                                                                         // 3시 · 9시 살 + 스위치
-    cadd(new THREE.BoxGeometry(.11, .05, .024), CM.leather, sx*.112, -.012, .012, 0, 0, sx*.05, wheelSpin);
-    cadd(new THREE.BoxGeometry(.104, .005, .026), CM.satin, sx*.112, .014, .013, 0, 0, sx*.05, wheelSpin);
-    cadd(rrBox(.07, .03, .006, .01), CM.piano, sx*.112, -.012, .026, 0, 0, sx*.05, wheelSpin);
-    for(let k=0;k<3;k++) cadd(new THREE.BoxGeometry(.012, .004, .004), CM.satin, sx*(.09 + k*.022), -.012, .03, 0, 0, sx*.05, wheelSpin);
+  /* 2026-10-29: 실제 비례로 다시 — 림 지름 37cm · 굵기 3.9cm(엄지 자리 4.4cm) · 3스포크(3 · 9 · 6시) · 에어백 허브 15 × 11.5cm.
+     참고 시안 assets/ref/2_7_interior.jpg. 회전축 = 핸들 면에 수직인 기둥 축(wheel 그룹의 z) — 돌리면 스포크가 함께 돈다 */
+  const RIM = .185;
+  cadd(new THREE.TorusGeometry(RIM, .0195, 24, 160), CM.leather, 0, 0, 0, 0, 0, 0, wheelSpin);
+  for(const sx of [-1, 1]) cadd(new THREE.TorusGeometry(RIM, .022, 20, 40, Math.PI*.2), CM.leather, 0, 0, 0, 0, 0, sx > 0 ? -Math.PI*.12 : Math.PI*.92, wheelSpin);   // 엄지 자리 (2 · 10시 아래)
+  cadd(new THREE.TorusGeometry(RIM, .0201, 8, 60, Math.PI*.16), CM.piano, 0, 0, 0, 0, 0, Math.PI*1.42, wheelSpin);        // 6시 쪽 유광 장식
+  // 스포크: 허브 가장자리 → 림 안쪽으로 가늘어지는 판 (옆 2개 · 아래 1개)
+  const spoke = (len, w0, w1, t) => { const sh = new THREE.Shape([new THREE.Vector2(0, -w0/2), new THREE.Vector2(len, -w1/2), new THREE.Vector2(len, w1/2), new THREE.Vector2(0, w0/2)]);
+    const g = new THREE.ExtrudeGeometry(sh, {depth:t, bevelEnabled:true, bevelThickness:.004, bevelSize:.004, bevelSegments:2}); g.translate(0, 0, -t/2); return g; };
+  for(const sx of [-1, 1]){
+    const g = spoke(.11, .052, .036, .02); if(sx < 0) g.rotateZ(Math.PI);
+    cadd(g, CM.leather, sx*.068, -.016, .012, 0, 0, 0, wheelSpin);
+    cadd(new THREE.BoxGeometry(.075, .004, .024), CM.satin, sx*.115, .006, .016, 0, 0, 0, wheelSpin);                 // 스포크 윗선 장식
+    cadd(rrBox(.058, .028, .006, .008), CM.piano, sx*.105, -.018, .027, 0, 0, 0, wheelSpin);                          // 스위치 판
+    for(let k = 0; k < 3; k++) cadd(new THREE.BoxGeometry(.01, .004, .004), CM.satin, sx*(.088 + k*.017), -.018, .031, 0, 0, 0, wheelSpin);
   }
-  for(const sx of [-1, 1]) cadd(new THREE.BoxGeometry(.018, .1, .022), CM.leather, sx*.03, -.1, .01, 0, 0, sx*.18, wheelSpin);   // 6시 살
+  const low = spoke(.13, .07, .05, .02); low.rotateZ(-Math.PI/2); cadd(low, CM.leather, 0, -.06, .01, 0, 0, 0, wheelSpin);
+  cadd(rrBox(.15, .115, .05, .03), CM.leather, 0, -.012, .03, 0, 0, 0, wheelSpin);                                     // 에어백 허브
+  cadd(rrBox(.07, .03, .006, .01), CM.piano, 0, -.006, .057, 0, 0, 0, wheelSpin);                                        // 허브 가운데 (로고 없음)
 })();
 cadd(new THREE.CylinderGeometry(.045, .06, .26, 16), CM.trim, 0, -.45, -.63, 1.01);   // 핸들 기둥 덮개
 

@@ -1,9 +1,9 @@
 /* ============================================================
-   guide.js — 안내 판단 로직 (v2, 2026-10-29). DOM · THREE를 쓰지 않는다 → tests/guide.test.js로 node에서 검증
+   guide.js — 안내 판단 로직 (2026-10-29). DOM · THREE를 쓰지 않는다 → tests/guide.test.js로 node에서 검증
    · 차로 변경 게이트: 목표 차로의 실제 차(위치 · 속도 · 간격)로 '대기 → 확인 → 이동'. 위험은 즉시, 해제는 안정된 뒤에만
    · 위험 방향: 내 차의 지금 자세(ψ) 기준 왼쪽/오른쪽 · 뒤/옆/앞 — 목적지 방향으로 대신하지 않음
    · 안내 단계: 갈림마다 접근 → 갈림 안(출구 아직 확정 안 됨) → 완료 / 이탈 — 거리 하나로 단계를 정하지 않음
-   main.js가 매 프레임 부른다(guideStep). 기준값의 근거 · 한계는 01_프로젝트/10_HUD_GUI_설계.md 'v2' 절
+   main.js가 매 프레임 부른다(guideStep). 우리 HUD는 글자 없이 이 상태를 그래픽으로만 그린다(ourhud.js). 근거 01_프로젝트/10_HUD_GUI_설계.md 0-7절
    ============================================================ */
 
 const GUIDE = {
@@ -12,8 +12,7 @@ const GUIDE = {
   rearGap: 10, rearTtc: 3.5,   // 뒤차: 1차 실험 우리 HUD '대기' 기준(DRV.hudGap · hudTtc)과 같은 값 → 기존 수치와 같은 틀
   frontGap: 4, frontTtc: 2,    // 목표 차로 앞차: '위험한 끼어들기' 기준(DRV.gapRisk · ttcRisk)과 같은 값
   queueGap: 4, queueTtc: 2,    // 정체 줄 차가 뒤일 때: 서행 중이라 위험한 끼어들기 기준 그대로
-  sideGap: 1,                  // 옆에 겹쳐 있음
-  doneShow: 1.5                // 차로를 다 옮긴 뒤 '차로 유지'를 보여 주는 시간(초)
+  sideGap: 1                   // 옆에 겹쳐 있음
 };
 
 /* ---------- 차 하나가 목표 차로 진입을 막는가 ----------
@@ -75,24 +74,6 @@ function gateStep(g, t, need, A){
   return g.state;
 }
 
-/* ---------- 짧은 문구 (HUD v2) ----------
-   대기 이유 · 방향은 내 차 자세 기준(relDir: side · zone)으로 — HUD가 그 차를 그린 자리(뒤 구역 / 옆)와 같은 말.
-   '안전'이라는 말은 쓰지 않는다 — 보증처럼 읽히지 않게 */
-const SIDE_WORD = {'-1':'왼쪽', '1':'오른쪽'};
-function gateText(state, reason, dirSide, needSide, jam, zone){
-  const sw = SIDE_WORD[dirSide || needSide] || '';
-  if(state === 'wait'){
-    if(!reason) return '대기';
-    if(jam && reason.kind === 'queue') return '틈 없음 · 차로 유지';
-    if(reason.rel === 'front') return '차간 간격 부족 · 대기';
-    const pos = zone ? (zone === 'rear' ? '뒤' : '옆') : reason.rel === 'rear' ? '뒤' : '옆';
-    return `${sw} ${pos} 차량 · 대기`;
-  }
-  if(state === 'clearing') return '확인 후 이동';
-  if(state === 'go') return jam ? '틈으로 이동' : `${SIDE_WORD[needSide] || ''}으로 이동`;
-  return '';
-}
-
 /* ---------- 안내 단계 (현대 HUD · 우리 HUD 공통) ----------
    nodeS: 경로 위 갈림 거리(m) · s: 경로 위 내 위치 · committed: 확정된 출구 수 · wrong: 경로와 다른 출구를 확정함
    phase: 'approach'(갈림 앞) | 'turning'(갈림 지점을 지났지만 출구가 아직 확정 안 됨 — 회전 중 · 교차로 안) | 'follow'(마지막 갈림까지 완료) | 'off'(경로 이탈)
@@ -107,4 +88,4 @@ function navPhase(nodeS, s, committed, wrong){
 // 왼쪽 패널 · 예전 기록용 진행 단계 숫자 (1 접근 · 2 지선 구분 · 3 차로 옮김 · 4 진입 · 5 도착)
 const stageOf = N => N.phase === 'approach' ? (N.d > 170 ? 1 : N.d > 115 ? 2 : N.d > 25 ? 3 : 4) : N.phase === 'turning' ? 4 : 5;
 
-if(typeof module !== 'undefined') module.exports = {GUIDE, blockOf, relDir, assessLane, makeGate, gateStep, gateText, navPhase, stageOf};
+if(typeof module !== 'undefined') module.exports = {GUIDE, blockOf, relDir, assessLane, makeGate, gateStep, navPhase, stageOf};

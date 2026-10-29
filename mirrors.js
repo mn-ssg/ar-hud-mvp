@@ -45,13 +45,19 @@ const MIR = {
       gl_FragColor = vec4(c, 1.0);
     }`;
   const stemMat = new THREE.MeshBasicMaterial({color:0x101215});
+  // 거울을 차에 붙이는 부분 (2026-10-29): 사이드미러 = 화면 가장자리 문 쪽에서 거울 밑으로 오는 검은 받침(도어 삼각 패널), 룸미러 = 앞유리 위 센서 덮개
+  const mountMat = new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide, depthTest:false, depthWrite:false});
+  const polyGeo = (pts, top, bot) => { const g = new THREE.BufferGeometry(), pos = [], col = [], ymin = Math.min(...pts.map(p => p[1])), ymax = Math.max(...pts.map(p => p[1]));
+    for(let i = 1; i < pts.length - 1; i++) [pts[0], pts[i], pts[i+1]].forEach(([x, y]) => { pos.push(x, y, 0); const t = (y - ymin)/Math.max(1, ymax - ymin); col.push(bot[0] + (top[0] - bot[0])*t, bot[1] + (top[1] - bot[1])*t, bot[2] + (top[2] - bot[2])*t); });
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); return g; };
   MIR.list.forEach(M => {
     M.cam = new THREE.PerspectiveCamera(30, M.asp, .6, 1400);
     M.rt = new THREE.WebGLRenderTarget(64, 32, {minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter});
     M.rt.texture.encoding = THREE.sRGBEncoding;   // 앞 화면과 같은 톤 매핑 · sRGB로 구워 두고 그대로 얹음
     M.mat = new THREE.ShaderMaterial({uniforms:{tex:{value:M.rt.texture}, size:{value:new THREE.Vector2(1, 1)}, rad:{value:10}, bezel:{value:5}, body:{value:M.body}, dim:{value:1}, bodySide:{value:M.side}},
       vertexShader:vert, fragmentShader:frag, depthTest:false, depthWrite:false});
-    M.quad = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), M.mat); over.add(M.quad);
+    M.mount = new THREE.Mesh(new THREE.BufferGeometry(), mountMat); M.mount.renderOrder = 0; over.add(M.mount);
+    M.quad = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), M.mat); M.quad.renderOrder = 2; over.add(M.quad);
     if(M.side === 0){ M.stem = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), stemMat); over.add(M.stem); }   // 룸미러 기둥 (앞유리 위로)
   });
   // 화면 크기가 바뀌면: 거울 자리(css px) · 렌더 타깃 해상도(DPR, 최대 1.5배) · 카메라 화각
@@ -63,7 +69,13 @@ const MIR = {
       M.box = {w, h, cx, cy};
       M.quad.position.set(cx, cy, 0); M.quad.scale.set(w, h, 1);
       M.mat.uniforms.size.value.set(w, h); M.mat.uniforms.rad.value = M.side ? Math.min(h*.32, 30) : h*.42; M.mat.uniforms.bezel.value = Math.max(3, Math.round(w*.022));
-      if(M.stem){ const top = H, y0 = cy + h/2 - 2; M.stem.position.set(cx, (top + y0)/2, 0); M.stem.scale.set(Math.max(6, w*.05), top - y0, 1); }
+      if(M.stem){ const top = H, y0 = cy + h/2 - 2; M.stem.position.set(cx, (top + y0)/2, 0); M.stem.scale.set(Math.max(6, w*.05), top - y0, 1); M.stem.renderOrder = 1; }
+      const yc = H*(typeof cowlBottomPct === 'function' ? cowlBottomPct()/100 : .33), bot = cy - h/2, top = cy + h/2, dark = [.045, .05, .056], mid = [.1, .108, .118];
+      let pts;
+      if(M.side === 0) pts = [[cx - w*.13, H], [cx + w*.13, H], [cx + w*.08, H - Math.max(14, h*.32)], [cx - w*.08, H - Math.max(14, h*.32)]];      // 센서 덮개
+      else { const e = M.side < 0 ? 0 : W, sgn = M.side < 0 ? 1 : -1, inner = cx - sgn*w*.5;
+        pts = [[e, yc - 4], [e, top + h*.25], [e + sgn*w*.18, top + h*.05], [cx + sgn*w*.1, bot + h*.18], [inner + sgn*w*.95, yc - 4]]; }    // 도어 삼각 패널
+      M.mount.geometry.dispose(); M.mount.geometry = polyGeo(pts, M.side === 0 ? mid : dark, M.side === 0 ? dark : mid);
       M.rt.setSize(Math.max(32, Math.round(w*dpr)), Math.max(16, Math.round(h*dpr)));
       M.cam.aspect = w/h; M.cam.fov = 2*Math.atan(Math.tan(M.hfov*Math.PI/360)/M.cam.aspect)*180/Math.PI; M.cam.updateProjectionMatrix();
     });

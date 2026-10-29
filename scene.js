@@ -28,6 +28,12 @@ function canvasTex(w, h, draw, repeat){
   if(repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
 }
+// 파일 텍스처(Higgsfield 생성 재질 등, assets/README.md): 불러오면 apply로 바꿔 끼움. 못 불러오면 코드 텍스처 그대로
+const texLoader = new THREE.TextureLoader();
+function loadTex(url, apply){
+  texLoader.load(url, t => { t.encoding = THREE.sRGBEncoding; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.RepeatWrapping; apply(t); },
+    undefined, () => console.warn('텍스처를 못 불러와 코드 텍스처로 둠:', url));
+}
 const radialTex = (rgb, a) => canvasTex(64, 64, g => {
   const gr = g.createRadialGradient(32,32,0,32,32,32);
   gr.addColorStop(0,`rgba(${rgb},${a})`); gr.addColorStop(1,`rgba(${rgb},0)`);
@@ -218,9 +224,11 @@ const treeKinds = (() => {
     for(let i=0;i<p.count;i++){ v.set(p.getX(i), (p.getY(i) - h*.55)*.7 + h*.6, p.getZ(i)).normalize(); n.setXYZ(i, v.x, v.y, v.z); }   // 둥글게 음영
     return g;
   };
-  return [[pineTex, cross(.56,1), 10, 7], [leafTex, cross(1,1), 7, 4]].map(([map, geo, hMin, hVar]) => {
-    const mat = new THREE.MeshStandardMaterial({map, alphaTest:.5, roughness:.95});
+  // 2026-10-29: 판에 그리는 그림을 Higgsfield 소나무 · 느티나무 사진(배경 제거, assets/tex/tree_*.png)으로 — 판 비율도 그림 비율로. 못 불러오면 위 코드 그림
+  return [[pineTex, cross(.67,1), 10, 7, 'assets/tex/tree_pine.png'], [leafTex, cross(.75,1), 8, 4, 'assets/tex/tree_zelkova.png']].map(([map, geo, hMin, hVar, url]) => {
+    const mat = new THREE.MeshStandardMaterial({map, alphaTest:.5, roughness:.95, envMapIntensity:.25});
     const depth = new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, map, alphaTest:.5});
+    loadTex(url, t => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; mat.map = t; depth.map = t; mat.needsUpdate = depth.needsUpdate = true; });
     return {geo, mat, depth, hMin, hVar};
   });
 })();
@@ -236,32 +244,39 @@ const facadeMat = new THREE.MeshStandardMaterial({roughness:.85, map:canvasTex(1
 }, true)});
 const facadeMats = [facadeMat];   // city.js가 색만 다른 복사본을 더함 — 텍스처를 바꿀 때 모두
 // 상자 건물: 면마다 UV를 실제 크기(m)에 맞춰 창 크기가 건물마다 같게
-function facadeBox(w, h, d){
+function facadeBox(w, h, d, tile = FACADE_TILE){
   const g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv, fw = [d, d, 0, 0, w, w];   // 면 순서 +x −x +y −y +z −z
-  for(let f = 0; f < 6; f++) for(let k = 0; k < 4; k++){ const i = f*4 + k; uv.setXY(i, uv.getX(i)*fw[f]/FACADE_TILE[0], uv.getY(i)*h/FACADE_TILE[1]); }
+  for(let f = 0; f < 6; f++) for(let k = 0; k < 4; k++){ const i = f*4 + k; uv.setXY(i, uv.getX(i)*fw[f]/tile[0], uv.getY(i)*h/tile[1]); }
   return g;
 }
 
 /* ---------- Higgsfield 생성 재질 (2026-10-29, 출처 · 프롬프트 assets/README.md) ----------
    아스팔트(이음새 없게 처리) · 보도 블록 · 건물 벽. 불러오기 전 · 실패 시엔 위 코드 텍스처 그대로 → 주행 판정과 무관(그림만) */
-const texLoader = new THREE.TextureLoader();
-function loadTex(url, apply){
-  texLoader.load(url, t => { t.encoding = THREE.sRGBEncoding; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.RepeatWrapping; apply(t); },
-    undefined, () => console.warn('텍스처를 못 불러와 코드 텍스처로 둠:', url));
-}
 loadTex('assets/tex/asphalt.jpg', t => { asphalt.map = t; asphalt.color = lin('#d2d6da'); asphalt.needsUpdate = true; });
-loadTex('assets/tex/facade.jpg', t => {
-  // 밤 창: 같은 그림에서 유리(어두운 곳)만, 창 칸(6 × 7)마다 30% 켬
-  const img = t.image, c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+// 밤 창: 같은 그림에서 유리(어두운 곳)만, 창 칸(6 × 7)마다 30% 켬. lumMax: 유리로 볼 밝기 한계(유리 외벽은 밝아서 높게)
+function facadeNight(img, lumMax = 95){
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
   const g = c.getContext('2d'); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height), on = Array.from({length:42}, () => Math.random() < .3 ? (Math.random() < .7 ? [255,214,160] : [205,222,255]) : null);
   for(let y = 0; y < c.height; y++) for(let x = 0; x < c.width; x++){
     const i = (y*c.width + x)*4, lum = .3*d.data[i] + .59*d.data[i+1] + .11*d.data[i+2], cell = on[Math.min(6, Math.floor(y/c.height*7))*6 + Math.min(5, Math.floor(x/c.width*6))];
-    const lit = cell && lum < 95; d.data[i] = lit ? cell[0] : 0; d.data[i+1] = lit ? cell[1] : 0; d.data[i+2] = lit ? cell[2] : 0;
+    const lit = cell && lum < lumMax; d.data[i] = lit ? cell[0] : 0; d.data[i+1] = lit ? cell[1] : 0; d.data[i+2] = lit ? cell[2] : 0;
   }
   g.putImageData(d, 0, 0);
-  const em = new THREE.CanvasTexture(c); em.encoding = THREE.sRGBEncoding; em.wrapS = em.wrapT = THREE.RepeatWrapping;
-  facadeMats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; });
-});
+  const em = new THREE.CanvasTexture(c); em.encoding = THREE.sRGBEncoding; em.wrapS = em.wrapT = THREE.RepeatWrapping; return em;
+}
+loadTex('assets/tex/facade.jpg', t => { const em = facadeNight(t.image); facadeMats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
+/* 건물 종류 (2026-10-29, Higgsfield 생성 입면 — 창 6열 × 7층, 한 장 크기 = 층 높이에 맞춤):
+   사무(facadeMat · 층 3m) · 아파트(층 2.8m) · 유리 업무(층 3.5m) + 1층 상가(높이 4.2m, 한 장 18m = 가게 3칸) + 지붕 테 · 옥상 설비 */
+const BUILD = {
+  office:{tile:FACADE_TILE, mats:facadeMats},
+  apt:{tile:[18, 19.6], mats:['#ffffff', '#efe9df', '#e3e8eb'].map(hex => new THREE.MeshStandardMaterial({color:lin(hex), roughness:.85, emissive:lin('#ffffff'), emissiveIntensity:0}))},
+  glass:{tile:[18, 24.5], mats:['#ffffff', '#dfe7ee'].map(hex => new THREE.MeshStandardMaterial({color:lin(hex), roughness:.22, metalness:.35, emissive:lin('#ffffff'), emissiveIntensity:0}))},
+  shop:new THREE.MeshStandardMaterial({color:lin('#ffffff'), roughness:.6, emissive:lin('#ffffff'), emissiveIntensity:0}),
+  roof:new THREE.MeshStandardMaterial({color:lin('#8b8d8a'), roughness:.92})
+};
+loadTex('assets/tex/facade_apt.jpg', t => { const em = facadeNight(t.image, 110); BUILD.apt.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
+loadTex('assets/tex/facade_glass.jpg', t => { const em = facadeNight(t.image, 175); BUILD.glass.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
+loadTex('assets/tex/shopfront.jpg', t => { BUILD.shop.map = t; BUILD.shop.emissiveMap = t; BUILD.shop.needsUpdate = true; });
 
 /* ---------- 먼 풍경: 겹겹이 산 (맵과 무관) ---------- */
 const farMats = [];   // 기본 재질(빛 무시) → 밤엔 setSceneLight가 색을 낮춘다
@@ -368,6 +383,7 @@ function buildMapScene(m){
   mainRoad.rotation.x = -Math.PI/2; mainRoad.position.set(0,0,(40-235)/2);
   const mainLine = curveOf([V(0,60), V(0,-236)], 50);
   for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(40), mainLine, 0, 1, s*H, s*(H+3.6), -0.01, -0.45), verge);
+  for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(40), mainLine, 0, 1, s*(H - .05), s*(H + .55), .004), PROPS.concrete);   // 포장 끝 콘크리트 띠 — 가드레일 지주가 그 위에 섬
   for(let i=0;i<N;i++) for(const o of [-.85,.85]){ const t = addMesh(new THREE.PlaneGeometry(.75, 268), trackMat); t.rotation.x = -Math.PI/2; t.position.set(m.laneX(i)+o, .002, -94); }
 
   /* 차선: 본선 점선 · 가장자리 실선 + 갈림 뒤 구간의 차로 사이 점선 (3m 칠 · 6m 빈칸, hud.js 미니 도로와 같은 간격) */
@@ -380,6 +396,7 @@ function buildMapScene(m){
     const c = e.vis, Lv = c.getLength(), hw = e.k*LANE/2;
     addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, -e.half, e.half, .003 + e.layer*.002), asphalt);
     for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, s*e.half, s*(e.half+3.3), -0.02, -0.45), verge);
+    for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, s*(e.half - .05), s*(e.half + .5), .006 + e.layer*.002), PROPS.concrete);
     const inner = 30/Lv;   // 갈림 안쪽 가장자리는 갈림 뒤 약 30m부터
     for(const [off, start] of [[-(hw+.5), e.outerL ? 0 : inner],[hw+.5, e.outerR ? 0 : inner]]) addMesh(fillRibbon(ribbonGeo(300), c, start, 1, off-.08, off+.08, .013), paint);
     for(let i=1;i<e.k;i++){
@@ -457,6 +474,10 @@ function buildMapScene(m){
       if(fbm(x*.02+3, z*.02) < .33) continue;                             // 숲 덩어리와 빈 들판
       spots.push([x, terrainH(x,z) - .2, z]);
     }
+    // 도로에서 30m 안 나무는 입체(줄기 · 가지 · 잎 덩어리, props.js) — 지나가며 시차가 보이게. 나머지는 판 나무
+    const near3d = [];
+    for(let i = spots.length - 1; i >= 0; i--){ const [x, y, z] = spots[i]; if(roadDist(x, z) < 30 && near3d.length < 260 && hash2(i, 5) < .55){ near3d.push([x, y, z, .95 + rnd()*.45, rnd()*6.3]); spots.splice(i, 1); } }
+    PROPS.plantTrees(MG, near3d, rnd);
     const d = new THREE.Object3D(), c = new THREE.Color();
     treeKinds.forEach(({geo, mat, depth, hMin, hVar}, ti) => {
       const list = spots.filter((_,i) => (hash2(i, 3) < .7) === (ti === 0));   // 침엽 70% · 활엽 30%
@@ -473,7 +494,8 @@ function buildMapScene(m){
   /* 먼 아파트 단지 */
   for(const [cx, cz, n] of [[-330,-760,9],[400,-720,8],[60,-990,7]]) for(let i=0;i<n;i++){
     const w = 34+rnd()*14, h = 55+rnd()*45, x = cx+(rnd()-.5)*220, z = cz+(rnd()-.5)*120;
-    const b = new THREE.Mesh(facadeBox(w,h,13), facadeMat); b.position.set(x, terrainH(x,z) + h/2 - 2, z); b.rotation.y = (rnd()-.5)*.5; MG.add(b);
+    const b = new THREE.Mesh(facadeBox(w,h,13, BUILD.apt.tile), BUILD.apt.mats[i % BUILD.apt.mats.length]); b.position.set(x, terrainH(x,z) + h/2 - 2, z); b.rotation.y = (rnd()-.5)*.5; MG.add(b);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(w + .4, .5, 13.4), BUILD.roof); cap.position.set(x, terrainH(x,z) + h - 1.75, z); cap.rotation.y = b.rotation.y; MG.add(cap);
   }
 
   const g = MG; MG = null; return g;

@@ -42,6 +42,8 @@ const arrowMats = {};
 });
 function cityLight(night){
   cityFacades.forEach(m => m.emissiveIntensity = night ? LIGHT.night.win : 0);
+  [...BUILD.apt.mats, ...BUILD.glass.mats].forEach(m => m.emissiveIntensity = night ? LIGHT.night.win : 0);
+  BUILD.shop.emissiveIntensity = night ? .55 : 0; PROPS.night(night);
   Object.values(arrowMats).forEach(m => m.emissiveIntensity = night ? LIGHT.night.paint : 0);
   cityMats.yellow.emissiveIntensity = night ? LIGHT.night.paint : 0;
 }
@@ -217,15 +219,20 @@ function buildCityScene(m){
     const a = addMesh(new THREE.PlaneGeometry(1.4, 5.6).rotateX(-Math.PI/2), arrowMats[keyOf(i)], ''); a.position.set(m.laneX(i), .013, z);
   }
 
-  /* 건물: 길마다 한 줄로, 보도 뒤 1m. 모퉁이는 가로 도로 쪽 줄이 차지 */
-  const parts = cityFacades.map(() => []);
-  const bgeo = facadeBox;   // scene.js — 창 크기가 건물마다 같게 (한 장 18 × 21m)
+  /* 건물: 길마다 한 줄로, 보도 뒤 1m. 모퉁이는 가로 도로 쪽 줄이 차지 (2026-10-29)
+     종류(사무 · 아파트 · 유리 업무)마다 층 높이에 맞는 입면, 1층은 상가(4.2m), 지붕 테 · 옥상 설비 — 덩어리 상자 하나가 아니게 */
+  const P = new Map(), put = (mat, geo, mtx) => { if(!P.has(mat)) P.set(mat, []); P.get(mat).push([geo, mtx]); }, GF = 4.2;
   const row = (axis, a0, a1, line, dir) => {
     let a = Math.min(a0, a1); const end = Math.max(a0, a1);
     while(a < end - 6){
-      const w = Math.min(end - a, 12 + rnd()*16), d = 12 + rnd()*12, h = 9 + rnd()*(rnd() < .3 ? 48 : 20), c = a + w/2, off = line + dir*(d/2 + 1);
+      const r = rnd(), type = r < .45 ? BUILD.apt : r < .75 ? BUILD.office : BUILD.glass;
+      const w = Math.min(end - a, 12 + rnd()*16), d = 12 + rnd()*12, c = a + w/2, off = line + dir*(d/2 + 1);
+      const fl = type === BUILD.apt ? 2.8 : type === BUILD.glass ? 3.5 : 3, h = GF + fl*Math.round((type === BUILD.office ? 4 : 6) + rnd()*(rnd() < .3 ? 12 : 6));
       const [x, z, bw, bd] = axis === 'z' ? [off, c, d, w] : [c, off, w, d];
-      parts[Math.floor(rnd()*parts.length)].push([bgeo(bw, h, bd), M4().makeTranslation(x, h/2, z)]);
+      put(BUILD.shop, facadeBox(bw, GF, bd, [18, GF]), M4().makeTranslation(x, GF/2, z));
+      put(type.mats[Math.floor(rnd()*type.mats.length)], facadeBox(bw, h - GF, bd, type.tile), M4().makeTranslation(x, GF + (h - GF)/2, z));
+      put(BUILD.roof, new THREE.BoxGeometry(bw + .4, .45, bd + .4), M4().makeTranslation(x, h + .22, z));
+      if(rnd() < .7) put(BUILD.roof, new THREE.BoxGeometry(2 + rnd()*3, 1.1 + rnd(), 2 + rnd()*2), M4().makeTranslation(x + (rnd() - .5)*bw*.5, h + 1, z + (rnd() - .5)*bd*.5));
       a += w + 1.5 + rnd()*4;
     }
   };
@@ -238,7 +245,20 @@ function buildCityScene(m){
     row('x', -420, alley[0] - 3, CZ.far - SW, -1); row('x', alley[1] + 3, xL - SW, CZ.far - SW, -1);
     row('z', -700, CZ.far - 32, alley[0] - 2.5, -1); row('z', -700, CZ.far - 32, alley[1] + 2.5, 1);
   } else { row('z', -760, CZ.far - 32, xL - SW, -1); row('x', -420, xL - SW, CZ.far - SW, -1); }
-  parts.forEach((p, i) => { if(p.length){ const s = addMesh(merge(p), cityFacades[i], 'rc'); s.castShadow = true; } });
+  P.forEach((list, mat) => { const s = addMesh(merge(list), mat, 'rc'); s.castShadow = true; });
+
+  /* 연석: 보도와 도로가 만나는 모든 가장자리 (직선 + 둥근 모퉁이) */
+  (() => {
+    const segs = [[xR + .1, CZ.near + RC, xR + .1, 60], [xL - .1, CZ.near + RC, xL - .1, 60], [xR + .1, -900, xR + .1, CZ.far - RC], [xL - .1, -900, xL - .1, CZ.far - RC],
+      [xR + RC, CZ.near + .1, 900, CZ.near + .1], [-900, CZ.near + .1, xL - RC, CZ.near + .1], [xR + RC, CZ.far - .1, 900, CZ.far - .1]];
+    if(alley) segs.push([-900, CZ.far - .1, alley[0], CZ.far - .1], [alley[1], CZ.far - .1, xL - RC, CZ.far - .1], [alley[0] - .1, -700, alley[0] - .1, CZ.far - SW], [alley[1] + .1, -700, alley[1] + .1, CZ.far - SW]);
+    else segs.push([-900, CZ.far - .1, xL - RC, CZ.far - .1]);
+    [[xR, CZ.near, 1, 1], [xL, CZ.near, -1, 1], [xR, CZ.far, 1, -1], [xL, CZ.far, -1, -1]].forEach(([cx, cz, sx, sz]) => {
+      const ox = cx + sx*RC, oz = cz + sz*RC, a0 = Math.atan2(0, -sx); let da = Math.atan2(-sz, 0) - a0; da -= 2*Math.PI*Math.round(da/(2*Math.PI));
+      for(let i = 0; i < 12; i++){ const p = a => [ox + (RC - .1)*Math.cos(a0 + da*a/12), oz + (RC - .1)*Math.sin(a0 + da*a/12)], [x0, z0] = p(i), [x1, z1] = p(i + 1); segs.push([x0, z0, x1, z1]); }
+    });
+    PROPS.curbs(MG, segs);
+  })();
 
   /* 가로등 · 가로수 (보도 위) */
   const lamp = (x, z, s) => {   // s: 팔이 뻗는 쪽(도로 쪽) — x 방향 ±1
@@ -257,12 +277,8 @@ function buildCityScene(m){
   for(let z = CZ.far - 10; z > -560; z -= 11){ trees.push([xR + 2.8, z]); trees.push([xL - 2.8, z - 5]); }
   for(let x = cwE0 + 10; x < 320; x += 12){ trees.push([x, CZ.near + 2.8]); trees.push([x + 5, CZ.far - 2.8]); }
   for(let x = cwW1 - 10; x > -320; x -= 12){ if(!alley || x > alley[1] + 4 || x < alley[0] - 4) trees.push([x, CZ.far - 2.8]); trees.push([x - 5, CZ.near + 2.8]); }
-  (() => {
-    const {geo, mat, depth} = treeKinds[1], im = new THREE.InstancedMesh(geo, mat, trees.length), d = new THREE.Object3D(), c = new THREE.Color();
-    im.customDepthMaterial = depth;
-    trees.forEach(([x, z], i) => { const s = 5.5 + rnd()*2.5; d.position.set(x, .15, z); d.rotation.set(0, rnd()*6.3, 0); d.scale.set(s, s*1.1, s); d.updateMatrix(); im.setMatrixAt(i, d.matrix); im.setColorAt(i, c.setRGB(.85 + rnd()*.25, .9 + rnd()*.2, .8 + rnd()*.2)); });
-    im.castShadow = im.receiveShadow = true; MG.add(im);
-  })();
+  // 입체 가로수(props.js): 자리 · 크기 · 방향을 흔들고 10%는 비워 줄이 기계적으로 보이지 않게
+  PROPS.plantTrees(MG, trees.filter(() => rnd() > .1).map(([x, z]) => [x + (rnd() - .5)*.6, .15, z + (rnd() - .5)*2.4, .85 + rnd()*.4, rnd()*6.3]), rnd);
 
   /* 방향 표지 (일반도로 = 파랑): 오른쪽 보도에서 뻗은 팔에 판, 정지선 80m 앞 */
   (() => {
@@ -290,15 +306,8 @@ function buildCityScene(m){
     ['red', 'yellow', 'arrow', 'green'].forEach((k, i) => { const c = addMesh(new THREE.CircleGeometry(.17, 20), m._lamps[k], ''); c.position.set(hx - .66 + i*.44, y, zP + .175); });
   })();
 
-  /* 버스 정류장 (⑤): 보도 위 지붕 · 뒤판 · 표지 기둥 */
-  if(m.bus){
-    const z0 = m.bus.z, x0 = xR + SW - .9;
-    const roof = addMesh(new THREE.BoxGeometry(1.8, .12, 7), cityMats.shelter, 'c'); roof.position.set(x0 - .3, 2.6, z0);
-    const backP = addMesh(new THREE.BoxGeometry(.06, 1.9, 6.6), cityMats.glass, ''); backP.position.set(x0 + .5, 1.2, z0);
-    for(const dz of [-3.2, 3.2]){ const p = addMesh(new THREE.BoxGeometry(.1, 2.5, .1), cityMats.shelter, ''); p.position.set(x0 + .5, 1.3, z0 + dz); }
-    const sign = addMesh(new THREE.BoxGeometry(.06, .6, .6), paintOf('#1f4f9c'), ''); sign.position.set(xR + .6, 2.6, z0 - 5);
-    const sp = addMesh(new THREE.CylinderGeometry(.05, .05, 2.6, 8), galv, ''); sp.position.set(xR + .6, 1.3, z0 - 5);
-  }
+  /* 버스 정류장 (⑤): props.js — 기둥 · 지붕 · 유리 · 의자 · 노선 표지 · 광고 상자 */
+  if(m.bus) PROPS.shelter(MG, xR + SW - 1.1, m.bus.z, 1);
 
   const g = MG; MG = null; return g;
 }

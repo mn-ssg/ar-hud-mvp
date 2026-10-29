@@ -33,9 +33,8 @@
     <h2>시연</h2>
     <p class="field">HUD</p>
     <div class="seg" id="modeSeg">
-      <button data-mode="nav" aria-pressed="false">현대</button>
-      <button data-mode="ar" aria-pressed="false">우리 v1</button>
-      <button data-mode="ar2" aria-pressed="true">우리 v2</button>
+      <button data-mode="nav" aria-pressed="false">현대 HUD</button>
+      <button data-mode="ar" aria-pressed="true">우리 HUD</button>
     </div>
     <p class="field">시간대</p>
     <div class="seg ico-seg" id="lightSeg">
@@ -60,17 +59,11 @@
 
   <section id="expSetup">
     <h2>실험</h2>
-    <p class="field">비교할 HUD (A · B)</p>
-    <div class="seg" id="pairSeg">
-      <button data-pair="ar,ar2" aria-pressed="true" title="우리 HUD v1(개선 전) · v2(개선 후)">v1 · v2</button>
-      <button data-pair="nav,ar2" aria-pressed="false" title="현대 HUD · 우리 HUD v2">현대 · v2</button>
-      <button data-pair="nav,ar" aria-pressed="false" title="현대 HUD · 우리 HUD v1 (1차 실험)">현대 · v1</button>
-    </div>
     <p class="field">제시 순서</p>
     <div class="seg" id="orderSeg">
-      <button data-order="auto" aria-pressed="true" title="참가자 번호 홀수 A→B · 짝수 B→A">번호로 교대</button>
-      <button data-order="AB" aria-pressed="false">A → B</button>
-      <button data-order="BA" aria-pressed="false">B → A</button>
+      <button data-order="auto" aria-pressed="true" title="참가자 번호 홀수: 현대 먼저 · 짝수: 우리 먼저">번호로 교대</button>
+      <button data-order="AB" aria-pressed="false">현대 먼저</button>
+      <button data-order="BA" aria-pressed="false">우리 먼저</button>
     </div>
     <label class="check"><input type="checkbox" id="practiceChk" checked> 본 실험 전 연습 주행</label>
   </section>
@@ -88,109 +81,22 @@
   <!-- 앞유리 틀 · 대시보드 · 핸들은 3D 실내(cabin.js)로, 룸미러 · 사이드미러는 mirrors.js로 그린다 -->
 
   <div id="hudWrap">
+    <!-- HUD 표시 영역 = 이 상자(viewBox 520 × 270) 하나. 두 HUD의 모든 층은 #hudClip 안에서만 그린다 (2026-10-29) -->
     <svg viewBox="0 0 520 270" aria-hidden="true">
       <defs>
-        <linearGradient id="fadeTop" gradientUnits="userSpaceOnUse" x1="0" y1="80" x2="0" y2="102">
-          <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity="1"/>
-        </linearGradient>
-        <mask id="roadMask" maskUnits="userSpaceOnUse" x="0" y="0" width="520" height="270">
-          <rect x="0" y="80" width="520" height="156" fill="url(#fadeTop)"/>
-        </mask>
-        <linearGradient id="edgeGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#ff4d4d" stop-opacity="0"/><stop offset=".5" stop-color="#ff4d4d" stop-opacity=".95"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/>
-        </linearGradient>
-        <!-- 정체 구간 빗금: 대각선 줄무늬가 흐르며 '막힘'을 표현 -->
-        <pattern id="jamHatch" patternUnits="userSpaceOnUse" width="14" height="14">
-          <rect width="14" height="14" fill="#ffb020" fill-opacity=".14"/>
-          <path d="M-2 12 L12 -2 M4 18 L18 4" stroke="#ffb020" stroke-opacity=".65" stroke-width="4"/>
-          <animateTransform attributeName="patternTransform" type="translate" from="0 0" to="14 -14" dur="1.1s" repeatCount="indefinite"/>
-        </pattern>
-        <!-- 들어갈 차로: 가까울수록 밝게 (원근감). v1.4: HUD에서 가장 진하게 -->
-        <linearGradient id="laneGrad" gradientUnits="userSpaceOnUse" x1="0" y1="228" x2="0" y2="88">
-          <stop id="lgA" offset="0" stop-color="#00e5ff" stop-opacity=".62"/><stop id="lgB" offset=".55" stop-color="#00e5ff" stop-opacity=".3"/><stop id="lgC" offset="1" stop-color="#00e5ff" stop-opacity=".1"/>
-        </linearGradient>
-        <!-- 옮길 화살표: 꼬리는 흐리고 머리는 선명하게 (좌표는 hud.js가 매 프레임 맞춤) -->
-        <linearGradient id="arrowGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1" y2="0">
-          <stop id="agA" offset="0" stop-color="#3ddc84" stop-opacity=".3"/><stop id="agB" offset="1" stop-color="#3ddc84" stop-opacity="1"/>
-        </linearGradient>
-        <!-- HUD 빛 번짐: 유리에 맺힌 빛처럼 -->
+        <clipPath id="hudClip" clipPathUnits="userSpaceOnUse"><rect x="0" y="0" width="520" height="270"/></clipPath>
+        <!-- 현대 HUD(대조군)의 빛 번짐 — 우리 HUD는 쓰지 않음 -->
         <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="2.4" result="b"/>
           <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
-        <radialGradient id="dangerRad"><stop offset="0" stop-color="#ff4d4d" stop-opacity=".75"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/></radialGradient>
       </defs>
-
-      <!-- ===== 우리 HUD v1.4 — 정보 위계(01_프로젝트/10_HUD_GUI_설계.md)
-           행동 단계 글자('이동'·'유지' 등)는 없다. 상태는 미니 도로의 옮길 화살표와 막대만으로 읽는다
-           ① 들어갈 차로 · 경로: 미니 도로(실제 도로를 옮긴 모형) — HUD에서 가장 크고 진하게(채도 높은 청록).
-              옮길 화살표(초록 흐름 = 옮겨도 됨 / 주황 = 서두름 · 주황 점 = 틈 대기 / 빨간 점 + 멈춤 막대 = 대기) · 정체 차량과 틈 · 뒤차
-           ② 갈 방향: 가운데 위, 다음 갈림에서 갈 쪽 화살표만. 경로색 하나로 고정(상태를 담지 않음)
-           ③ 언제: 숫자 없는 막대(초록→주황→빨강 연속) + 미니 도로 마감선. 뒤차로 기다리는 동안엔 회색으로 흐리게
-           ④ 제한속도: 왼쪽 위, 표지 모양 그대로 (v1.8: 차속 삭제 · 맨 아래 → 왼쪽 위 · 반지름 8.5 → 21). 도로 윤곽선은 흐리게 → 경로가 먼저 보이도록 ===== -->
-      <g id="arHud">
-        <g mask="url(#roadMask)">
-          <path id="roadSurf" fill="#ffffff" fill-opacity=".045"/>
-          <path id="laneFill" fill="url(#laneGrad)"/>
-          <path id="roadEdges" fill="#eaf6ff" fill-opacity=".5"/>
-          <path id="roadDash" fill="#eaf6ff" fill-opacity=".3"/>
-          <path id="jamBand" fill="url(#jamHatch)" opacity="0"/>
-          <path id="pulses" fill="#00e5ff"/>
-          <path id="laneRails" fill="#00e5ff" filter="url(#glow)"/>
-          <g id="veh"></g>
-          <path id="gapMark" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
-          <path id="slot" fill="#00e5ff" fill-opacity=".2" stroke="#00e5ff" stroke-width="2" stroke-linejoin="round"/>
-          <path id="gate" filter="url(#glow)"/>
-          <!-- 일반도로 (D69): 멈출 곳(빨간불 정지선 · 보행자 앞 횡단보도) 빨간 막대 + 보행자 점 -->
-          <path id="cityStop" fill="#ff4d4d" filter="url(#glow)"/>
-          <path id="pedDots" fill="#ffffff" fill-opacity=".9"/>
-        </g>
-        <g id="moveGrp" filter="url(#glow)">
-          <path id="moveArrow" fill="none" stroke="url(#arrowGrad)" stroke-width="8" stroke-linecap="round"/>
-          <path id="moveHead" stroke="none" stroke-linejoin="round"/>
-          <path id="moveStop" fill="none" stroke="#ff4d4d" stroke-width="6" stroke-linecap="round"/>
-          <path id="moveStopCore" fill="none" stroke="#ffd2cc" stroke-width="2.4" stroke-linecap="round"/><!-- 멈춤 막대의 밝은 심: 빨강은 휘도가 낮아 낮에 대비가 3:1 언저리라 (v1.5) -->
-        </g>
-        <!-- 내 차: 뒷모습 -->
-        <g id="ego" transform="translate(260 221)" fill="#eaf6ff">
-          <path d="M-15 4 Q-15 -3 -11 -4 L-7 -10 Q-6 -12 -3 -12 H3 Q6 -12 7 -10 L11 -4 Q15 -3 15 4 V7 Q15 9 13 9 H-13 Q-15 9 -15 7 Z" fill-opacity=".92"/>
-          <rect x="-12" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/><rect x="7" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/>
-          <path d="M-5 -9 H5 L8 -4 H-8 Z" fill="#0b0d10" fill-opacity=".55"/>
-        </g>
-        <!-- 뒤에서 오는 차 (초보자는 옆·뒤를 잘 안 보므로 가운데 쪽으로 끌어와 보여줌) -->
-        <g id="carBehind" opacity="0">
-          <circle r="26" fill="url(#dangerRad)"/>
-          <rect x="-8" y="-11" width="16" height="22" rx="4" fill="#ff5f5f" stroke="#ffc4bd" stroke-width="1.6"/><rect x="-5" y="-7" width="10" height="6" rx="2" fill="#000" fill-opacity=".45"/>
-        </g>
-        <rect id="edgeL" x="0" y="96" width="7" height="140" rx="3.5" fill="url(#edgeGrad)" opacity="0"/>
-        <rect id="edgeR" x="513" y="96" width="7" height="140" rx="3.5" fill="url(#edgeGrad)" opacity="0"/>
-
-        <!-- ② 갈 방향: 다음 갈림에서 갈 쪽만. 글자·테두리 없음, 경로색 고정. 위치·등장 애니메이션은 hud.js -->
-        <g id="act" filter="url(#glow)">
-          <g id="nowIcon" transform="scale(1.55)" fill="none" stroke="#00e5ff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
-            <g id="icoRight"><path d="M-6 13 V4 Q-6 -4 5 -9 M-1 -13 L8 -9 L4 -1"/></g>
-            <g id="icoLeft"><path d="M6 13 V4 Q6 -4 -5 -9 M1 -13 L-8 -9 L-4 -1"/></g>
-            <g id="icoUp"><path d="M0 13 V-12 M-8 -4 L0 -13 L8 -4"/></g>
-          </g>
-        </g>
-        <!-- ③ 언제 -->
-        <g id="cd" filter="url(#glow)">
-          <rect id="cdBg" x="200" y="62" width="120" height="6" rx="3" fill-opacity=".16"/>
-          <rect id="cdBar" x="200" y="62" width="120" height="6" rx="3"/>
-        </g>
-        <!-- ④ 제한속도 (v1.8): 차속은 HUD에서 빼고 계기판으로. 표지는 실제 표지 모양 그대로, 왼쪽 위(갈 방향과 같은 줄) —
-             가운데 세로줄(갈 방향 → 막대 → 미니 도로)은 경로만, 규정은 옆으로. 근거 01_프로젝트/10_HUD_GUI_설계.md 0-4절 -->
-        <g id="info" transform="translate(112 34)">
-          <circle r="21" fill="#fff" fill-opacity=".92" stroke="#e5262b" stroke-width="5"/>
-          <text id="limA" y="6.8" text-anchor="middle" font-size="19" font-weight="700" fill="#111" class="hud-t tnum">80</text>
-        </g>
+      <g clip-path="url(#hudClip)">
+        <!-- 우리 HUD: ourhud.js ahMarkup()이 채움. 글자 없이 그래픽으로만 -->
+        <g id="arHud"></g>
+        <!-- 현대 HUD (대조군): 현대 HUD 사진을 그대로 재현. hud.js navMarkup()이 채운다 -->
+        <g id="navHud" class="hud-t"></g>
       </g>
-
-      <!-- ===== 우리 HUD v2 (개선 후, 2026-10-29): hud2.js hud2Markup()이 채운다. 판단은 guide.js ===== -->
-      <g id="arHud2" style="display:none"></g>
-
-      <!-- ===== 현대 HUD (대조군): 현대 HUD 사진을 그대로 재현. hud.js navMarkup()이 채운다 ===== -->
-      <g id="navHud" class="hud-t"></g>
     </svg>
   </div>
 
@@ -257,8 +163,10 @@
 <script src="scene.js"></script>
 <script src="cabin.js"></script>
 <script src="mirrors.js"></script>
+<script src="props.js"></script>
 <script src="hud.js"></script>
-<script src="hud2.js"></script>
+<script src="hudgeom.js"></script>
+<script src="ourhud.js"></script>
 <script src="drive.js"></script>
 <script src="city.js"></script>
 <script src="main.js"></script>
