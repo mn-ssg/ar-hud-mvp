@@ -1,7 +1,7 @@
 /* ============================================================
    hud.js — 유리 위 HUD 상자(SVG) 그리기
    · 현대 HUD(대조군): 사용자가 준 현대 HUD 사진을 그대로 재현 — 근거는 01_프로젝트/13_현대HUD_재현.md
-   · 우리 HUD: 중간고사 1차 실험 때(v1.9, 커밋 470a8f7) 그대로 — 이 파일 아래쪽 drawAr()
+   · 우리 HUD 1.10: 중간고사 1차 실험 v1.9(커밋 470a8f7) 위에 옆 공간 괄호 · 이동 연결선 · 같은 모양 차 — 이 파일 아래쪽 drawAr()
    · 맵 5종(maps.js): 분기 그림 · 차로 안내 칸을 맵 데이터로 그린다. C = 다음 갈림 정보(main.js navCtx)
    config.js, maps.js, scene.js 다음에 로드. 상태 S·path는 main.js에서 정의(호출 시점엔 존재).
    ============================================================ */
@@ -151,209 +151,291 @@ function drawNav(p, f, C, kmh, remainKm, dangerOn){
   $('#nvBcwR').setAttribute('opacity', (S.drive ? S.bswR : dangerOn && R.side > 0) ? 1 : 0);
 }
 
-/* ---------- 우리 HUD: 중간고사 1차 실험(2026-10-12) 때 그대로 — 커밋 470a8f7의 hud.js에서 복원 (2026-10-29) ----------
-   설계 근거 01_프로젝트/10_HUD_GUI_설계.md v1.9. 바꾼 것: 건넌 뒤 멀어지는 보행자를 그리지 않음(V1에 없던 단계) */
-/* ---------- 우리 HUD: 미니 도로 투영 (v1.4: 글자를 뺀 자리만큼 위·옆으로 키움, y 88~228 · 반폭 126) ---------- */
-const HX = 260, HY_NEAR = 228, HY_FAR = 88, HALF = 126, K = 55, PXM = HALF/5.25;   // PXM: 가장 가까운 곳 1m = px
-function makeProj(p, f){
-  const rx = -f.z, rz = f.x;
-  return (wx,wz) => {
-    const dx = wx-p.x, dz = wz-p.z, d = dx*f.x + dz*f.z;
-    if(d < 0 || d > 300) return null;
-    const X = dx*rx + dz*rz, s = K/(d+K);
-    return [HX + X*PXM*s, HY_FAR + (HY_NEAR-HY_FAR)*s, s, d];
-  };
-}
-const fmt = q => q[0].toFixed(1)+' '+q[1].toFixed(1);
-function strip(L,R){ const a=[],b=[]; L.forEach((q,i)=>{ if(q&&R[i]){ a.push(q); b.push(R[i]); } }); return a.length>1 ? 'M'+a.map(fmt).join('L')+'L'+b.reverse().map(fmt).join('L')+'Z' : ''; }
-function offsetPts(curve,u0,u1,off,proj,n=24){
-  const out=[];
-  for(let i=0;i<n;i++){ const u=u0+(u1-u0)*i/(n-1), q=curve.getPointAt(u), t=curve.getTangentAt(u); let nx=-t.z,nz=t.x; const l=Math.hypot(nx,nz)||1; out.push(proj(q.x+nx/l*off, q.z+nz/l*off)); }
+/* ============================================================
+   우리 HUD — 중간고사 1차 실험 v1.9(커밋 470a8f7)를 이어서 고침 (2026-10-29, 설계 01_프로젝트/10_HUD_GUI_설계.md 0-9절)
+   V1에서 그대로 둔 것: 미니 도로(원근) · 들어갈 차로 청록 면 + 테두리 · 위 갈 방향 화살표 · 다음 행동까지 막대 · 마감선 · 제한속도 표지 ·
+                       일반도로 빨간 멈춤 막대(정지선 · 횡단보도) · 보행자 점
+   바꾼 것 — '주변 차의 상대 위치 + 내 차 옆 공간의 점유 + 이동 연결선':
+     · 내 차 · 다른 차 = 같은 모양의 위에서 본 차(앞 = 위, 앞유리가 앞). 내 차는 밝게, 보통 차는 회색, 위험 차는 빨강
+     · 내 차 아래에 '뒤 띠' — 내 차 기준 평면도(옆 ±4m는 1m = 5px, 그 뒤는 압축). 원근 미니 도로와 가까운 면(내 차 앞 4m)에서 이어짐
+     · 옆 공간 점유 = 내 차로와 옮길 차로 사이 경계에 선 짧은 괄호(내 차 길이만큼). 위험 차 때문 = 빨강 실선, 정체 줄로 자리 없음 = 흰 실선,
+       위험이 풀려 확인 중 = 회색 점선이 0.8초 동안 옅어짐 (색을 빼도 실선 / 점선 · 차 위치로 구분)
+     · 이동 연결선 = 내 차 옆에서 바로 옆 차로로 이어지는 짧은 초록 선 + 작은 화살 끝. 판단이 '이동'일 때만, 처음 0.26초 동안 그려지며 나타남(반복 없음)
+     · 정체 = 줄 차를 같은 차 모양으로(빗금 · 깜빡이는 칸 · 막대 없음). 들어갈 수 있는 틈만 얇은 초록 모서리 표시
+     · 빨강 = 부딪힐 위험(차 · 괄호 · 앞쪽 멈춤 막대)만. 마감 임박은 주황, 정체로 자리 없음은 흰색, 이동은 초록, 경로는 청록
+   판단은 guide.js 하나(main.js guideStep → S.G): 대기 · 확인 · 이동, 대기 이유 차, 옮길 바로 옆 차로, 정체 줄 끝. 여기는 그리기만.
+   차로 변경 판단 기준은 1차 실험 우리 HUD 기준과 같은 값(뒤 10m · 3.5초) + 옮길 차로 앞차 4m · 2초(위험한 끼어들기 기준) — 10_HUD_GUI_설계 0-9절
+   ============================================================ */
+
+/* ---------- 공통 값: 크기 · 선 · 투명도 · 시간 ---------- */
+const HK = {
+  HX:260, YF:84, YN:186, NEAR:4, K:55, PXM:24, FAR:300, LAT:10.5,   // 원근: 가까운 면 = 내 차 앞 4m(y 186), 1m = 24px(가까운 면)
+  EGO_Y:206, RATE:5,                                                 // 내 차 중심 y · 내 차 옆(앞뒤 ±4m) 1m = 5px
+  REAR_Y0:226, REAR_H:36, REAR_K:12, REAR_MAX:44, EDGE_Y:262,        // 뒤 띠: 4m 뒤 y 226 → 압축, 44m 넘게 뒤면 아래 가장자리 표시
+  car:{w:19, h:28}, ego:{w:21, h:31},                              // 1366 화면에서 차 한 대 ≈ 10 × 14px
+  sw:{line:1.4, bracket:4, bracketQ:2.8, intent:5.5, link:4.2, corner:2.4, trail:2, carLine:1.4},
+  bracketHalf:18, bracketSerif:5,                                    // 괄호 반 길이(px, 내 차 길이보다 조금 길게) · 끝 갈고리
+  op:{car:.2, carLine:.85, edge:.45, dash:.28, rearLine:.22, laneFlat:.2},
+  qAhead:2, qBehind:1, qFar:30,                                      // 정체 줄 차: 바로 옆 차로에서 앞 2대(30m 안) · 뒤 1대만 — 틈을 이루는 차
+  t:{bracketIn:300, link:260}                                         // ms: 괄호 처음 강조가 가라앉는 시간 · 연결선이 그려지는 시간
+};
+const AC = {lane:C_NOW, go:C_GO, hazard:C_DANGER, hazLine:'#ffe3df', deadline:C_WARN, full:'#f2f5f8', car:'#aab4bf', ego:'#f4f8fb', idle:'#b4bec9', glass:'#0b0d10', ink:'#eaf6ff'};
+const ROUTE_END = 70;   // 경로 끝: 마지막 갈림 뒤 이만큼(m)까지 안내 (main.js 시연 종료는 +88m)
+const ease = t => 1 - Math.pow(1 - t, 3);
+const f1 = v => v.toFixed(1);
+
+/* ---------- 좌표: 세계(x, z) → 내 차 기준(앞 lon, 오른쪽 lat) → HUD ----------
+   원근(lon ≥ NEAR): 다각형을 가까운 면 · 먼 면 · 옆 ±LAT로 잘라서(Sutherland–Hodgman) 그림.
+   V1은 가까운 면 = 내 차 줄(d = 0)이고 그 뒤 점을 빼고 남은 점을 한 띠로 이어, 교차로 직전 옆길이 내 차 높이에 가로로 깔렸다
+   ('차 밑 90도 도로'). 이제 원근 그림은 가까운 면(y 186) 위에만 — 내 차 · 뒤 띠는 그 아래 평면도 */
+const toE = (p, f) => (wx, wz) => { const dx = wx - p.x, dz = wz - p.z; return [dx*f.x + dz*f.z, dx*(-f.z) + dz*f.x]; };
+const sOf = lon => HK.K/(lon - HK.NEAR + HK.K);
+const prj = (lon, lat) => { const s = sOf(lon); return [HK.HX + lat*HK.PXM*s, HK.YF + (HK.YN - HK.YF)*s]; };
+// 평면도(뒤 띠 · 내 차 옆): lon < NEAR
+const planY = lon => lon >= -4 ? HK.EGO_Y - lon*HK.RATE : HK.REAR_Y0 + HK.REAR_H*(1 - Math.exp((lon + 4)/HK.REAR_K));
+// 어느 lon이든 화면 자리 · 크기 배율 (가까운 면에서 두 방식이 같은 자리 · 같은 크기로 이어짐)
+// 뒤 띠는 4m 뒤부터 압축 → 차도 조금씩 작게(바로 뒤 차끼리 겹침을 줄임)
+const place = (lon, lat) => lon >= HK.NEAR ? [...prj(lon, lat), sOf(lon)] : [HK.HX + lat*HK.PXM, planY(lon), lon >= -4 ? 1 : .55 + .45*Math.exp((lon + 4)/8)];
+const carBox = (lon, lat) => { const [x, y, s] = place(lon, lat), k = Math.max(.38, s); return {x, y, w:HK.car.w*k, h:HK.car.h*k}; };
+function clipPoly(poly){
+  const planes = [[0, HK.NEAR, 1], [0, HK.FAR, -1], [1, -HK.LAT, 1], [1, HK.LAT, -1]];
+  let out = poly;
+  for(const [k, v, sg] of planes){
+    if(out.length < 3) return [];
+    const inp = out; out = [];
+    for(let i = 0; i < inp.length; i++){
+      const a = inp[i], b = inp[(i + 1) % inp.length], ia = (a[k] - v)*sg >= 0, ib = (b[k] - v)*sg >= 0;
+      if(ia) out.push(a);
+      if(ia !== ib){ const t = (v - a[k])/(b[k] - a[k]); out.push([a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t]); }
+    }
+  }
   return out;
 }
-// 선을 '원근 굵기'의 띠로 그린다 — 가까운 선은 굵고 먼 선은 가늘게 (실제 도로를 옮긴 모형처럼)
-function bandX(x0, x1, z0, z1, proj, step=4){ const L=[],R=[]; for(let z=z0; z>=z1; z-=step){ L.push(proj(x0,z)); R.push(proj(x1,z)); } return strip(L,R); }
-const lineX = (x, z0, z1, hw, proj) => bandX(x-hw, x+hw, z0, z1, proj);
-const lineC = (c, u0, u1, off, hw, proj, n=40) => strip(offsetPts(c,u0,u1,off-hw,proj,n), offsetPts(c,u0,u1,off+hw,proj,n));
-function quadZ(x0, x1, za, zb, proj){ const q = [proj(x0,za), proj(x1,za), proj(x1,zb), proj(x0,zb)]; return q.every(Boolean) ? 'M'+q.map(fmt).join('L')+'Z' : ''; }
-// 곡선을 따라 offset a~b 사이 띠. 끝 taper m 동안 폭이 0으로 좁아짐(경로 끝을 뾰족하게, v1.6). L = 곡선 길이
-function bandC(c, u0, u1, a, b, taper, L, proj, n=48){
-  const A=[], B=[];
-  for(let i=0;i<n;i++){
-    const u = u0+(u1-u0)*i/(n-1), q = c.getPointAt(u), t = c.getTangentAt(u), f = taper ? clamp((u1-u)*L/taper) : 1;
-    let nx=-t.z, nz=t.x; const l=Math.hypot(nx,nz)||1; nx/=l; nz/=l;
-    A.push(proj(q.x+nx*a*f, q.z+nz*a*f)); B.push(proj(q.x+nx*b*f, q.z+nz*b*f));
+const polyD = poly => { const c = clipPoly(poly); return c.length > 2 ? 'M' + c.map(q => { const r = prj(q[0], q[1]); return f1(r[0]) + ' ' + f1(r[1]); }).join('L') + 'Z' : ''; };
+// 점 목록([x, z, tx, tz]) 따라 옆 a ~ b 띠. 구간마다 사각형 하나 → 잘린 조각이 서로 이어지지 않음. taper: 끝 n점 동안 폭을 0으로
+function bandAlong(T, pts, a, b, i0 = 0, i1 = pts.length - 1, taper = 0){
+  let d = '';
+  const side = (q, o) => T(q[0] - q[3]*o, q[1] + q[2]*o), w = i => taper ? clamp((i1 - i)/taper) : 1;
+  for(let i = i0; i < i1; i++){
+    const q0 = pts[i], q1 = pts[i + 1], A = side(q0, a*w(i)), B = side(q1, a*w(i + 1)), C2 = side(q1, b*w(i + 1)), D2 = side(q0, b*w(i));
+    if(Math.max(A[0], B[0], C2[0], D2[0]) < HK.NEAR || Math.min(A[0], B[0], C2[0], D2[0]) > HK.FAR) continue;
+    d += polyD([A, B, C2, D2]);
   }
-  return strip(A,B);
+  return d;
 }
-// 경로 끝: 마지막 갈림 뒤 이만큼(m)까지 안내. 그 사이 남은 경로가 짧아지며 청록 → 초록, 끝나면 사라짐 (main.js 시연 종료는 +88m)
-const ROUTE_END = 70;
-// 점선은 3D 도로와 같은 간격(3m 칠 · 6m 빈칸)
-function dashX(x, hw, zNear, proj){ let o=''; for(let z=38; z>-222; z-=9){ if(z > zNear + 3) continue; o += quadZ(x-hw, x+hw, z, z-3, proj); } return o; }
+const zPts = (x, z0, z1, step = 4) => { const o = []; for(let z = z0; z > z1; z -= step) o.push([x, z, 0, -1]); o.push([x, z1, 0, -1]); return o; };
+const bandZ = (T, x0, x1, z0, z1) => z0 <= z1 ? '' : bandAlong(T, zPts(x0, z0, z1), 0, x1 - x0);
+// 곡선을 2m 간격 점으로 (앞에서부터 len m)
+function curvePts(c, L, len = L, step = 2){
+  const uMax = clamp(len/L), n = Math.max(2, Math.ceil(len/step)), o = [];
+  for(let i = 0; i <= n; i++){ const u = uMax*i/n, q = c.getPointAt(u), t = c.getTangentAt(u), l = Math.hypot(t.x, t.z) || 1; o.push([q.x, q.z, t.x/l, t.z/l]); }
+  return o;
+}
+const quadW = (T, pts) => polyD(pts.map(q => T(q[0], q[1])));
+
+/* ---------- 차 모양 (모두 같은 모양, 위에서 본 차 · 앞 = 위) ---------- */
+function carShape(cx, cy, w, h){
+  const x0 = cx - w/2, x1 = cx + w/2, y0 = cy - h/2, y1 = cy + h/2, r = w*.34, rb = w*.22;
+  const body = `M${f1(x0 + r)} ${f1(y0)}H${f1(x1 - r)}Q${f1(x1)} ${f1(y0)} ${f1(x1)} ${f1(y0 + r)}V${f1(y1 - rb)}Q${f1(x1)} ${f1(y1)} ${f1(x1 - rb)} ${f1(y1)}H${f1(x0 + rb)}Q${f1(x0)} ${f1(y1)} ${f1(x0)} ${f1(y1 - rb)}V${f1(y0 + r)}Q${f1(x0)} ${f1(y0)} ${f1(x0 + r)} ${f1(y0)}Z`;
+  const gy0 = y0 + h*.24, gy1 = y0 + h*.4, gx = w*.36, gx2 = w*.42;   // 앞유리(앞쪽, 넓음) · 뒷유리(뒤쪽, 좁음)
+  const glass = `M${f1(cx - gx)} ${f1(gy0)}H${f1(cx + gx)}L${f1(cx + gx2)} ${f1(gy1)}H${f1(cx - gx2)}Z` +
+    `M${f1(cx - w*.32)} ${f1(y1 - h*.2)}H${f1(cx + w*.32)}L${f1(cx + w*.28)} ${f1(y1 - h*.1)}H${f1(cx - w*.28)}Z`;
+  return {body, glass};
+}
+
+/* ---------- 요소 만들기 ---------- */
+const mkS = (n, parent, attrs = {}) => { const e = document.createElementNS(SVGNS, n); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); parent.appendChild(e); return e; };
+const carEls = Array.from({length:16}, () => {
+  const g = mkS('g', $('#cars')), trail = mkS('path', g, {fill:'none', 'stroke-width':HK.sw.trail, 'stroke-linecap':'round'}), body = mkS('path', g, {'stroke-linejoin':'round'}), glass = mkS('path', g, {fill:AC.glass, 'fill-opacity':.55});
+  return {g, trail, body, glass};
+});
+const edgeEls = Array.from({length:3}, () => mkS('path', $('#cars'), {fill:'none', 'stroke-width':2.6, 'stroke-linecap':'round', 'stroke-linejoin':'round'}));   // 44m 넘게 뒤 · 화면 밖 차: 아래 가장자리 꺾쇠(차 모양 아님 → 정확한 자리가 아니라는 표시)
+(() => { const s = carShape(HK.HX, HK.EGO_Y, HK.ego.w, HK.ego.h); $('#egoBody').setAttribute('d', s.body); $('#egoGlass').setAttribute('d', s.glass); })();
 
 const icons = ['icoRight','icoLeft','icoUp'];
 function showIcon(id){ icons.forEach(n => $('#'+n).style.display = n===id ? '' : 'none'); }
-const hexRgb = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16));
-const mix = (a, b, t) => { const A = hexRgb(a), B = hexRgb(b); return '#'+A.map((v,i) => Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join(''); };
-const ease = t => 1 - Math.pow(1 - t, 3);
-// 남은 몫에 따라 연속으로 초록 → 주황 → 빨강 (막대 · 마감선)
-const timeColor = fr => fr >= .5 ? C_GO : fr >= .2 ? mix(C_WARN, C_GO, (fr-.2)/.3) : mix(C_DANGER, C_WARN, fr/.2);
-// 옮길 화살표는 주황에서 멈춘다 — 빨강은 '대기'(빨간 점 + 멈춤 막대)에만 쓴다
-const arrowColor = fr => fr >= .5 ? C_GO : fr >= .2 ? mix(C_WARN, C_GO, (fr-.2)/.3) : C_WARN;
-// 뒤차로 기다리는 동안의 막대 · 마감선: 시간은 계속 줄지만 초록(해도 됨)과 겹치지 않게 회색으로 흐리게
-const C_IDLE = '#b4bec9';
+const AS = {icon:null, since:0, gate:'none', gateAt:0, route:null};
+function resetHud(){ AS.icon = null; AS.gate = 'none'; AS.gateAt = 0; AS.route = null; }
 
-// 미니 도로의 차량 표시: 정체 줄 차(주황) · 뒤에서 와 앞지르는 차(빨강)
-const vehEls = Array.from({length:24}, () => { const r = document.createElementNS(SVGNS,'rect'); r.setAttribute('rx', 2.5); r.setAttribute('stroke-width', 1.4); $('#veh').appendChild(r); return r; });
+/* ---------- 매 프레임 ---------- */
+function drawAr(p, f, C, k){
+  const m = S.map, R = S.route, G = S.G, T = toE(p, f), now = performance.now(), st = C.st;
+  const onMain = C.i === 0 && (C.phase === 'approach' || C.phase === 'turning') && p.z > FORK_Z - 1;
+  const straight = onMain && Math.abs(f.x) < .2;                 // 본선을 곧게 달리는 중: 뒤 띠 · 옆 공간 · 연결선은 이때만 (차로 번호가 뜻이 있음)
+  const need = G.need, wait = need && G.gate === 'wait', clearing = need && G.gate === 'clearing', go = need && G.gate === 'go';
+  const jam = G.jam, tx = m.laneX(G.tl), zNear = Math.min(p.z, 40);
+  if(G.gate !== AS.gate){ AS.gate = G.gate; AS.gateAt = now; }   // UI 전환 시각 (판단 자체는 guide.js — 그림 때문에 늦어지지 않음)
 
-/* ② 갈 방향은 바뀔 때만 0.2초 동안 커지며 나타남 · 차로를 다 옮기면 1.4초 칭찬(들어간 차로가 초록 → 경로색) */
-const AS = {icon:null, since:0, doneUntil:0, wasMove:false};
-function resetHud(){ AS.icon = null; AS.doneUntil = 0; AS.wasMove = false; }
-
-/* ---------- 우리 HUD v1.4 ---------- */
-function drawAr(p, f, C, k, dangerOn){
-  const m = S.map, R = S.route, st = C.st, onMain = C.i === 0;
-  const proj = makeProj(p, f), tx = R.tx, sgn = R.side, now = performance.now();
-  // 뒤차 판단: 시연은 다가오는 차가 내 옆을 지나갈 때까지, 주행 테스트는 실제 옆 차로 차가 위험할 때 (drive.js hudThreat)
-  const block = S.drive ? S.rearBlock : S.rearActive && S.rearGap < 45 && S.rearGap > -8;
-  const warn = block || S.danger > .5, inLane = !onMain || Math.abs(p.x - tx) < 1.2;
-  const tail = onMain && S.jam > 0 && S.q && S.q.backZ !== null ? S.q.backZ : null;
-  const needMove = onMain && !inLane && st <= 3;
-  const besideQueue = tail !== null && needMove && p.z <= tail + 2;          // 이미 줄 옆까지 와 버림
-  const gateZ = tail !== null ? tail + 10 : changeEndOf(m);                  // 여기까지는 옮겨 있어야 함 (일반도로: 백색실선 시작)
-  const frac = clamp((p.z - gateZ)/(0 - gateZ));
-  const zNear = Math.min(p.z - 2, 40);
-
-  /* ② 갈 방향 — 다음 갈림에서 갈 쪽만, 경로색 하나. 행동 단계 글자('이동'·'유지' 등)는 없다:
-     상태는 ① 미니 도로의 옮길 화살표와 ③ 막대가 보여 준다. 갈림을 지나면 끔 */
-  if(AS.wasMove && !needMove && inLane && st <= 3) AS.doneUntil = now + 1400;
-  AS.wasMove = needMove;
-  const icon = C.d >= -8 ? {L:'icoLeft', S:'icoUp', R:'icoRight'}[C.node.key] : null;
+  /* 갈 방향 (V1): 다음 갈림에서 갈 쪽, 출구를 확정할 때까지 */
+  const icon = C.phase === 'approach' || C.phase === 'turning' ? {L:'icoLeft', S:'icoUp', R:'icoRight'}[C.node.key] : null;
   if(icon !== AS.icon){ AS.icon = icon; AS.since = now; }
   const act = $('#act'), e = ease(clamp((now - AS.since)/200));
-  showIcon(icon);
-  act.style.display = icon ? '' : 'none';
-  act.setAttribute('transform', `translate(${HX} 32) scale(${(.88 + .12*e).toFixed(3)})`);
-  act.setAttribute('opacity', e.toFixed(3));
+  showIcon(icon); act.style.display = icon ? '' : 'none';
+  act.setAttribute('transform', `translate(${HK.HX} 32) scale(${(.88 + .12*e).toFixed(3)})`); act.setAttribute('opacity', e.toFixed(3));
 
-  /* ③ 다음 행동까지 — 주행 내내 보임 (v1.6, D49). 길이 = 다음 행동 지점까지 남은 거리, 색 = 남은 여유. 가운데로 줄어듦
-     · 옮겨야 함: 옮김 마감선(정체면 줄 끝)까지, 초록 → 주황 → 빨강 연속. 뒤차로 기다리면 회색. 줄 옆까지 와 버렸으면 빈 빨간 막대(마감 지남)
-     · 이미 맞는 차로: 다음 갈림까지, 초록 그대로(할 일이 없어 여유 충분). 차로를 옮기고 나면 이 길이로 바뀜
-     · 갈림을 지나면 다음 갈림까지 다시 차오르고, 마지막 갈림을 지나면 사라짐. 미니 도로의 마감선은 옮겨야 할 때만, 막대와 같은 색 */
+  /* 다음 행동까지 (V1 막대): 옮겨야 하면 마감선(정체면 줄 끝)까지 — 흰색, 마감 직전(25% 미만) 주황. 기다리는 동안 회색. 빨강 · 초록은 쓰지 않음 */
+  // 정체: 줄 끝에 닿기 전엔 줄 끝까지, 이미 줄 옆이면 원래 마감선까지 (V1은 줄 옆에서도 줄 끝 기준이라 막대가 0 · 주황으로 떴음)
+  const gateZ = jam && need && !jam.beside ? jam.tail + 10 : changeEndOf(m), frac = clamp((p.z - gateZ)/(0 - gateZ));
   let bar = null, bi = C.i, bd = C.d;
-  if(bd <= 0 && bi < path.nodeS.length - 1){ bi++; bd = path.nodeS[bi] - S.s; }   // 갈림을 지나자마자 다음 갈림으로
-  if(needMove) bar = besideQueue ? {fr:0, col:C_DANGER, op:1} : {fr:frac, col:warn ? C_IDLE : timeColor(frac), op:warn ? .55 : 1};
-  else if(bd > 0) bar = {fr:clamp(bd/(bi === 0 ? path.nodeS[0] - path.sStart : path.nodeS[bi] - path.nodeS[bi-1])), col:C_GO, op:1};
+  if(bd <= 0 && bi < path.nodeS.length - 1){ bi++; bd = path.nodeS[bi] - S.s; }
+  if(need) bar = wait || clearing ? {fr:frac, col:AC.idle, op:.55} : {fr:frac, col:frac < .25 ? AC.deadline : AC.full, op:.9};
+  else if(bd > 0 && C.phase !== 'off') bar = {fr:clamp(bd/(bi === 0 ? path.nodeS[0] - path.sStart : path.nodeS[bi] - path.nodeS[bi-1])), col:AC.full, op:.5};
   $('#cd').style.display = bar ? '' : 'none';
-  if(bar){
-    const b = $('#cdBar'); b.setAttribute('width', (120*bar.fr).toFixed(1)); b.setAttribute('x', (260 - 60*bar.fr).toFixed(1)); b.setAttribute('fill', bar.col); b.setAttribute('fill-opacity', bar.op);
-    $('#cdBg').setAttribute('fill', bar.col); $('#cdBg').setAttribute('fill-opacity', bar.fr > .001 ? .16 : (.14 + .14*Math.sin(now/220)).toFixed(3));   // 빈 막대: 바탕만 옅게 깜빡임(마감 지남) — 꽉 찬 막대로 보이지 않게
-  }
-  const showGate = needMove && !besideQueue;
-  $('#gate').setAttribute('d', showGate ? quadZ(tx-1.75, tx+1.75, gateZ+.35, gateZ-.35, proj) : '');
+  if(bar){ const b = $('#cdBar'); b.setAttribute('width', f1(120*bar.fr)); b.setAttribute('x', f1(260 - 60*bar.fr)); b.setAttribute('fill', bar.col); b.setAttribute('fill-opacity', bar.op); $('#cdBg').setAttribute('fill', bar.col); $('#cdBg').setAttribute('fill-opacity', .16); }
+  $('#gate').setAttribute('d', need ? bandZ(T, tx - 1.75, tx + 1.75, gateZ + .3, gateZ - .3) : '');
   if(bar){ $('#gate').setAttribute('fill', bar.col); $('#gate').setAttribute('fill-opacity', bar.op); }
 
-  /* ① 들어갈 차로 · 경로 — 미니 도로. HUD에서 가장 크고 진하게 */
-  // 도로면 · 가장자리 · 점선 (원근 굵기)
-  let surf = bandX(-m.edgeX, m.edgeX, zNear, -232, proj), edges = lineX(-m.edgeX, zNear, -228, .09, proj) + lineX(m.edgeX, zNear, -228, .09, proj), dash = '';
-  m.segs.forEach(e => {
-    const c = e.curve, hw = e.k*LANE/2, inner = 25/e.L;
-    surf += strip(offsetPts(c,0,1,-e.half,proj,40), offsetPts(c,0,1,e.half,proj,40));
-    edges += lineC(c, e.outerL?0:inner, 1, -e.half, .09, proj) + lineC(c, e.outerR?0:inner, 1, e.half, .09, proj);
-    for(let i=1;i<e.k;i++) for(let s=8; s<e.L-3; s+=9) dash += strip(offsetPts(c,s/e.L,(s+3)/e.L,-hw+i*LANE-.075,proj,2), offsetPts(c,s/e.L,(s+3)/e.L,-hw+i*LANE+.075,proj,2));
+  /* 도로 (V1 그림 · 잘라서): 면 · 가장자리 · 점선 */
+  let surf = bandZ(T, -m.edgeX, m.edgeX, zNear, FORK_Z - 2), edges = bandZ(T, -m.edgeX - .09, -m.edgeX + .09, zNear, FORK_Z - 2) + bandZ(T, m.edgeX - .09, m.edgeX + .09, zNear, FORK_Z - 2), dash = '';
+  for(let i = 1; i < m.lanes; i++){ const x = m.laneX(i) - LANE/2; for(let z = 38; z > FORK_Z + 6; z -= 9) if(z - 3 < zNear) dash += bandZ(T, x - .075, x + .075, Math.min(z, zNear), z - 3); }
+  if(!m._hudSegs) m._hudSegs = m.segs.map(sg => { const L = sg.vis.getLength(); return {sg, pts:curvePts(sg.vis, L, Math.min(L, 260))}; });
+  m._hudSegs.forEach(({sg, pts}) => {
+    surf += bandAlong(T, pts, -sg.half, sg.half);
+    const n = pts.length - 1, in0 = Math.min(13, n);
+    edges += bandAlong(T, pts, -sg.half - .09, -sg.half + .09, sg.outerL ? 0 : in0) + bandAlong(T, pts, sg.half - .09, sg.half + .09, sg.outerR ? 0 : in0);
+    const hw = sg.k*LANE/2;
+    for(let j = 1; j < sg.k; j++) for(let s = 4; s < n - 2; s += 4.5) dash += bandAlong(T, pts, -hw + j*LANE - .075, -hw + j*LANE + .075, Math.floor(s), Math.floor(s) + 1);
   });
-  for(let i=1;i<m.lanes;i++) dash += dashX(m.laneX(i) - LANE/2, .075, zNear, proj);
-  $('#roadSurf').setAttribute('d', surf); $('#roadEdges').setAttribute('d', edges);
-  $('#roadDash').setAttribute('d', dash);
-  // 들어갈 차로: 지금 위치 바로 앞부터 지선까지 빛 (차로마다 화살표 표지처럼 '이 차로가 목적지로 간다')
-  const fillTarget = st===1 ? .85 : 1;   // v1.6: 갈림 뒤에도 흐려지지 않음 — 끝은 길이 · 색으로 보여 줌
-  S.fill += (fillTarget - S.fill)*k;
-  // 갈림 뒤: 목적지까지의 내 차로(다차로 출구면 그 차로만, 1차로면 출구 전체 폭). 안내 끝(마지막 갈림 + ROUTE_END)까지만 칠하고 끝은 뾰족하게
-  // → 마지막 갈림을 지나면 남은 경로가 내 앞에서 짧아지다 사라진다 (v1.6, '완료' 글자 대신)
-  const lastS = path.nodeS[path.nodeS.length-1], endT = clamp((S.s - lastS)/ROUTE_END);
-  const bc = R.afterCurve, bu = clamp((lastS + ROUTE_END - path.nodeS[0])/R.afterL), bh = R.leaf.path[0].k === 1 ? 2.3 : 1.75, lf = (warn ? .45 : 1)*S.fill;
-  const mainFill = onMain ? bandX(tx-1.75, tx+1.75, zNear, -230, proj) : '', mainRails = onMain ? lineX(tx-1.75, zNear, -230, .1, proj) + lineX(tx+1.75, zNear, -230, .1, proj) : '';
-  $('#laneFill').setAttribute('d', mainFill + bandC(bc, 0, bu, -bh, bh, 18, R.afterL, proj));
-  $('#laneFill').setAttribute('opacity', lf.toFixed(3));
-  $('#laneRails').setAttribute('d', mainRails + bandC(bc, 0, bu, -bh-.1, -bh+.1, 18, R.afterL, proj) + bandC(bc, 0, bu, bh-.1, bh+.1, 18, R.afterL, proj));
-  $('#laneRails').setAttribute('opacity', lf.toFixed(3));
-  // 초록으로 바뀌는 두 순간 (글자 없이 색으로): 차로를 다 옮기면 1.4초 칭찬 · 마지막 갈림을 지나면 남은 경로가 짧아지며 청록 → 초록
-  const praise = clamp((AS.doneUntil - now)/1400), g = Math.max(praise, ease(endT)), lc = g > 0 ? mix(C_NOW, C_GO, g) : C_NOW;
-  ['#lgA','#lgB','#lgC'].forEach(s => $(s).setAttribute('stop-color', lc));
-  $('#laneRails').setAttribute('fill', lc); $('#pulses').setAttribute('fill', lc);
-  // 흐르는 빛 띠: 내 차로를 따라 앞으로 (활주로 유도등처럼)
-  let pul = '';
-  if(onMain && !warn && st <= 3 && S.fill > .3) for(let i=0;i<3;i++){ const z = p.z - 7 - ((now/1000*15 + i*20) % 60); if(z > -226) pul += quadZ(tx-1.55, tx+1.55, z, z-1.1, proj); }
-  $('#pulses').setAttribute('d', pul); $('#pulses').setAttribute('fill-opacity', (.7*S.fill).toFixed(3));
-  // 옮길 화살표: 내 위치 → 들어갈 차로. 글자 대신 이것이 상태를 말한다 —
-  // 초록 흐름 = 옮겨도 됨(마감이 다가오면 주황으로) / 주황 점 = 틈 대기 / 빨간 점 + 맥박 치는 멈춤 막대 = 대기
-  const a0 = needMove ? proj(p.x, p.z-7) : null, a1 = needMove ? proj(p.x, p.z-19) : null, a2 = needMove ? proj(tx, p.z-31) : null;
-  const ma = $('#moveArrow'), mh = $('#moveHead'), ms = $('#moveStop');
-  if(a0 && a1 && a2){
-    const ac = warn ? C_DANGER : besideQueue ? (S.q.mergeNear ? C_GO : C_WARN) : arrowColor(frac);
-    ma.setAttribute('d', `M${fmt(a0)}Q${fmt(a1)} ${fmt(a2)}`);
-    const ag = $('#arrowGrad'); ag.setAttribute('x1', a0[0]); ag.setAttribute('y1', a0[1]); ag.setAttribute('x2', a2[0]); ag.setAttribute('y2', a2[1]);
-    $('#agA').setAttribute('stop-color', ac); $('#agB').setAttribute('stop-color', ac);
-    const still = warn || (besideQueue && !S.q.mergeNear);
-    ma.setAttribute('stroke-dasharray', still ? '.1 14' : '12 14'); ma.classList.toggle('flow', !still);   // 굵기 8 · 둥근 끝 → 점 / 긴 대시
-    let dx = a2[0]-a1[0], dy = a2[1]-a1[1]; const l = Math.hypot(dx,dy)||1; dx/=l; dy/=l;
-    const nx = -dy, ny = dx;
-    mh.setAttribute('d', `M${(a2[0]+dx*9).toFixed(1)} ${(a2[1]+dy*9).toFixed(1)}L${(a2[0]-dx*8+nx*10).toFixed(1)} ${(a2[1]-dy*8+ny*10).toFixed(1)}L${(a2[0]-dx*8-nx*10).toFixed(1)} ${(a2[1]-dy*8-ny*10).toFixed(1)}Z`);
-    mh.setAttribute('fill', ac); mh.setAttribute('stroke', warn ? '#ffc4bd' : 'none'); mh.setAttribute('stroke-width', 1.4);   // 대기: 빨강 머리에 밝은 테(대비)
-    const sx = a2[0]-dx*19, sy = a2[1]-dy*19;
-    const stopD = warn ? `M${(sx+nx*13).toFixed(1)} ${(sy+ny*13).toFixed(1)}L${(sx-nx*13).toFixed(1)} ${(sy-ny*13).toFixed(1)}` : '';
-    ms.setAttribute('d', stopD); $('#moveStopCore').setAttribute('d', stopD);
-    const pulse = warn ? (.82 + .18*Math.sin(now/170)).toFixed(2) : 1;   // 대기: 멈춤 막대만 맥박(바닥 82% → 대비 유지)
-    ms.setAttribute('opacity', pulse); $('#moveStopCore').setAttribute('opacity', pulse);
-  } else { ma.setAttribute('d', ''); mh.setAttribute('d', ''); ms.setAttribute('d', ''); $('#moveStopCore').setAttribute('d', ''); ma.classList.remove('flow'); }
-  // 정체: 막힌 구간 빗금 + 줄 맨 뒤 '설 칸' + 줄 옆이면 끼어들 틈
-  const jb = $('#jamBand');
-  if(tail !== null){ const dj = bandX(tx-1.7, tx+1.7, Math.min(tail, zNear), qFrontOf(m), proj); jb.setAttribute('d', dj); jb.setAttribute('opacity', dj ? '.45' : '0'); }   // 차량이 함께 그려지므로 옅게
-  else jb.setAttribute('opacity','0');
-  $('#slot').setAttribute('d', tail !== null && p.z > tail + 14 ? quadZ(tx-1.3, tx+1.3, tail+10, tail+5, proj) : '');
-  $('#slot').setAttribute('opacity', (.7 + .3*Math.sin(now/260)).toFixed(2));
-  let gapD = '';
-  if(besideQueue && S.q.mergeNear){
-    const zs = queueCars.filter(c => c.visible && Math.abs(c.position.x - tx) < 1).map(c => c.position.z).sort((a,b) => b-a);   // 들어갈 차로의 줄만 (주행 테스트는 두 차로 줄도 있음)
-    for(let i=0;i<zs.length-1;i++){ if(zs[i]-zs[i+1] > Q_MERGE){ const m = (zs[i]+zs[i+1])/2; if(Math.abs(m - p.z) < 16){ gapD = quadZ(tx-1.45, tx+1.45, m+1.6, m-1.6, proj); break; } } }
+  $('#roadSurf').setAttribute('d', surf); $('#roadEdges').setAttribute('d', edges); $('#roadDash').setAttribute('d', dash);
+
+  /* ① 들어갈 차로 · 경로 (V1, 청록): 상태와 상관없이 같은 진하기. 정체면 줄 끝까지만 칠하고 테두리는 끝까지(경로가 줄 차를 지나가 보이지 않게) */
+  if(!AS.route || AS.route.R !== R){ const len = path.nodeS[path.nodeS.length - 1] + ROUTE_END - path.nodeS[0]; AS.route = {R, pts:curvePts(R.afterCurve, R.afterL, Math.min(R.afterL, len))}; }
+  const rp = AS.route.pts, bh = R.leaf.path[0].k === 1 ? 2.3 : 1.75, off = C.phase === 'off';
+  S.fill += ((st === 1 ? .85 : 1) - S.fill)*k;
+  let fillTo = FORK_Z;
+  if(jam && onMain){
+    if(need) fillTo = jam.tail + 3.3;
+    else { const ahead = G.cars.filter(c => c.lane === G.my && c.z < p.z - 1).map(c => c.z + c.halfL); if(ahead.length) fillTo = Math.max(...ahead) + .5; }
   }
-  $('#gapMark').setAttribute('d', gapD);
-  // 차량: 정체 줄(주황 테) · 뒤에서 와 앞으로 지나간 차(빨강)
-  const vs = [];
-  if(tail !== null) queueCars.forEach(c => { if(c.visible) vs.push({x:c.position.x, z:c.position.z, q:true}); });
-  const rc = S.drive ? S.threatCar && S.threatCar.mesh : otherCar.visible && otherCar;   // 주행 테스트: 옮길 쪽 차로의 가장 가까운 차
-  if(rc) vs.push({x:rc.position.x, z:rc.position.z, q:false});
-  vs.sort((a, b) => Math.abs(a.z - p.z) - Math.abs(b.z - p.z));   // 칸(24)이 모자라면 가까운 차부터
-  vehEls.forEach((r,i) => {
-    const v = vs[i], a = v && proj(v.x, v.z+2.25), b = v && proj(v.x, v.z-2.25), c = v && proj(v.x, v.z);
-    if(!a || !b || !c){ r.setAttribute('opacity', 0); return; }
-    const w = 1.8*PXM*c[2], h = Math.max(2.5, a[1]-b[1]);
-    r.setAttribute('x', (c[0]-w/2).toFixed(1)); r.setAttribute('y', b[1].toFixed(1)); r.setAttribute('width', w.toFixed(1)); r.setAttribute('height', h.toFixed(1));
-    r.setAttribute('fill', v.q ? '#0b0d10' : C_DANGER); r.setAttribute('fill-opacity', v.q ? .0 : .75);   // 정체 차는 테두리만 → 빗금과 겹쳐도 한 대씩 보임
-    r.setAttribute('stroke', v.q ? C_WARN : C_DANGER); r.setAttribute('opacity', 1);
+  let lane = onMain && fillTo < zNear ? bandZ(T, tx - 1.75, tx + 1.75, zNear, fillTo) : '';
+  let rails = onMain ? bandZ(T, tx - 1.85, tx - 1.65, zNear, FORK_Z) + bandZ(T, tx + 1.65, tx + 1.85, zNear, FORK_Z) : '';
+  if(!off){ lane += bandAlong(T, rp, -bh, bh, 0, rp.length - 1, 9); rails += bandAlong(T, rp, -bh - .1, -bh + .1, 0, rp.length - 1, 9) + bandAlong(T, rp, bh - .1, bh + .1, 0, rp.length - 1, 9); }
+  $('#laneFill').setAttribute('d', lane); $('#laneRails').setAttribute('d', rails);
+  $('#laneFill').setAttribute('opacity', S.fill.toFixed(3)); $('#laneRails').setAttribute('opacity', S.fill.toFixed(3));
+
+  /* 뒤 띠 (평면도): 내 차 옆 · 뒤 차로선 + 들어갈 차로 테두리가 내 차 옆까지. 이미 들어갈 차로면 테두리가 내 차를 감쌈 */
+  let rl = '', rr = '', rf = '';
+  if(straight){
+    const X = lat => HK.HX + lat*HK.PXM, yb = HK.EDGE_Y, col = (lat, w, y1 = yb) => `M${f1(X(lat) - w)} ${HK.YN}H${f1(X(lat) + w)}V${f1(y1)}H${f1(X(lat) - w)}Z`;
+    for(let i = 1; i < m.lanes; i++) rl += col(T(m.laneX(i) - LANE/2, p.z)[1], .7);
+    rl += col(T(-m.edgeX, p.z)[1], .9) + col(T(m.edgeX, p.z)[1], .9);
+    const lL = T(tx - 1.75, p.z)[1], lR = T(tx + 1.75, p.z)[1], yEnd = planY(-4.6);
+    rr = col(lL, 1.2, yEnd) + col(lR, 1.2, yEnd);
+    rf = `M${f1(X(lL))} ${HK.YN}H${f1(X(lR))}V${f1(yEnd)}H${f1(X(lL))}Z`;
+  }
+  $('#rearLines').setAttribute('d', rl); $('#rearRails').setAttribute('d', rr); $('#rearFill').setAttribute('d', rf);
+  $('#rearRails').setAttribute('opacity', S.fill.toFixed(3));
+
+  /* ② 차: 판단에 쓴 바로 그 차(S.G.cars)만 — 옮길 바로 옆 차로의 차 · 대기 이유인 차 · 정체 줄(들어갈 차로, 줄 안이면 바로 앞차)
+       자리 = 실제 위치(내 차 기준 앞뒤 · 좌우). 대기 이유 차 = 빨강 속 찬 차, 그 밖 = 회색 테두리 차(속 빔) → 색을 빼도 모양으로 구분.
+       다가오는(나보다 빠른) 위험 차는 뒤에 짧은 두 줄. 대기 이유 차는 몇 대든 모두 그림(두 번째 위험 차도 빠지지 않음) */
+  // 대기 이유 = 해제 기준(1.2배)까지 본 차 — 기준 1배는 벗어났지만 아직 대기인 동안에도 그 차가 빨강으로 남음(괄호만 흰색이 되지 않게)
+  const hot = new Set((wait ? G.A.strict : []).filter(b => b.c.kind !== 'queue').map(b => b.c));
+  const fading = new Set((clearing ? G.A.strict : []).filter(b => b.c.kind !== 'queue').map(b => b.c));
+  let shown = [];
+  if(onMain){
+    const qLane = jam ? (need ? G.next : G.my) : null;
+    G.cars.forEach(c => {
+      const [lon, lat] = T(c.x, c.z);
+      const rel = (need && c.lane === G.next) || hot.has(c) || (jam && c.kind === 'queue' && c.lane === qLane && (need || (c.z < p.z && lon < 30)));
+      if(!rel || lon > 90 || lon < -70) return;
+      shown.push({c, lon, lat});
+    });
+  }
+  // 정체 줄: 틈을 이루는 차만 — 바로 옆 차로면 앞 3대(30m 안) · 뒤 1대, 줄 안(합류 뒤)이면 바로 앞차 하나. 위험 차는 그대로
+  if(jam){
+    const q = shown.filter(v => v.c.kind === 'queue' && !hot.has(v.c)), rest = shown.filter(v => !q.includes(v));
+    const ahead = q.filter(v => v.lon > 0 && v.lon < HK.qFar).sort((a, b) => a.lon - b.lon), behind = q.filter(v => v.lon <= 0).sort((a, b) => b.lon - a.lon);
+    shown = need ? [...rest, ...ahead.slice(0, HK.qAhead), ...behind.slice(0, HK.qBehind)] : ahead.slice(0, 1);
+  }
+  // 가까운 차가 위에 그려지게: 먼 차부터
+  shown.sort((a, b) => Math.abs(a.lon) - Math.abs(b.lon)); shown = shown.slice(0, carEls.length).reverse();
+  let ei = 0;
+  edgeEls.forEach(el => el.setAttribute('d', ''));
+  carEls.forEach((el, i) => {
+    const v = shown[i]; if(!v){ el.g.setAttribute('opacity', 0); return; }
+    const isHot = hot.has(v.c), col = isHot ? AC.hazard : AC.car, closing = v.c.v - EGO.v > 1;
+    if(v.lon < -HK.REAR_MAX){   // 화면 밖 뒤: 아래 가장자리 꺾쇠(차 모양 아님)
+      el.g.setAttribute('opacity', 0);
+      if(ei < edgeEls.length){ const x = clamp(HK.HX + v.lat*HK.PXM, 14, 506), y = HK.EDGE_Y + 2; const ed = edgeEls[ei++];
+        ed.setAttribute('d', `M${f1(x - 7)} ${f1(y + 4)}L${f1(x)} ${f1(y - 2)}L${f1(x + 7)} ${f1(y + 4)}`); ed.setAttribute('stroke', col); ed.setAttribute('opacity', isHot ? 1 : .6); }
+      return;
+    }
+    const {x, y, w, h} = carBox(v.lon, v.lat), sh = carShape(x, y, w, h);
+    el.body.setAttribute('d', sh.body); el.glass.setAttribute('d', sh.glass);
+    el.body.setAttribute('fill', col); el.body.setAttribute('fill-opacity', isHot ? 1 : HK.op.car);
+    // 위험 차 = 빨강 속 + 밝은 테두리(흑백에서도 노면과 구분), 보통 차 = 회색 테두리만
+    el.body.setAttribute('stroke', isHot ? AC.hazLine : col); el.body.setAttribute('stroke-width', HK.sw.carLine); el.body.setAttribute('stroke-opacity', isHot ? 1 : HK.op.carLine);
+    el.glass.setAttribute('fill-opacity', isHot ? .55 : 0);
+    el.trail.setAttribute('d', isHot && closing && v.lon < HK.NEAR ? `M${f1(x - w*.28)} ${f1(y + h/2 + 2)}V${f1(y + h/2 + 8)}M${f1(x + w*.28)} ${f1(y + h/2 + 2)}V${f1(y + h/2 + 8)}` : '');
+    el.trail.setAttribute('stroke', col); el.trail.setAttribute('opacity', .7);
+    el.g.setAttribute('opacity', fading.has(v.c) ? .8 : 1);
   });
 
-  /* 뒤차가 아직 뒤(화면 밖)일 때: 목표 차로 아래쪽에 빨간 차 + 번지는 빛, 옆 가장자리 빛 */
-  const dz = Math.max(S.danger, warn && S.rearActive ? .7 : 0), cb = $('#carBehind');
-  $('#edgeL').setAttribute('opacity', sgn < 0 ? S.danger*.8 : 0);
-  $('#edgeR').setAttribute('opacity', sgn > 0 ? S.danger*.8 : 0);
-  const behind = S.drive ? S.rearActive && S.rearGap > -3 : S.rearActive && !otherCar.visible || (S.rearActive && S.rearGap > 0);
-  cb.setAttribute('opacity', (behind && sgn !== 0 && !inLane ? dz*(.85 + .15*Math.sin(now/170)) : 0).toFixed(2));   // 맥박 바닥을 높여 늘 대비 3:1 이상
-  cb.setAttribute('transform', `translate(${(HX + sgn*LANE*PXM).toFixed(1)} 222) scale(${(0.8 + dz*.45).toFixed(2)})`);   // 옆 차로 한가운데
+  /* ③ 옆 공간 점유: 내 차로 · 옮길 차로 경계에 짧은 괄호(내 차 길이만큼, 끝 갈고리는 내 차 쪽). 내 차 앞을 가로막지 않음.
+       위험 차 = 빨강 굵은 실선 + 밝은 심 · 정체 줄로 자리 없음 = 흰 가는 실선 · 확인 중 = 회색 점선이 옅어짐 (색을 빼도 굵기 · 점선으로 구분)
+       처음 생길 때만 0.3초 굵게 → 가라앉음. 깜빡이지 않음 — 대기인데 그쪽으로 넘어가기 시작하면 더 굵게(고정) */
+  let br = '', brCol = AC.hazard, brW = HK.sw.bracket, brDash = '', brOp = 0;
+  if(straight && (wait || clearing)){
+    const sd = G.side, xb = HK.HX + T(m.laneX(G.my) + sd*LANE/2, p.z)[1]*HK.PXM, xs = sd > 0 ? Math.max(xb, HK.HX + 15) : Math.min(xb, HK.HX - 15);
+    const y0 = HK.EGO_Y - HK.bracketHalf, y1 = HK.EGO_Y + HK.bracketHalf, sx = xs - sd*HK.bracketSerif;
+    br = `M${f1(sx)} ${y0}H${f1(xs)}V${y1}H${f1(sx)}`;
+    if(wait){
+      const haz = hot.size > 0;                         // 위험 차가 하나라도 있으면 빨강, 정체 줄로만 막혔으면 흰색
+      brCol = haz ? AC.hazard : AC.full;
+      brW = (G.intent ? HK.sw.intent : haz ? HK.sw.bracket : HK.sw.bracketQ) + 2*(1 - ease(clamp((now - AS.gateAt)/HK.t.bracketIn)));
+      brOp = 1;
+    } else { brCol = AC.idle; brW = 2.4; brDash = '3 3'; brOp = .9*(1 - clamp((S.cityT - (G.since ?? S.cityT))/GUIDE.hold)); }
+  }
+  const bEl = $('#bracket');
+  bEl.setAttribute('d', br); bEl.setAttribute('stroke', brCol); bEl.setAttribute('stroke-width', f1(brW)); bEl.setAttribute('stroke-dasharray', brDash); bEl.setAttribute('opacity', brOp.toFixed(2));
+  const core = $('#bracketCore'); core.setAttribute('d', wait && brCol === AC.hazard ? br : ''); core.setAttribute('opacity', brOp.toFixed(2));
 
-  /* 일반도로 (D69): 멈춰야 할 곳에 빨간 막대(대기와 같은 색) — 빨간불이면 정지선(들어갈 차로들 폭), 사람이 건너거나 건너려 하면 횡단보도 앞.
-     보행자는 흰 점. 현대 HUD(대조군)엔 없음 — 실제 순정 HUD처럼 */
+  /* ④ 들어갈 수 있는 틈 (정체): 판단이 '이동'일 때만, 실제 앞뒤 줄 차 사이를 얇은 초록 모서리 네 개로 */
+  let slot = null, corners = '';
+  if(go && jam && straight){
+    const q = G.cars.filter(c => c.kind === 'queue' && c.lane === G.next);
+    const front = q.filter(c => c.z < p.z + 2).sort((a, b) => b.z - a.z)[0], back = q.filter(c => c.z >= p.z + 2).sort((a, b) => a.z - b.z)[0];
+    const lonF = front ? T(front.x, front.z + front.halfL)[0] - .4 : 8, lonB = back ? T(back.x, back.z - back.halfL)[0] + .4 : -8;
+    if(lonF - lonB > 2){
+      const lat = T(m.laneX(G.next), p.z)[1], [xl] = place(0, lat - 1.25), [xr] = place(0, lat + 1.25);
+      // 모서리는 그려진 줄 차 모양의 가장자리에 맞춤 — 뒤 띠는 거리를 압축하므로 실제 범퍼 자리로 그리면 뒤 줄 차 그림과 겹쳐 보임
+      const bx = c => { const [lon, la] = T(c.x, c.z), b = carBox(lon, la); return b; };
+      const yF = front ? (b => b.y + b.h/2 + 2)(bx(front)) : place(lonF, lat)[1], yB = back ? (b => b.y - b.h/2 - 2)(bx(back)) : place(lonB, lat)[1], c = 6;
+      slot = {lonF, lonB, yF, yB};
+      corners = `M${f1(xl)} ${f1(yF + c)}V${f1(yF)}H${f1(xl + c)}M${f1(xr - c)} ${f1(yF)}H${f1(xr)}V${f1(yF + c)}M${f1(xr)} ${f1(yB - c)}V${f1(yB)}H${f1(xr - c)}M${f1(xl + c)} ${f1(yB)}H${f1(xl)}V${f1(yB - c)}`;
+    }
+  }
+  $('#gapCorners').setAttribute('d', corners);
+
+  /* ⑤ 이동 연결선: 판단이 '이동'일 때만, 내 차 옆 → 바로 옆 차로(틈이 있으면 틈 가운데). 처음 0.26초 동안 그려지며 나타남, 반복 없음 */
+  let link = '', head = '';
+  if(go && straight){
+    const sd = G.side, lat = T(m.laneX(G.next), p.z)[1];
+    let end = slot ? place(clamp((slot.lonF + slot.lonB)/2, -3, 10), lat) : place(HK.NEAR + 7, lat);
+    if(slot) end = [end[0], clamp(end[1], slot.yF + 4, Math.max(slot.yF + 4, slot.yB - 4))];   // 화살 끝은 틈 모서리 안
+    const sx = HK.HX + sd*(HK.ego.w/2 + 3), sy = HK.EGO_Y - HK.ego.h*.25, cx = (sx + end[0])/2, cy = Math.min(sy, end[1]) - 6;
+    link = `M${f1(sx)} ${f1(sy)}Q${f1(cx)} ${f1(cy)} ${f1(end[0])} ${f1(end[1])}`;
+    let dx = end[0] - cx, dy = end[1] - cy; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    const hs = 7, hw = 5.5, bx = end[0] - dx*hs, by = end[1] - dy*hs;
+    head = `M${f1(end[0] + dx*2)} ${f1(end[1] + dy*2)}L${f1(bx - dy*hw)} ${f1(by + dx*hw)}L${f1(bx + dy*hw)} ${f1(by - dx*hw)}Z`;
+  }
+  const lk = $('#link'), lh = $('#linkHead'), drawIn = ease(clamp((now - AS.gateAt)/HK.t.link));
+  const lc = $('#linkCore');
+  lk.setAttribute('d', link); lh.setAttribute('d', head); lc.setAttribute('d', link);
+  if(link){ const L = lk.getTotalLength(), da = f1(L), off = f1(L*(1 - drawIn)); [lk, lc].forEach(e => { e.setAttribute('stroke-dasharray', da); e.setAttribute('stroke-dashoffset', off); }); lh.setAttribute('opacity', drawIn > .85 ? 1 : 0); }
+
+  /* ⑥ 일반도로 멈춤 (V1): 빨간불 정지선 · 보행자 앞 횡단보도 = 지금 차로를 가로지르는 빨간 막대(옆 괄호와 모양이 다름). 보행자 = 흰 점 */
   let cs = '', pd = '';
   if(m.city){
     const t = S.cityT, e1 = R.leaf.path[0];
-    if(onMain && p.z > FORK_Z - 1 && sigOf(e1.key, t) === 'red') cs += quadZ(m.laneX(e1.lanes[0]) - 1.75, m.laneX(e1.lanes[e1.k-1]) + 1.75, FORK_Z + .6, FORK_Z - .6, proj);
+    if(onMain && p.z > FORK_Z - 1 && sigOf(e1.key, t) === 'red') cs += bandZ(T, m.laneX(e1.lanes[0]) - 1.75, m.laneX(e1.lanes[e1.k-1]) + 1.75, FORK_Z + .6, FORK_Z - .6);
     if(m.cw){
-      if(pedBlock(t) && p.x < m.cw.x0) cs += quadW([[m.cw.x0 - 1.5, CZ.near], [m.cw.x0 - .4, CZ.near], [m.cw.x0 - .4, CZ.mid], [m.cw.x0 - 1.5, CZ.mid]], proj);
-      pedsAt(t).forEach(q => { if(q.phase === 'done') return; const c = proj(q.x, q.z); if(!c) return; const r = Math.max(1.8, 4.5*c[2]);   // 건넌 뒤 멀어지는 사람(2026-10-29 추가)은 V1에 없던 것이라 그리지 않음
-        pd += `M${(c[0] - r).toFixed(1)} ${c[1].toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2*r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2*r).toFixed(1)} 0Z`; });
+      if(pedBlock(t) && p.x < m.cw.x0) cs += quadW(T, [[m.cw.x0 - 1.5, CZ.near], [m.cw.x0 - .4, CZ.near], [m.cw.x0 - .4, CZ.mid], [m.cw.x0 - 1.5, CZ.mid]]);
+      pedsAt(t).forEach(q => { if(q.phase === 'done') return; const [lon, lat] = T(q.x, q.z); if(lon < HK.NEAR || Math.abs(lat) > HK.LAT) return;
+        const c = prj(lon, lat), r = Math.max(1.8, 4.5*sOf(lon));
+        pd += `M${f1(c[0] - r)} ${f1(c[1])}a${f1(r)} ${f1(r)} 0 1 0 ${f1(2*r)} 0a${f1(r)} ${f1(r)} 0 1 0 ${f1(-2*r)} 0Z`; });
     }
   }
   $('#cityStop').setAttribute('d', cs); $('#pedDots').setAttribute('d', pd);
 }
-// 월드 좌표 사각형(네 꼭짓점)을 미니 도로에
-function quadW(pts, proj){ const q = pts.map(a => proj(a[0], a[1])); return q.every(Boolean) ? 'M' + q.map(fmt).join('L') + 'Z' : ''; }

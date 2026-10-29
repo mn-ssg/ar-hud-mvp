@@ -24,8 +24,7 @@
 .cab.night #roadDash{ fill-opacity:.22; }
 .cab.night #roadSurf{ fill-opacity:.03; }
 .cab.night #lgA{ stop-opacity:.5; } .cab.night #lgB{ stop-opacity:.24; } .cab.night #lgC{ stop-opacity:.08; }
-.cab.night #ego{ opacity:.78; }
-.cab.night #carBehind circle{ opacity:.5; }
+.cab.night #ego{ opacity:.82; } .cab.night #rearLines{ fill-opacity:.16; } .cab.night #cars path{ opacity:.9; }
 .cab.night #info{ opacity:.72; }   /* v1.8: 표지가 커져 밤엔 흰 면이 눈부시지 않게 */
 /* 발표용 'HUD 설명 보기': HUD를 키우고 층마다 이름표 (explain.js) */
 .cab.explain #hudWrap{ transform:translateX(-50%) scale(1.6); }
@@ -89,12 +88,6 @@ kbd{ display:inline-grid; place-items:center; min-width:24px; height:24px; paddi
 
 
 
-/* ---------- 우리 HUD 애니메이션 (V1 그대로): 옮길 화살표 흐름 ---------- */
-@keyframes hudFlow{ to{ stroke-dashoffset:-52; } }   /* hud.js 흐름 점선 '12 14'의 2주기 */
-#moveArrow.flow{ animation: hudFlow .7s linear infinite; }
-
 @media (prefers-reduced-motion: reduce){
   *{ transition:none !important; }
-  #moveArrow.flow{ animation:none; }
-  #jamHatch animateTransform{ display:none; }
 }

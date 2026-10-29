@@ -95,7 +95,7 @@ function setLight(l){
 }
 // HUD 두 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD (중간고사 때 v1.9, hud.js drawAr). 'off' = 연습 주행(HUD 없음)
 // HUD_VER는 기록 식별용 내부 값(엑셀 'HUD 버전' 칸) — 화면에 고르는 버전은 없다. 예전 기록은 이 칸이 비어 있음
-const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9'};
+const HUD_VER = {nav:'현대 3.3', ar:'우리 1.10'};   // 우리 1.10 (2026-10-29): 1.9 + 옆 공간 괄호 · 이동 연결선 · 같은 차 모양 (10_HUD_GUI_설계 0-9절)
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';

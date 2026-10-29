@@ -14,6 +14,7 @@
 | `tex/leaves.png` | **실제 적용** | `props.js` 입체 가로수 잎 덩어리 | 배경 제거 + 둥근 가장자리(코드) |
 | `tex/facade_apt.jpg` · `tex/facade_glass.jpg` · `tex/shopfront.jpg` | **실제 적용** | `scene.js BUILD` · `city.js` 건물 종류 · 1층 상가 · 먼 아파트 | 512 · 1024px JPEG, 밤 창은 같은 그림에서 생성 |
 | `ref/2_0_hud_grid.jpg` · `ref/2_7_interior.jpg` · `ref/2_tree_sources.jpg` | 참고 시안 | 우리 HUD 상태 비교 · 실내 · 나무 원본 | 화면에 쓰지 않음 |
+| `ref/3_0_hud_states_scene.jpg` · `ref/3_1_hud_states_board.jpg` | 참고 시안 | 우리 HUD 1.10 같은 배치 6상태(정상 · 뒤 접근 · 나란히 · 해제 · 정체 틈 없음 · 틈) 비교 — 차 모양 크기 조정에만 반영 | 화면에 쓰지 않음 (HUD는 `hud.js` SVG) |
 
 - 차선 · 정지선 · 횡단보도 · 차량 · 보행자 위치는 모두 맵 좌표로 코드가 그린다. 생성 이미지는 노면 · 벽 · 보도의 **재질**로만 쓴다(주행 가능 영역과 무관).
 - 텍스처를 못 불러오면 예전처럼 코드로 그린 텍스처가 그대로 쓰인다(`loadTex`).
