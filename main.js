@@ -90,7 +90,8 @@ function setLight(l){
   document.documentElement.dataset.light = l;
   $('#cab').classList.toggle('night', night);
   setSceneLight(night); setCabinLight(night);
-  $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임
+  $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임 (현대 HUD)
+  $('#ahGlow feGaussianBlur').setAttribute('stdDeviation', night ? .9 : 1.6);   // 우리 HUD
   $$('#lightSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.light === l)));
 }
 // HUD 두 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD (ourhud.js). 'off' = 연습 주행(HUD 없음)

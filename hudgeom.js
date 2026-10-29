@@ -31,15 +31,30 @@ function clipPoly(poly){
 const f1 = v => v.toFixed(1);
 const polyD = poly => { const c = clipPoly(poly); return c.length > 2 ? 'M' + c.map(q => { const r = prj(q[0], q[1]); return f1(r[0]) + ' ' + f1(r[1]); }).join('L') + 'Z' : ''; };
 // 세계 중심선 점([x, z, tx, tz]) 따라 a ~ b 옆 띠 (+ = 오른쪽). 구간마다 사각형 하나 — 잘린 조각끼리 잘못 이어지지 않음
-function bandAlong(T, pts, a, b, i0 = 0, i1 = pts.length - 1){
+// keep(q0, q1): 이 구간을 그릴지 (없으면 다). 앞 방향 띠(corridor)로 걸러 옆으로 꺾인 도로를 그리지 않을 때 씀
+function bandAlong(T, pts, a, b, i0 = 0, i1 = pts.length - 1, keep = null){
   let d = '';
   const side = (q, o) => T(q[0] - q[3]*o, q[1] + q[2]*o);   // 오른쪽 법선 = (−tz, tx)
   for(let i = i0; i < i1; i++){
-    const q0 = pts[i], q1 = pts[i + 1], A = side(q0, a), B = side(q1, a), C2 = side(q1, b), D2 = side(q0, b);
+    const q0 = pts[i], q1 = pts[i + 1];
+    if(keep && !keep(q0, q1)) continue;
+    const A = side(q0, a), B = side(q1, a), C2 = side(q1, b), D2 = side(q0, b);
     if(Math.max(A[0], B[0], C2[0], D2[0]) < AH.NEAR || Math.min(A[0], B[0], C2[0], D2[0]) > AH.FAR) continue;
     d += polyD([A, B, C2, D2]);
   }
   return d;
+}
+/* 앞 방향 띠 (2026-10-29 두 번째 수정): 내 차가 향한 방향과 CORRIDOR(35°) 넘게 벌어진 도로 · 경로는 그리지 않는다.
+   교차로에서 옆으로 꺾이는 길을 미니 도로 원근에 그대로 그리면 'ㄱ'자로 90도 꺾인 도로가 된다(사용자 지적) —
+   꺾이는 곳은 경로 끝의 회전 화살표로만 보여 주고, 실제로 돌면 내 차 방향이 따라 돌아 그 앞 길이 차례로 나타난다 */
+const CORRIDOR = Math.cos(35*Math.PI/180);
+const inCorridor = f => (q0, q1) => q0[2]*f.x + q0[3]*f.z >= CORRIDOR && q1[2]*f.x + q1[3]*f.z >= CORRIDOR;
+// 경로를 그릴 범위 [a, b]: a = 가까운 면 앞의 첫 점, b = a부터 이어서 앞 방향 띠를 벗어나는 첫 점(없으면 끝).
+// 띠는 a부터 이어진 부분만 — 이미 벗어난 점(회전 중 옆으로 휜 길)에서 시작하지 않는다 → 내 차 앞에 가로로 깔린 조각이 생기지 않음
+function corridorRange(T, f, pts, i1){
+  let a = 0; while(a < i1 && T(pts[a][0], pts[a][1])[0] < AH.NEAR) a++;
+  let b = a; while(b < i1 && pts[b][2]*f.x + pts[b][3]*f.z >= CORRIDOR) b++;
+  return [Math.max(0, a - 1), b];
 }
 // 본선(z 방향 곧은 길)의 x0 ~ x1 띠, z0(가까움) → z1(멂)
 const zPts = (z0, z1, step = 4) => { const o = []; for(let z = z0; z > z1; z -= step) o.push([0, z, 0, -1]); o.push([0, z1, 0, -1]); return o; };
@@ -52,4 +67,4 @@ function curvePts(c, L, len = L, step = 2){
   return o;
 }
 
-if(typeof module !== 'undefined') module.exports = {AH, toEgo, prj, clipPoly, polyD, bandAlong, bandZ, zPts, f1, curvePts};
+if(typeof module !== 'undefined') module.exports = {AH, toEgo, prj, clipPoly, polyD, bandAlong, bandZ, zPts, f1, curvePts, CORRIDOR, inCorridor, corridorRange};

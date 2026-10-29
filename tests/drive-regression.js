@@ -34,6 +34,9 @@ const AUTOPILOT = () => {
     const u = clamp(Math.atan(2*WHEELBASE*sinA/l)/dMax, -1, 1);
     KEYS.left = KEYS.right = false;
     KEYS.down = A.brakeUntilS !== null && S.s > A.brakeUntilS - 18 && (A.held < A.brakeHold);
+    // 급한 굽은 길(일반도로 회전 · 골목) 앞에서는 사람처럼 줄임: 앞 15m 경로 방향 변화가 크면 시속 25km 아래로
+    { const r = project(path.P, D.x, D.z, -1), a = pathAt(path.P, r.s + 2), b = pathAt(path.P, r.s + 17), turnA = Math.acos(clamp(a[2]*b[2] + a[3]*b[3], -1, 1));
+      if(turnA > .35 && D.v > 7) KEYS.down = true; }
     if(KEYS.down && D.v < .2) A.held += dt;
     _sp(dt); D.steer = u; D.wheel = u*dMax;
   };
@@ -69,6 +72,7 @@ const AUTOPILOT = () => {
       dirSide:G.dir ? G.dir.side : 0, dirZone:G.dir ? G.dir.zone : '', reasonKind:G.reason ? G.reason.kind : '', jam:!!G.jam, beside:G.jam ? G.jam.beside : false,
       rear, hotRear:rear.filter(r => r.hot), hazAhead:at('ahHazAhead').length > 0, nearRails:[...at('ahNearRails').matchAll(/M(-?[\d.]+)/g)].map(m => +m[1]),
       laneMaxY:lanePts.length ? Math.max(...lanePts.map(q => q[1])) : null, laneN:lanePts.length,
+      laneXmin:lanePts.length ? Math.min(...lanePts.map(q => q[0])) : null, laneXmax:lanePts.length ? Math.max(...lanePts.map(q => q[0])) : null, turnMark:at('ahTurn').length > 0,
       blockers:G.A.blockers.map(b => ({kind:b.c.kind, rel:b.rel, lat:+((b.c.x - D.x)).toFixed(1)}))};
   };
 };
@@ -256,6 +260,10 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const under = r.samples.filter(s => s.laneMaxY !== null && s.laneMaxY > 212.01);
     check(`${mapId} 회전: 접근 · 회전 중 내내 회전 아이콘 유지(확정 전)`, near.length && near.every(s => s.icon === key), `${near.length}프레임`);
     check(`${mapId} 회전: 경로 그래픽이 가까운 면(y 212) 아래 = 내 차 줄로 내려오지 않음`, under.length === 0, under.length ? JSON.stringify({t:under[0].t, y:under[0].laneMaxY}) : `${r.samples.length}프레임`);
+    // 'ㄱ'자 도로 재발 방지: 회전 전 접근 중 경로 띠는 들어갈 차로 폭 안(가로로 뻗지 않음) + 꺾이는 곳엔 회전 꺾쇠
+    const appr = r.samples.filter(s => s.chosen === 0 && s.ph === 'approach' && s.d > 12 && s.d < 60 && s.laneN);
+    const wide = appr.filter(s => s.laneXmax - s.laneXmin > 150 || s.laneXmin < 150 || s.laneXmax > 370);
+    check(`${mapId} 회전 접근: 경로 띠가 옆으로 꺾여 뻗지 않음 (x 150 ~ 370 · 폭 150 안) · 회전 꺾쇠 표시`, appr.length > 10 && wide.length === 0 && appr.filter(s => s.turnMark).length > appr.length*.8, wide.length ? JSON.stringify({t:wide[0].t, x:[wide[0].laneXmin, wide[0].laneXmax]}) : `${appr.length}프레임 · 꺾쇠 ${appr.filter(s => s.turnMark).length}`);
   }
 
   /* ---------- 4. 미러: 같은 차가 같은 쪽 거울에 보임 (그린 픽셀 차이로) ---------- */

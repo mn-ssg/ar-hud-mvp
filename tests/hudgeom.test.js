@@ -49,3 +49,18 @@ test('자르기: 화면 밖으로 나갔다 들어오는 띠가 서로 이어지
   assert.ok(subs.every(p => p.endsWith('Z')));
   assert.ok(Math.max(...ys(d)) <= H.AH.YN + 1e-6);
 });
+
+test('앞 방향 띠: 정지선 앞 접근 중엔 회전 원호 앞에서 끊김 — 옆으로 꺾인 경로를 그리지 않음 (사용자 지적 2번)', () => {
+  const pts = rightTurn(), f = {x:0, z:-1}, T = H.toEgo({x:3.5, z:-190}, f);
+  const [a, b] = H.corridorRange(T, f, pts, pts.length - 1);
+  assert.equal(a, 0);
+  assert.ok(b > 10 && b < 25, `끊긴 번호 ${b}`);
+  const d = H.bandAlong(T, pts, -1.75, 1.75, a, b);
+  const xr = xs(d); assert.ok(Math.max(...xr) < 360 && Math.min(...xr) > 200, `x ${Math.min(...xr)} ~ ${Math.max(...xr)}`);
+});
+
+test('앞 방향 띠: 회전 중 이미 옆으로 휜 곳에서는 시작하지 않음 → 내 차 앞에 가로 조각 없음', () => {
+  const pts = rightTurn(), h = 13*Math.PI/180, f = {x:Math.sin(h), z:-Math.cos(h)}, T = H.toEgo({x:5, z:-237.6}, f);
+  const [a, b] = H.corridorRange(T, f, pts, pts.length - 1);
+  assert.ok(b - a <= 1, `그릴 구간 ${a} ~ ${b}`);
+});
