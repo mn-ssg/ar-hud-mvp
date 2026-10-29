@@ -4,11 +4,8 @@
    HUD가 아니라 발표 자료다. 주행 테스트 중에는 저절로 꺼진다. main.js 다음에 로드.
    ============================================================ */
 (() => {
-  const btn = $('#explainBtn'), cabEl = $('#cab'), layer = $('#explain'), desc = $('#modeDesc');
-  const MODE_DESC = {
-    ar: '초보자용 정보 위계 — 들어갈 차로·경로 → 갈 방향 → 다음 행동까지 → 제한속도. 상태는 글자 없이 차로 강조·막대 길이와 색으로',
-    nav: '현대 HUD 화면을 그대로 재현한 비교 기준(대조군)'
-  };
+  // 2026-10-29: 화면에 늘 떠 있던 설계 설명문(MODE_DESC)은 뺐다 — 설명은 발표 때 이 '설명 보기'에서만
+  const btn = $('#explainBtn'), cabEl = $('#cab'), layer = $('#explain');
   // side: 이름표를 HUD 왼쪽/오른쪽 어디에 둘지
   const NOTES = {
     ar: [
@@ -16,6 +13,13 @@
       {sel:'#act', n:'2', t:'갈 방향', s:'다음 갈림에서 갈 쪽 · 글자 없음', side:'R'},
       {sel:'#cd', n:'3', t:'다음 행동까지', s:'길이 = 남은 거리 · 색 = 여유', side:'R'},
       {sel:'#info', n:'4', t:'제한속도', s:'왼쪽 위 · 표지 모양 그대로', side:'L'}
+    ],
+    ar2: [
+      {sel:'#h2Fill', n:'1', t:'들어갈 차로', s:'늘 같은 청록 — 상태와 따로', side:'L'},
+      {sel:'#h2Act', n:'2', t:'갈 방향', s:'출구를 정할 때까지 유지', side:'R'},
+      {sel:'#h2Msg', n:'3', t:'지금 할 일', s:'대기 이유 · 확인 · 이동', side:'R'},
+      {sel:'#h2RearCars', n:'4', t:'뒤차 · 옆 차', s:'실제 위치 · 내 차 기준 방향', side:'R'},
+      {sel:'#h2Info', n:'5', t:'제한속도', s:'왼쪽 위', side:'L'}
     ],
     nav: [
       {sel:'#nvTbt', t:'경로 안내', s:'회전 화살표 · 거리 · 목적지', side:'L'},
@@ -45,7 +49,6 @@
   let frame = 0;
   function loop(){
     requestAnimationFrame(loop);
-    desc.textContent = MODE_DESC[S.mode] || '';
     btn.disabled = S.testing;
     if(S.testing && cabEl.classList.contains('explain')) setOn(false);
     if(!cabEl.classList.contains('explain') || (frame++ % 3)) return;   // 3프레임마다 갱신

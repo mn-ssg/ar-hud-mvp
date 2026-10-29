@@ -1,0 +1,11 @@
+{
+  "name": "ar-hud-tests",
+  "private": true,
+  "description": "판단 로직 단위 테스트(node --test) + 브라우저 주행 회귀 테스트(playwright-core, 설치된 Chrome 사용)",
+  "scripts": {
+    "unit": "node --test guide.test.js",
+    "drive": "node drive-regression.js",
+    "test": "node --test guide.test.js && node drive-regression.js"
+  },
+  "devDependencies": { "playwright-core": "1.48.2" }
+}

@@ -21,7 +21,10 @@ const cityMats = (() => {
 // 건물 벽: 창 무늬를 건물 크기만큼 되풀이(창 하나 ≈ 3m) — 색만 다른 재질 4개, 밤엔 창이 켜짐(cityLight)
 facadeMat.map.wrapS = facadeMat.map.wrapT = facadeMat.emissiveMap.wrapS = facadeMat.emissiveMap.wrapT = THREE.RepeatWrapping;
 facadeMat.map.needsUpdate = facadeMat.emissiveMap.needsUpdate = true;
-const cityFacades = ['#ffffff', '#e6dccb', '#cfd6dc', '#d9c9c0'].map(hex => { const m = facadeMat.clone(); m.color = lin(hex); return m; });
+const cityFacades = ['#ffffff', '#e6dccb', '#cfd6dc', '#d9c9c0'].map(hex => { const m = facadeMat.clone(); m.color = lin(hex); facadeMats.push(m); return m; });
+// 보도: Higgsfield 생성 보도 블록 (한 장 ≈ 1.8m, 세계 좌표로 깔아 이음새 없이). 불러오기 전엔 단색
+worldUV(cityMats.walk, 1/1.8);
+loadTex('assets/tex/sidewalk.jpg', t => { cityMats.walk.map = t; cityMats.walk.color = lin('#d8d6d0'); cityMats.walk.needsUpdate = true; });
 // 길바닥 화살표 (흰 칠, 앞 = 위): S ↑ · L ↰ · R ↱ · SR ↑↱
 const arrowMats = {};
 ['S', 'L', 'R', 'SR'].forEach(k => {
@@ -65,50 +68,85 @@ function updateSignalHead(m, t){
 /* ---------- 보행자 ----------
    계획 S.pedPlan = [{x, dir(+1 가까운 쪽 → 먼 쪽 · -1 반대), v, t0}] — 위치는 시간만으로 정해진다(같은 시간 = 같은 자리, 기록 재현 가능).
    건너기 3초 전부터 보도 끝에 서 있음(= '건너려 하는' 사람 — 1.5초였을 땐 차가 코앞에서야 보여 설 수 없었음). 횡단보도 x 폭은 맵 cw */
-const pedMeshes = Array.from({length:6}, (_, i) => {
-  const g = new THREE.Group(), shirt = new THREE.MeshStandardMaterial({color:lin(['#c0392b','#2e86c1','#f4f1e8','#27ae60','#8e44ad','#e67e22'][i]), roughness:.85});
-  const add = (geo, mat, x, y) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, 0); m.castShadow = true; g.add(m); return m; };
-  g.userData.legs = [add(new THREE.BoxGeometry(.15, .82, .17), cityMats.pants, -.1, .41), add(new THREE.BoxGeometry(.15, .82, .17), cityMats.pants, .1, .41)];
-  add(new THREE.BoxGeometry(.46, .64, .27), shirt, 0, 1.14);
-  add(new THREE.SphereGeometry(.13, 12, 10), cityMats.skin, 0, 1.6);
+/* 사람 모양 (2026-10-29, 참고 시안 assets/ref/7_peds.jpg): 키 1.7m 안팎 · 엉덩이 · 어깨 관절에서 다리 · 팔이 흔들림 · 머리 + 머리카락 · 신발.
+   앞 = -z. 옷 색은 차분한 실제 옷 색 (예전: 원색 상자 몸통). 충돌 · 양보 판정은 아래 pedsAt 위치 하나로 — 보이는 자리 = 판정 자리 */
+const PED_STYLE = [['#2f3a4d','#3a4a63','#1d1f24'], ['#c9bda6','#2a2c31','#eae6dd'], ['#59604a','#1f2329','#d8d4cc'], ['#7a2f35','#3b4554','#202226'], ['#9aa3ad','#24272c','#f0eee8'], ['#4b3b2f','#c2b59b','#2a2a2a']];
+const pedMeshes = PED_STYLE.map(([coat, pants, shoe], i) => {
+  const g = new THREE.Group(), std = hex => new THREE.MeshStandardMaterial({color:lin(hex), roughness:.88});
+  const mCoat = std(coat), mPants = std(pants), mShoe = std(shoe), mSkin = std(['#d9b393','#c99f7f','#e2c2a2'][i % 3]), mHair = std(['#1b1714','#2b2119','#121212'][i % 3]);
+  const mesh = (geo, mat, parent, x, y, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
+  const limb = (r0, r1, len) => { const c = new THREE.CylinderGeometry(r0, r1, len, 8); c.translate(0, -len/2, 0); return c; };   // 위끝이 관절
+  const body = new THREE.Group(); g.add(body);
+  const legs = [-1, 1].map(s => { const hip = new THREE.Group(); hip.position.set(s*.1, .9, 0); body.add(hip);
+    mesh(limb(.075, .055, .84), mPants, hip, 0, 0); mesh(new THREE.BoxGeometry(.11, .07, .25), mShoe, hip, 0, -.86, -.04); return hip; });
+  const torso = new THREE.CylinderGeometry(.19, .16, .62, 10); torso.scale(1, 1, .62);
+  mesh(torso, mCoat, body, 0, 1.2);
+  mesh(new THREE.CylinderGeometry(.05, .055, .08, 8), mSkin, body, 0, 1.54);                       // 목
+  mesh(new THREE.SphereGeometry(.105, 14, 12), mSkin, body, 0, 1.64);                            // 머리
+  const hair = mesh(new THREE.SphereGeometry(.112, 14, 10, 0, Math.PI*2, 0, Math.PI*.55), mHair, body, 0, 1.655, .012); hair.rotation.x = -.25;
+  const arms = [-1, 1].map(s => { const sh = new THREE.Group(); sh.position.set(s*.22, 1.47, 0); body.add(sh);
+    mesh(limb(.05, .04, .6), mCoat, sh, 0, 0); mesh(new THREE.SphereGeometry(.04, 8, 6), mSkin, sh, 0, -.63); return sh; });
+  g.userData = {legs, arms, body};
   g.visible = false; scene.add(g); return g;
 });
-// 지금 보이는 보행자: {x, z, walking}
+/* 지금 보이는 보행자: {i, x, z, phase, walking}
+   phase: 'wait'(보도 끝에서 건너려 함 — 건너기 3초 전부터) · 'cross'(건너는 중, 다 건너고 1m 몫 서 있는 것까지 = 예전과 같은 양보 판정 구간)
+   · 'done'(건넌 뒤 보도를 따라 멀어짐 4초 — 횡단보도 밖이라 양보 판정 없음, 예전엔 그 자리에서 사라졌음) */
 function pedsAt(t){
   const m = S.map, out = [];
   if(!m || !m.cw || !S.pedPlan) return out;
-  S.pedPlan.forEach(p => {
+  S.pedPlan.forEach((p, i) => {
     const z0 = p.dir > 0 ? CZ.near + 1 : CZ.far - 1, z1 = p.dir > 0 ? CZ.far - 1 : CZ.near + 1, len = Math.abs(z1 - z0);
     if(t < p.t0 - 3) return;
     const d = Math.max(0, t - p.t0)*p.v;
-    if(d > len + 1) return;
-    out.push({x:p.x, z:z0 - p.dir*Math.min(d, len), walking:t >= p.t0 && d < len});
+    if(d <= len + 1){ out.push({i, x:p.x, z:z0 - p.dir*Math.min(d, len), phase:t < p.t0 ? 'wait' : 'cross', walking:t >= p.t0 && d < len, dir:p.dir}); return; }
+    const w = (d - len - 1)/p.v;
+    if(w < 4) out.push({i, x:p.x + w*p.v, z:z1, phase:'done', walking:true, dir:p.dir});
   });
   return out;
 }
-// 내가 들어갈 가까운 2개 차로(7m = 가로 도로 내 쪽 절반) + 보도 끝 1.5m 안에 사람이 있으면 일시정지
-const pedBlock = t => pedsAt(t).some(p => p.z <= CZ.near + 1.5 && p.z >= CZ.near - 7);
+// 내가 들어갈 가까운 2개 차로(7m = 가로 도로 내 쪽 절반) + 보도 끝 1.5m 안에 건너려 하거나 건너는 사람이 있으면 일시정지
+const pedBlock = t => pedsAt(t).some(p => p.phase !== 'done' && p.z <= CZ.near + 1.5 && p.z >= CZ.near - 7);
 function pedFrame(t){
   const ps = pedsAt(t);
   pedMeshes.forEach((g, i) => {
-    const p = ps[i]; g.visible = !!p; if(!p) return;
-    const dir = S.pedPlan[i] ? S.pedPlan[i].dir : 1, sw = p.walking ? Math.sin(t*7 + i)*.35 : 0;
-    g.position.set(p.x, .15*(p.z > CZ.near || p.z < CZ.far ? 1 : 0), p.z); g.rotation.y = dir > 0 ? 0 : Math.PI;
-    g.userData.legs[0].rotation.x = sw; g.userData.legs[1].rotation.x = -sw;
+    const p = ps.find(q => q.i === i); g.visible = !!p; if(!p) return;
+    const u = g.userData, ph = t*6.2 + i*1.7, sw = p.walking ? Math.sin(ph) : 0;
+    g.position.set(p.x, p.z > CZ.near || p.z < CZ.far ? .15 : 0, p.z);   // 보도 위면 보도 높이
+    g.rotation.y = p.phase === 'done' ? -Math.PI/2 : p.dir > 0 ? 0 : Math.PI;
+    u.legs[0].rotation.x = sw*.42; u.legs[1].rotation.x = -sw*.42;
+    u.arms[0].rotation.x = -sw*.34; u.arms[1].rotation.x = sw*.34;
+    u.body.position.y = p.walking ? Math.abs(Math.cos(ph))*.025 : 0;
+    if(p.phase === 'wait'){ u.arms[0].rotation.x = u.arms[1].rotation.x = 0; u.body.rotation.z = Math.sin(t*1.3 + i)*.012; } else u.body.rotation.z = 0;
   });
 }
 
-/* ---------- 버스 (⑤ 정류장) — 길이 11.4m, 앞 = -z ---------- */
+/* ---------- 버스 (⑤ 정류장) — 길이 11.4m · 폭 2.5m, 앞 = -z (2026-10-29, 참고 시안 assets/ref/6_vehicles.jpg) ----------
+   저상 시내버스: 큰 앞유리 · 행선지 표시 · 전조등 · 옆 창 띠 · 앞/뒤 문 · 바퀴 덮개 · 뒤 등 · 지붕 냉방기 · 거울 팔. 판정 크기(11.4 × 2.5)는 그대로 */
 const busMesh = (() => {
-  const g = new THREE.Group(), body = paintOf('#2f8f4e');
-  const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; };
-  add(new THREE.BoxGeometry(2.5, 2.75, 11.4), body, 0, 1.73, 0);
-  for(const sx of [-1, 1]) add(new THREE.BoxGeometry(.03, .95, 9.4), carMats.glass, sx*1.26, 2.25, -.4);
-  add(new THREE.BoxGeometry(2.2, 1.2, .03), carMats.glass, 0, 2.1, -5.71);
-  add(new THREE.BoxGeometry(2.0, .8, .03), carMats.glass, 0, 2.35, 5.71);
-  for(const sx of [-1, 1]) add(new THREE.BoxGeometry(.32, .2, .05), carMats.tail, sx*1.0, .95, 5.72);
+  const g = new THREE.Group(), body = paintOf('#2f8f4e'), white = paintOf('#e9ecea'), dark = cityMats.dark;
+  const add = (geo, mat, x, y, z, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = true; g.add(m); return m; };
+  const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+  add(B(2.5, 1.05, 11.4), body, 0, .88, 0);                                      // 아래 몸통
+  add(B(2.48, 1.5, 11.2), white, 0, 2.15, .05);                                  // 창 띠 높이의 흰 몸통
+  add(B(2.5, .22, 11.3), body, 0, 3.0, .02);                                     // 지붕 테
+  add(B(1.5, .32, 2.6), white, 0, 3.27, .8);                                     // 냉방기
+  for(const sx of [-1, 1]) add(B(.03, 1.05, 9.2), carMats.glass, sx*1.255, 2.2, .55, false);   // 옆 창 띠
+  add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, -4.55, false);              // 앞문 (오른쪽)
+  add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, .6, false);                 // 뒷문
+  add(B(2.3, 1.55, .04), carMats.glass, 0, 1.95, -5.715, false);                  // 앞유리
+  add(B(1.9, .26, .05), new THREE.MeshStandardMaterial({color:lin('#141414'), emissive:lin('#ffb347'), emissiveIntensity:.9}), 0, 2.9, -5.72, false);   // 행선지 표시
+  for(const sx of [-1, 1]) add(B(.36, .16, .05), carMats.head, sx*.92, .72, -5.72, false);   // 전조등
+  add(B(2.3, .32, .06), dark, 0, .48, -5.72);                                     // 앞 범퍼
+  add(B(1.9, .85, .04), carMats.glass, 0, 2.3, 5.715, false);                      // 뒷유리
+  for(const sx of [-1, 1]) add(B(.18, .55, .05), carMats.tail, sx*1.08, 1.05, 5.72, false);   // 뒤 등
+  add(B(.52, .12, .02), carMats.plate, 0, .62, 5.72, false);
+  for(const sx of [-1, 1]){ add(B(.06, .06, .5), dark, sx*1.4, 2.35, -5.9); add(B(.08, .42, .22), dark, sx*1.42, 2.1, -6.1); }   // 거울 팔 · 거울
   const tire = new THREE.CylinderGeometry(.5, .5, .3, 18); tire.rotateZ(Math.PI/2);
-  for(const z of [-3.6, 3.4]) for(const sx of [-1, 1]) add(tire, carMats.tire, sx*1.1, .5, z);
+  for(const z of [-3.6, 3.4]) for(const sx of [-1, 1]){ add(tire, carMats.tire, sx*1.1, .5, z); add(B(.04, .6, 1.35), dark, sx*1.26, .78, z, false); }
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 12.2).rotateX(-Math.PI/2).translate(0, .02, 0), carMats.shadow); g.add(shadow);
+  for(const sx of [-1, 1]){ const sp = new THREE.Sprite(headGlowMat); sp.scale.set(1.2, 1.2, 1); sp.position.set(sx*.92, .72, -5.85); sp.visible = NIGHT; nightOnly.push(sp); g.add(sp); }
+  g.userData.L = 11.4; g.userData.W = 2.5;
   g.visible = false; scene.add(g); return g;
 })();
 
@@ -181,11 +219,7 @@ function buildCityScene(m){
 
   /* 건물: 길마다 한 줄로, 보도 뒤 1m. 모퉁이는 가로 도로 쪽 줄이 차지 */
   const parts = cityFacades.map(() => []);
-  const bgeo = (w, h, d) => {
-    const g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv, fw = [d, d, 0, 0, w, w];   // 면 순서 +x −x +y −y +z −z
-    for(let f = 0; f < 6; f++) for(let k = 0; k < 4; k++){ const i = f*4 + k; uv.setXY(i, uv.getX(i)*fw[f]/30, uv.getY(i)*h/75); }
-    return g;
-  };
+  const bgeo = facadeBox;   // scene.js — 창 크기가 건물마다 같게 (한 장 18 × 21m)
   const row = (axis, a0, a1, line, dir) => {
     let a = Math.min(a0, a1); const end = Math.max(a0, a1);
     while(a < end - 6){

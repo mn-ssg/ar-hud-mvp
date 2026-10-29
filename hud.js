@@ -85,6 +85,7 @@ $('#navHud').innerHTML = navMarkup();
 // 제한속도 · 고속도로 주행 보조(HDA)는 맵마다: 일반도로 50 · HDA 없음 (D69)
 function setLimitSign(m){
   $('#limA').textContent = $('#nvLimitN').textContent = m.limit || 80;
+  const h2 = $('#h2Lim'); if(h2) h2.textContent = m.limit || 80;   // 우리 HUD v2 (hud2.js)
   $('#nvAdas').style.display = m.city ? 'none' : '';
 }
 // 차로 화살표: 본선 차로마다 그 차로가 가는 방향(곧장 ↑ · 오른쪽 ↱ · 왼쪽 ↰), 권장 차로(목적지 출구의 차로)는 파랑, 사이는 점선
@@ -109,18 +110,21 @@ const nvCarEls = Array.from({length:8}, () => {
   top.setAttribute('fill', HY.carTop); front.setAttribute('fill', HY.car); g.append(top, front); $('#nvCars').appendChild(g); return {g, top, front};
 });
 function drawNav(p, f, C, kmh, remainKm, dangerOn){
-  const R = S.route, dist = Math.max(0, Math.round(C.d)), before = C.st <= 3 && dist > 0;
+  // v3.3 (2026-10-29): 안내 단계를 거리(예전 d ≤ 25m → 진입)가 아니라 출구 확정으로 넘김(main.js navCtx).
+  // 회전 접근 · 정지선 대기 · 회전 중(출구 확정 전)은 회전 화살표 + 거리(0까지) + 목적지를 유지, 확정 뒤에 다음 안내(마지막이면 직진 + km).
+  // 다른 출구를 확정하면 '경로 재탐색' — 정상 직진처럼 보이지 않게. 대조군이라 그 밖의 표현은 그대로
+  const R = S.route, dist = Math.max(0, Math.round(C.d)), before = C.phase === 'approach' || C.phase === 'turning', off = C.phase === 'off';
   // 회전 화살표 · 거리 | 목적지
   const key = C.node.key, turn = before && key !== 'S';
   $('#nvTurn').style.display = turn ? '' : 'none';
-  $('#nvStraight').style.display = turn ? 'none' : '';
+  $('#nvStraight').style.display = turn || off ? 'none' : '';
   $('#nvTurn').setAttribute('transform', key === 'L' ? 'translate(156 22) scale(-1 1)' : 'translate(104 22)');
-  $('#nvDistN').textContent = before ? dist : remainKm;
-  $('#nvUnit').textContent = before ? 'm' : 'km';
-  $('#nvName').textContent = before ? R.leaf.dest : '';
+  $('#nvDistN').textContent = before ? dist : off ? '' : remainKm;
+  $('#nvUnit').textContent = before ? 'm' : off ? '' : 'km';
+  $('#nvName').textContent = before ? R.leaf.dest : off ? '경로 재탐색' : '';
   $('#nvSep').style.display = before ? '' : 'none';
   // 차로 안내: 첫 갈림 전 본선에서만 (램프 위 ⑤ 두 번째 갈림엔 없음)
-  $('#nvLanes').style.display = before && C.i === 0 ? '' : 'none';
+  $('#nvLanes').style.display = C.phase === 'approach' && C.i === 0 ? '' : 'none';
   nvLaneEls.forEach((l, i) => { const c = R.exitLanes.includes(i) ? HY.blue : HY.grey; l.stem.setAttribute('stroke', c); l.head.setAttribute('fill', c); });
   // 주변 차: 시뮬레이터의 정체 줄 차 · 옆 차로 차를 내 차 기준(앞 거리 d, 옆 차로)으로. 주행 테스트는 실제 교통 전부
   // 실제 HUD처럼 차로 칸(왼쪽 · 내 차로 · 오른쪽)에 맞춰 놓는다 — 내 차가 보는 방향 기준으로 두면 핸들을 조금만 틀어도
@@ -224,7 +228,8 @@ function drawAr(p, f, C, k, dangerOn){
      상태는 ① 미니 도로의 옮길 화살표와 ③ 막대가 보여 준다. 갈림을 지나면 끔 */
   if(AS.wasMove && !needMove && inLane && st <= 3) AS.doneUntil = now + 1400;
   AS.wasMove = needMove;
-  const icon = C.d >= -8 ? {L:'icoLeft', S:'icoUp', R:'icoRight'}[C.node.key] : null;
+  // 2026-10-29: 갈림을 8m 지나면 끄던 것을 '출구 확정 전까지'로 — 회전 중에 안내가 사라지지 않게 (안내 단계 수정만, v1 표현은 그대로)
+  const icon = C.phase === 'approach' || C.phase === 'turning' ? {L:'icoLeft', S:'icoUp', R:'icoRight'}[C.node.key] : null;
   if(icon !== AS.icon){ AS.icon = icon; AS.since = now; }
   const act = $('#act'), e = ease(clamp((now - AS.since)/200));
   showIcon(icon);
@@ -345,7 +350,7 @@ function drawAr(p, f, C, k, dangerOn){
     if(onMain && p.z > FORK_Z - 1 && sigOf(e1.key, t) === 'red') cs += quadZ(m.laneX(e1.lanes[0]) - 1.75, m.laneX(e1.lanes[e1.k-1]) + 1.75, FORK_Z + .6, FORK_Z - .6, proj);
     if(m.cw){
       if(pedBlock(t) && p.x < m.cw.x0) cs += quadW([[m.cw.x0 - 1.5, CZ.near], [m.cw.x0 - .4, CZ.near], [m.cw.x0 - .4, CZ.mid], [m.cw.x0 - 1.5, CZ.mid]], proj);
-      pedsAt(t).forEach(q => { const c = proj(q.x, q.z); if(!c) return; const r = Math.max(1.8, 4.5*c[2]);
+      pedsAt(t).forEach(q => { if(q.phase === 'done') return; const c = proj(q.x, q.z); if(!c) return; const r = Math.max(1.8, 4.5*c[2]);   // 건넌 뒤 멀어지는 사람(2026-10-29 추가)은 v1에 그리지 않음 — 예전 표시 그대로
         pd += `M${(c[0] - r).toFixed(1)} ${c[1].toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2*r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2*r).toFixed(1)} 0Z`; });
     }
   }

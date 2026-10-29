@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>초보 운전자를 위한 AR-HUD</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -12,83 +13,79 @@
 <link rel="stylesheet" href="hud.css">
 </head>
 <body>
-<div class="app">
+<div class="app" id="app" data-screen="home">
 
-<!-- 안내 영역: 발표·조작용. HUD가 아님 -->
-<aside class="side">
-  <div>
-    <h1>초보 운전자를 위한 AR-HUD</h1>
+<!-- 위 막대: 처음 · 시연 화면에서만 (주행 중에는 숨김 — 운전 화면을 넓게). 연구자용 버튼만 -->
+<header class="topbar" id="topbar">
+  <div class="brand"><b>AR-HUD 주행 실험</b><span id="statusLine"></span></div>
+  <div class="topbar-actions">
+    <button class="btn ghost" id="pauseBtn" hidden>일시정지</button>
+    <button class="btn ghost" id="homeBtn" hidden>처음으로</button>
+    <button class="btn ghost" id="logBtn">기록 <span id="logCount" class="count">0</span></button>
+    <button class="btn ghost" id="setupBtn" aria-expanded="false">연구자 설정</button>
   </div>
+</header>
 
-  <div class="group">
-    <h2>HUD 방식</h2>
+<div class="stage">
+<!-- 연구자 설정: 시연 조건 · 실험 조건 · 보기. 참가자 화면이 아님 — 주행 테스트 중에는 닫히고 잠김 -->
+<aside class="setup" id="setup" hidden>
+  <section id="scenario">
+    <h2>시연</h2>
+    <p class="field">HUD</p>
     <div class="seg" id="modeSeg">
-      <button data-mode="ar" aria-pressed="true">우리 HUD</button>
-      <button data-mode="nav" aria-pressed="false">현대 HUD</button>
+      <button data-mode="nav" aria-pressed="false">현대</button>
+      <button data-mode="ar" aria-pressed="false">우리 v1</button>
+      <button data-mode="ar2" aria-pressed="true">우리 v2</button>
     </div>
-    <p class="mode-desc" id="modeDesc"></p>
-    <button class="btn toggle" id="explainBtn" aria-pressed="false">HUD 설명 보기</button>
-  </div>
-
-  <div class="group">
-    <h2>시간대</h2>
+    <p class="field">시간대</p>
     <div class="seg ico-seg" id="lightSeg">
       <button data-light="day" data-ico="sun" aria-pressed="true">주간</button>
       <button data-light="night" data-ico="moon" aria-pressed="false">야간</button>
     </div>
-  </div>
-
-  <div class="group" id="scenario">
-    <h2>시연 상황 <span class="hint">· 주행 테스트는 맵 · 상황이 랜덤</span></h2>
-    <div class="seg" id="mapSeg">
-      <button data-m="ICR" aria-pressed="true"><b>①</b>IC 진출</button>
-      <button data-m="JC4" aria-pressed="false"><b>②</b>JC 4차로</button>
-      <button data-m="SEQ" aria-pressed="false"><b>③</b>연속 분기</button>
-      <button data-m="CL2" aria-pressed="false"><b>④</b>좌회전</button>
-      <button data-m="CRT" aria-pressed="false"><b>⑤</b>우회전</button>
+    <p class="field">맵 <span class="field-note" id="mapName"></span></p>
+    <div class="seg maps" id="mapSeg">
+      <button data-m="ICR" aria-pressed="true" title="IC 오른쪽 진출">①</button>
+      <button data-m="JC4" aria-pressed="false" title="JC 4차로">②</button>
+      <button data-m="SEQ" aria-pressed="false" title="연속 분기">③</button>
+      <button data-m="CL2" aria-pressed="false" title="이중 좌회전">④</button>
+      <button data-m="CRT" aria-pressed="false" title="우회전 · 횡단보도">⑤</button>
     </div>
-    <p class="map-name" id="mapName"></p>
     <div class="seg" id="targetSeg"></div>
     <div class="seg" id="jamSeg">
-      <button data-j="0" aria-pressed="true">정체 없음</button>
+      <button data-j="0" aria-pressed="true">뒤차</button>
       <button data-j="3" aria-pressed="false">정체</button>
     </div>
-  </div>
+    <button class="btn primary block" id="demoSide">시연 시작</button>
+  </section>
 
-  <div class="actions">
-    <button class="btn primary" id="demoSide">시연 보기</button>
-    <button class="btn" id="testSide">주행 테스트</button>
-    <button class="btn" id="pauseBtn">일시정지</button>
-    <button class="btn" id="logBtn">기록 <span id="logCount">0</span></button>
-  </div>
-
-  <div class="group">
-    <h2>진행 단계</h2>
-    <ol class="stages" id="stages">
-      <li data-s="1"><span class="n">1</span><b>접근</b></li>
-      <li data-s="2"><span class="n">2</span><b>지선 구분</b></li>
-      <li data-s="3"><span class="n">3</span><b>차로 옮김</b></li>
-      <li data-s="4"><span class="n">4</span><b>진입</b></li>
-      <li data-s="5"><span class="n">5</span><b>도착</b></li>
-    </ol>
-  </div>
-
-  <div class="group">
-    <h2>우리 HUD 색</h2>
-    <div class="legend">
-      <div><i class="c1"></i>들어갈 차로 · 갈 방향</div>
-      <div><i class="c5"></i>지금 옮겨도 됨</div>
-      <div><i class="c3"></i>서두름 · 정체</div>
-      <div><i class="c4"></i>대기 (위험)</div>
+  <section id="expSetup">
+    <h2>실험</h2>
+    <p class="field">비교할 HUD (A · B)</p>
+    <div class="seg" id="pairSeg">
+      <button data-pair="ar,ar2" aria-pressed="true" title="우리 HUD v1(개선 전) · v2(개선 후)">v1 · v2</button>
+      <button data-pair="nav,ar2" aria-pressed="false" title="현대 HUD · 우리 HUD v2">현대 · v2</button>
+      <button data-pair="nav,ar" aria-pressed="false" title="현대 HUD · 우리 HUD v1 (1차 실험)">현대 · v1</button>
     </div>
-  </div>
+    <p class="field">제시 순서</p>
+    <div class="seg" id="orderSeg">
+      <button data-order="auto" aria-pressed="true" title="참가자 번호 홀수 A→B · 짝수 B→A">번호로 교대</button>
+      <button data-order="AB" aria-pressed="false">A → B</button>
+      <button data-order="BA" aria-pressed="false">B → A</button>
+    </div>
+    <label class="check"><input type="checkbox" id="practiceChk" checked> 본 실험 전 연습 주행</label>
+  </section>
+
+  <section>
+    <h2>보기</h2>
+    <label class="check"><input type="checkbox" id="mirrorChk" checked> 룸미러 · 사이드미러</label>
+    <button class="btn block" id="explainBtn" aria-pressed="false">HUD 설명 보기 (발표용)</button>
+  </section>
 </aside>
 
 <!-- 운전석 영역 -->
 <main class="cab" id="cab">
   <div id="view"></div>
-  <!-- 앞유리 틀 · 대시보드 · 핸들은 3D 실내(cabin.js)로 그린다 -->
-  <div class="cab-label">운전석 시점</div>
+  <!-- 앞유리 틀 · 대시보드 · 핸들은 3D 실내(cabin.js)로, 룸미러 · 사이드미러는 mirrors.js로 그린다 -->
 
   <div id="hudWrap">
     <svg viewBox="0 0 520 270" aria-hidden="true">
@@ -189,6 +186,9 @@
         </g>
       </g>
 
+      <!-- ===== 우리 HUD v2 (개선 후, 2026-10-29): hud2.js hud2Markup()이 채운다. 판단은 guide.js ===== -->
+      <g id="arHud2" style="display:none"></g>
+
       <!-- ===== 현대 HUD (대조군): 현대 HUD 사진을 그대로 재현. hud.js navMarkup()이 채운다 ===== -->
       <g id="navHud" class="hud-t"></g>
     </svg>
@@ -197,22 +197,25 @@
   <!-- 발표용: HUD 층마다 이름표 (explain.js). HUD가 아님 -->
   <svg id="explain" aria-hidden="true"></svg>
 
-  <!-- 안내 카드: 아이콘 + 짧은 말 (내용은 main.js setCard) -->
+  <!-- 처음 화면: 할 수 있는 것 세 가지. 주행 테스트가 주된 행동 -->
   <div class="overlay" id="intro">
-    <div class="card">
-      <div class="card-head"><span id="cardIcon"></span><h2 id="cardTitle">① 세 갈래</h2></div>
-      <div id="cardText" class="chips"></div>
+    <div class="card home">
+      <p class="eyebrow">디지털미디어 프로타이핑 · 4팀</p>
+      <h1>분기점 차로 안내 주행 실험</h1>
+      <p class="lead">HUD를 보고 목적지 출구까지 키보드로 운전합니다. 한 사람에 6회 주행하고, 3회마다 짧은 질문에 답합니다.</p>
+      <div class="keyrow"><span><kbd>←</kbd><kbd>→</kbd> 핸들</span><span><kbd>↑</kbd> 가속</span><span><kbd>↓</kbd> 브레이크</span></div>
+      <button class="btn primary lg block" id="testBtn">주행 테스트 시작</button>
       <div class="row">
-        <button class="btn primary" id="demoBtn"></button>
-        <button class="btn" id="testBtn"></button>
+        <button class="btn" id="practiceBtn">연습 주행</button>
+        <button class="btn" id="demoBtn">시연 보기</button>
       </div>
     </div>
   </div>
 
-  <!-- 주행 테스트 진행 카드: 참가자 ID · 판 결과 · 쉬는 화면 · 요약 (내용은 session.js sesCard) -->
+  <!-- 진행 카드: 참가자 정보 · 주행 결과 · 질문 · 끝 · 시연 끝 (내용은 session.js sesCard) -->
   <div class="overlay" id="sess" hidden>
     <div class="card">
-      <div class="card-head"><span id="sesIcon"></span><h2 id="sesTitle"></h2></div>
+      <div class="card-head"><span id="sesIcon"></span><div><p class="eyebrow" id="sesEyebrow"></p><h2 id="sesTitle"></h2></div></div>
       <div id="sesBody"></div>
       <div class="row">
         <button class="btn primary" id="sesBtn"></button>
@@ -220,18 +223,21 @@
       </div>
     </div>
   </div>
-  <!-- 주행 테스트: 3 · 2 · 1 과 키 안내 -->
+  <!-- 주행: 3 · 2 · 1 · 키 안내(첫 판 · 연습만) · 연구자용 중단(Esc) -->
   <div id="count" hidden>3</div>
   <div id="keyHint" hidden><span><kbd>←</kbd><kbd>→</kbd> 핸들</span><span><kbd>↑</kbd> 가속</span><span><kbd>↓</kbd> 브레이크</span></div>
+  <button class="abort" id="abortBtn" hidden title="연구자: 주행 테스트 중단 (Esc)">중단</button>
 </main>
+</div>
 </div>
 
 <aside id="drawer" aria-label="주행 테스트 기록">
   <header><h2>주행 테스트 기록</h2><button class="btn" id="closeDrawer">닫기</button></header>
   <label>다음 참가자 <input type="text" id="pid" value="P1" autocomplete="off"></label>
+  <p class="drawer-note">연습 주행 기록은 여기에 섞이지 않고 엑셀 '연습' 시트에만 들어갑니다.</p>
   <div id="summary"></div>
   <div class="tablewrap"><table>
-    <thead><tr><th>참가자</th><th>HUD</th><th>시간대</th><th>맵</th><th>상황</th><th>결과</th><th>마감선 앞(m)</th><th>반응(초)</th><th>위험</th><th>보행자</th></tr></thead>
+    <thead><tr><th>참가자</th><th>HUD</th><th>시간대</th><th>맵</th><th>상황</th><th>결과</th><th>마감선 앞(m)</th><th>반응(초)</th><th>위험</th><th>대기 중 이동</th></tr></thead>
     <tbody id="logBody"></tbody>
   </table><div class="empty" id="logEmpty">아직 기록이 없습니다. 주행 테스트를 하면 여기에 쌓입니다.</div></div>
   <div class="row">
@@ -246,10 +252,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- 순서 중요: 상수 → 맵 → 3D장면 → 실내 → HUD → 주행 → 일반도로(교차로 · 신호 · 보행자) → 로직 → 주행 테스트 진행 -->
 <script src="config.js"></script>
+<script src="guide.js"></script>
 <script src="maps.js"></script>
 <script src="scene.js"></script>
 <script src="cabin.js"></script>
+<script src="mirrors.js"></script>
 <script src="hud.js"></script>
+<script src="hud2.js"></script>
 <script src="drive.js"></script>
 <script src="city.js"></script>
 <script src="main.js"></script>

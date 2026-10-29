@@ -107,20 +107,22 @@ function driveReset(cfg){
   Object.assign(D, {x:m.laneX(cfg.lane), z:p0.z, psi:0, v:D.cruise, steer:0, wheel:0, t:0, frozen:false, cfg, ped:0, pedIn:false, sigChecked:false,
     seg:null, hint:-1, segS:0, cands:null, lane:cfg.lane, chosen:[], exitName:'',
     enterZ:null, changeDist:null, risky:0, enc:{}, lastCut:{}, offroad:0, lastTouch:-9, followT:0, crashWith:'', result:null, endT:0,
-    safeOn:false, safeSince:0, reactT:null, moved:false});
+    safeOn:false, safeSince:0, reactT:null, moved:false,
+    events:[], lc:null});   // events: 위험 · 판단 상태 · 차로 변경 시작/완료 · 끼어들기 · 충돌 시점 (2026-10-29, session.js가 기록에 붙임)
   Object.keys(KEYS).forEach(k => KEYS[k] = false);
   queueCars.forEach(c => c.visible = false); flowCars.forEach(c => { c.visible = false; c.userData.onc = false; setBrake(c, false); }); otherCar.visible = false; busMesh.visible = false;
   D.cars = [];
   const R = mulberry32(cfg.seed ?? Math.floor(Math.random()*1e9)), rr = ([a, b]) => a + R()*(b - a), ri = ([a, b]) => a + Math.floor(R()*(b - a + 1));
   let fi = 0, qi = 0;
+  // 판정 크기 = 보이는 차체 크기 (2026-10-29: 예전엔 차종과 상관없이 4.6 × 1.85m — 해치 4.1m · 탑차 4.8m와 어긋났음). 버스는 o.len · o.w
   const add = (mesh, lane, z, v, kind, o = {}) => {
-    const c = {mesh, lane, kind, v, v0:v, base:v, T:1.1, s0:2.5, seenV:v, P:o.P || lanePath(m, lane, Math.floor(R()*2)), s:LANE_START - z, ...o};   // 버스 · 마주 오는 차는 자기 길(o.P)
+    const c = {mesh, lane, kind, v, v0:v, base:v, T:1.1, s0:2.5, seenV:v, len:mesh.userData.L, w:mesh.userData.W, P:o.P || lanePath(m, lane, Math.floor(R()*2)), s:LANE_START - z, ...o};   // 버스 · 마주 오는 차는 자기 길(o.P)
     D.cars.push(c); mesh.visible = true; return c;
   };
   const tl = S.route.tl, lanes = [...Array(m.lanes).keys()], V0 = D.cruise;
   // 내 차로 앞차는 늘 있음. 판마다 둘 중 하나: 앞차가 급정거해 완전히 섬(내 뒤는 비어 있음) / 뒤에 바짝 붙어 오는 차(급하게 서면 받힘, 뒤차 판만)
   // — 둘을 한 판에 같이 두면 세게 밟아도 약하게 밟아도 부딪혀 피할 길이 없음
-  cfg.brake = R() < HARD.brakeAhead;
+  cfg.brake = cfg.type !== 'practice' && R() < HARD.brakeAhead;   // 연습 판(session.js)은 급정거 · 뒤차 · 정체 없이 앞차와 옆 차로 차만
   const lead = add(flowCars[fi++], cfg.lane, D.z - DRV.carL - rr(HARD.lead), V0, 'lead');
   lead.brakeAt = cfg.brake ? rr(HARD.brakeAt) : null; lead.phase = 0;
   // 바짝 붙은 뒤차는 뒤차 판에만 — 정체 판은 줄 때문에 누구나 크게 줄여야 해서, 뒤차까지 붙으면 제대로 줄여도 받힘(실제론 뒤차도 정체를 보고 같이 줄임)
@@ -200,7 +202,7 @@ function driveStep(dt){
     if(!D.seg && !D.cands) stepMain(dt);
     else if(D.cands) stepCands(dt);
     else stepSeg(dt);
-    if(!D.result){ const h = hit(); if(h){ D.crashWith = h; endRun('crash'); } }
+    if(!D.result){ const h = hit(); if(h){ D.crashWith = h; D.events.push({t:+D.t.toFixed(2), type:'crash', with:h}); endRun('crash'); } }
     if(!D.result && D.t > (S.map.city ? CITY_DRV.timeout : DRV.timeout)) endRun('timeout');
     if(!D.result && S.map.cw) pedCheck();
   }
@@ -391,8 +393,18 @@ function trackLanes(){
   if(side && !D.moved){ const ok = laneSafe(next); if(ok && !D.safeOn) D.safeSince = D.t; D.safeOn = ok; }
   touch.forEach(l => {
     if(side && !D.moved && l === next){ D.moved = true; D.reactT = D.safeOn ? +(D.t - D.safeSince).toFixed(2) : null; }   // 안전하지 않을 때 끼면 빈칸(위험 끼어들기로 잡힘)
-    if(!D.enc[l]){ D.enc[l] = true; cutIn(l); }
+    if(!D.enc[l]){
+      D.enc[l] = true;
+      // 차로 변경 시작: 차 옆면이 선을 넘기 시작한 순간. 그때 판단 상태(S.G — 어느 HUD든 같은 판단, 보인 건 v2뿐)를 함께
+      D.lc = {from:li, to:l, t0:D.t}; D.events.push({t:+D.t.toFixed(2), type:'lcStart', from:li, to:l, gate:S.G ? S.G.gate : '', toward:l === next});
+      cutIn(l);
+    }
   });
+  // 차로 변경 완료: 새 차로 가운데 ±settle에 들어옴 / 되돌아오면 취소
+  if(D.lc){
+    if(li === D.lc.to && Math.abs(D.x - m.laneX(li)) < DRV.settle){ D.events.push({t:+D.t.toFixed(2), type:'lcDone', from:D.lc.from, to:li, dur:+(D.t - D.lc.t0).toFixed(2)}); D.lc = null; }
+    else if(li === D.lc.from && !touch.includes(D.lc.to)){ D.events.push({t:+D.t.toFixed(2), type:'lcAbort', from:D.lc.from, to:D.lc.to}); D.lc = null; }
+  }
   // 목표 차로 중앙 ±1m 안에 들어오면 그곳을 기억, 목표 차로를 벗어나면 지움 → 갈림에서 남은 값이 '자리 잡은 곳'
   if(S.route.leaf.path[0].lanes.includes(li)){ if(D.enterZ === null && Math.abs(D.x - m.laneX(li)) < DRV.settle) D.enterZ = D.z; }
   else D.enterZ = null;
@@ -412,12 +424,13 @@ function laneSafe(li){
 function cutIn(li){
   if(D.t - (D.lastCut[li] ?? -9) < 1) return;   // 선 위에서 흔들린 것은 1초에 한 번만
   D.lastCut[li] = D.t;
-  const risky = D.cars.some(c => {
+  const by = D.cars.find(c => {
     if(c.lane !== li || c.z < FORK_Z - 5) return false;
     const dz = c.z - D.z, behind = dz >= 0, gap = Math.abs(dz) - halfL(c) - DRV.carL/2, closing = behind ? c.v - D.v : D.v - c.v;
     return gap < DRV.gapRisk || (closing > 0 && gap/closing < DRV.ttcRisk);
   });
-  if(risky) D.risky++;
+  if(by) D.risky++;
+  D.events.push({t:+D.t.toFixed(2), type:'cutIn', lane:li, risky:!!by, with:by ? KIND_NAME[by.kind] + (by.z > D.z ? ' (뒤)' : ' (앞)') : ''});
 }
 
 /* ---------- HUD에 줄 값 (hud.js가 읽음) ----------

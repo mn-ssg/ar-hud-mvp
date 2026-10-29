@@ -108,49 +108,31 @@ const cGlow = new THREE.PointLight(lin('#a9c6ff'), 0, .9, 2); cGlow.position.set
 const CF = '"Pretendard Variable","Pretendard",' + FONT;
 let cabinNight = false, lastKmh = -1, lastMin = -1;
 const two = n => String(n).padStart(2, '0');
-function gauge(g, cx, cy, r, fr, col){
-  const a0 = Math.PI*.75, a1 = Math.PI*2.25;
-  g.lineCap = 'round'; g.lineWidth = 10; g.strokeStyle = '#1a222c'; g.beginPath(); g.arc(cx, cy, r, a0, a1); g.stroke();
-  g.strokeStyle = col; g.beginPath(); g.arc(cx, cy, r, a0, a0 + (a1-a0)*clamp(fr)); g.stroke();
-  for(let i=0;i<=10;i++){ const a = a0 + (a1-a0)*i/10; g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx+Math.cos(a)*(r-16), cy+Math.sin(a)*(r-16)); g.lineTo(cx+Math.cos(a)*(r-24), cy+Math.sin(a)*(r-24)); g.stroke(); }
-}
+/* 2026-10-29: 계기판 · 센터 화면 정리 — 운전에 쓰는 것(속도 · 기어 · 시각)만 남김.
+   뺀 것: 회전수 게이지 · 누적 거리 · 차로 유지 그림 · 라디오 카드(보라 ~ 청록 앨범 그림). 참고 시안 assets/ref/0_art_day.jpg */
 function drawCluster(kmh){
   const g = clusterCv.getContext('2d'), W = clusterCv.width, H = clusterCv.height, d = new Date();
-  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#0c1117'); bg.addColorStop(1, '#05070a');
-  g.fillStyle = bg; g.fillRect(0, 0, W, H);
-  gauge(g, 150, 140, 96, kmh/220, '#8fbfff');
-  gauge(g, W-150, 140, 96, (800 + kmh*14)/7000, '#c9d3de');
-  g.textAlign = 'center'; g.fillStyle = '#fff';
-  g.font = `700 64px ${CF}`; g.fillText(kmh, 150, 150);
-  g.font = `500 18px ${CF}`; g.fillStyle = '#8b96a3'; g.fillText('km/h', 150, 180); g.fillText('x1000 r/min', W-150, 180);
-  g.font = `600 44px ${CF}`; g.fillStyle = '#dfe6ee'; g.fillText(((800 + kmh*14)/1000).toFixed(1), W-150, 152);
-  // 가운데: 기어 · 차로 유지 보조 그림 · 시각 · 누적 거리
-  g.font = `700 40px ${CF}`; g.fillStyle = '#fff'; g.fillText('D', W/2, 70);
-  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 4;
-  g.beginPath(); g.moveTo(W/2-60, 200); g.lineTo(W/2-26, 108); g.moveTo(W/2+60, 200); g.lineTo(W/2+26, 108); g.stroke();
-  g.fillStyle = '#c9d3de'; g.beginPath(); g.roundRect ? g.roundRect(W/2-16, 160, 32, 40, 7) : g.rect(W/2-16, 160, 32, 40); g.fill();
-  g.font = `500 20px ${CF}`; g.fillStyle = '#8b96a3';
-  g.fillText(`${two(d.getHours())}:${two(d.getMinutes())}   18°C`, W/2, 30);
-  g.fillText('ODO 12,483 km', W/2, 236);
+  g.fillStyle = '#080b0f'; g.fillRect(0, 0, W, H);
+  // 속도: 가는 호 + 큰 숫자
+  const cx = 250, cy = 150, r = 98, a0 = Math.PI*.78, a1 = Math.PI*2.22;
+  g.lineCap = 'round'; g.lineWidth = 6; g.strokeStyle = '#1b232d'; g.beginPath(); g.arc(cx, cy, r, a0, a1); g.stroke();
+  g.strokeStyle = '#a9c7ec'; g.beginPath(); g.arc(cx, cy, r, a0, a0 + (a1-a0)*clamp(kmh/200)); g.stroke();
+  g.textAlign = 'center'; g.fillStyle = '#f2f5f8'; g.font = `600 84px ${CF}`; g.fillText(kmh, cx, cy + 26);
+  g.font = `500 20px ${CF}`; g.fillStyle = '#8b96a3'; g.fillText('km/h', cx, cy + 58);
+  // 기어 · 시각
+  g.font = `700 46px ${CF}`; g.fillStyle = '#f2f5f8'; g.fillText('D', 540, 150);
+  g.font = `500 20px ${CF}`; g.fillStyle = '#8b96a3'; g.fillText(`${two(d.getHours())}:${two(d.getMinutes())}`, 540, 190);
   clusterMat.map.needsUpdate = true;
 }
 function drawInfo(){
   const g = infoCv.getContext('2d'), W = infoCv.width, H = infoCv.height, d = new Date();
-  g.fillStyle = '#0a0e14'; g.fillRect(0, 0, W, H);
-  // 음악(라디오) 카드
-  g.fillStyle = '#121923'; g.beginPath(); g.roundRect ? g.roundRect(24, 22, 470, 158, 18) : g.rect(24, 22, 470, 158); g.fill();
-  const art = g.createLinearGradient(40, 36, 170, 166); art.addColorStop(0, '#5b4fd6'); art.addColorStop(1, '#2fa7c9');
-  g.fillStyle = art; g.beginPath(); g.roundRect ? g.roundRect(42, 38, 126, 126, 12) : g.rect(42, 38, 126, 126); g.fill();
-  g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = `700 34px ${CF}`; g.fillText('FM 95.9', 192, 86);
-  g.fillStyle = '#8b96a3'; g.font = `500 22px ${CF}`; g.fillText('라디오', 192, 120);
-  g.fillStyle = '#263241'; g.fillRect(192, 146, 280, 5); g.fillStyle = '#9fb3c8'; g.fillRect(192, 146, 120, 5);
-  // 시각
-  g.fillStyle = '#fff'; g.font = `300 88px ${CF}`; g.fillText(`${two(d.getHours())}:${two(d.getMinutes())}`, 530, 120);
-  g.fillStyle = '#8b96a3'; g.font = `500 24px ${CF}`; g.fillText(`${d.getMonth()+1}월 ${d.getDate()}일`, 536, 160);
+  g.fillStyle = '#080b0f'; g.fillRect(0, 0, W, H);
+  g.textAlign = 'left'; g.fillStyle = '#e6ebf0'; g.font = `300 76px ${CF}`; g.fillText(`${two(d.getHours())}:${two(d.getMinutes())}`, 60, 118);
+  g.fillStyle = '#8b96a3'; g.font = `500 24px ${CF}`; g.fillText(`${d.getMonth()+1}월 ${d.getDate()}일 · 바깥 18°C`, 64, 160);
   // 공조 줄
-  g.fillStyle = '#0f151d'; g.fillRect(0, 196, W, 56);
-  g.fillStyle = '#dfe6ee'; g.font = `600 30px ${CF}`; g.fillText('22.0°', 40, 236); g.textAlign = 'right'; g.fillText('22.0°', W-40, 236);
-  g.textAlign = 'center'; g.fillStyle = '#8b96a3'; g.font = `600 22px ${CF}`; g.fillText('AUTO', W/2, 233);
+  g.fillStyle = '#0d1218'; g.fillRect(0, 196, W, 56);
+  g.fillStyle = '#c9d2dc'; g.font = `600 28px ${CF}`; g.fillText('22.0°', 40, 234); g.textAlign = 'right'; g.fillText('22.0°', W-40, 234);
+  g.textAlign = 'center'; g.fillStyle = '#7d8894'; g.font = `600 20px ${CF}`; g.fillText('AUTO', W/2, 232);
   infoMat.map.needsUpdate = true;
 }
 drawCluster(0); drawInfo();

@@ -29,15 +29,32 @@ function buildPath(R, jam){
     return best;
   });
   const cwI = m.cw ? samples.findIndex(q => q.x >= m.cw.x0 && q.z < FORK_Z) : -1;   // ⑤ 경로가 횡단보도에 닿는 곳(s)
+  // 갈림마다 '출구 확정' 지점(s) — 주행 테스트 drive.js stepCands와 같은 기준: 경로 점이 경로의 출구 포장 위에만 있고
+  // 다른 출구 포장에서 commitGap(3m) 넘게 떨어진 첫 곳 (일반도로는 출구 시작에서 6m 넘게 들어간 뒤). 시연의 안내 단계가 이걸 씀 (2026-10-29)
+  const commitS = R.nodes.map((n, i) => {
+    const mine = R.leaf.path[i], sibs = i === 0 ? m.exits : R.leaf.path[i-1].node.exits, hint = sibs.map(() => -1);
+    for(let s = nodeS[i]; s < samples.length; s++){
+      const q = samples[s]; let ok = true;
+      sibs.forEach((e, k) => {
+        const r = project(segPts(e), q.x, q.z, hint[k]); hint[k] = r.i;
+        if(e === mine){ if(Math.abs(r.d) > e.half || (m.city && r.s <= 6)) ok = false; }
+        else if(Math.abs(r.d) - e.half <= DRV.commitGap) ok = false;
+      });
+      if(ok) return s;
+    }
+    return L;
+  });
   // sStart: 일반도로는 60m 앞에서 출발(50km/h라 접근이 길어져서). P: 주행 테스트에서 내 차를 경로 위로 옮겨 잴 때
-  return {curve, L, sStart:m.city ? 100 : 40, mergeZ, nodeS, cwS:cwI >= 0 ? cwI : null, P:resample(samples.map(q => [q.x, q.z]), 1)};
+  return {curve, L, sStart:m.city ? 100 : 40, mergeZ, nodeS, commitS, cwS:cwI >= 0 ? cwI : null, P:resample(samples.map(q => [q.x, q.z]), 1)};
 }
-// 다음 갈림: 번호 i · 남은 거리 d(경로 위 m) · 진행 단계 st(1 접근 · 2 지선 구분 · 3 차로 옮김 · 4 진입 · 5 도착)
+/* 다음 갈림: 번호 i · 남은 거리 d(경로 위 m) · phase(guide.js navPhase) · 진행 단계 st(1 접근 · 2 지선 구분 · 3 차로 옮김 · 4 진입 · 5 도착)
+   단계는 '출구를 실제로 확정했는가'로 넘긴다 — 주행 테스트는 drive.js가 확정한 출구(D.chosen), 시연은 경로 위 확정 지점(commitS).
+   v1은 거리만 봐서(d ≤ 25 → 진입) 현대 HUD가 회전 전에 직진 화살표를 그렸다 (2026-10-29 재현 · tests/drive-regression.js) */
 function navCtx(s){
-  const ns = path.nodeS; let i = 0;
-  while(i < ns.length - 1 && s > ns[i] + 45) i++;
-  const d = ns[i] - s;
-  return {i, d, node:S.route.nodes[i], st: d > 170 ? 1 : d > 115 ? 2 : d > 25 ? 3 : d > -45 ? 4 : 5};
+  const committed = S.drive ? D.chosen.length : path.commitS.filter(c => s >= c).length;
+  const N = navPhase(path.nodeS, s, committed, S.drive && D.result === 'wrong');
+  N.node = S.route.nodes[N.i]; N.st = stageOf(N);
+  return N;
 }
 
 /* ---------- 상태 ---------- */
@@ -65,7 +82,7 @@ function setTarget(i, lane){
   path = buildPath(S.route, S.drive ? 0 : S.jam); S.s = path.sStart;
   S.fill = 0; S.danger = 0; S.jamHoldT = 0;
   S.car = null; otherCar.visible = false;
-  resetHud();
+  resetHud(); resetGuide();
 }
 // 주간 · 야간: 3D 장면(scene.js) + HUD 밤 밝기(hud.css .night) + 페이지 다크 테마(styles.css [data-light])
 function setLight(l){
@@ -76,24 +93,27 @@ function setLight(l){
   $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임
   $$('#lightSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.light === l)));
 }
+// HUD 세 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD v1(1차 실험, 개선 전 — 그대로 보존) · 'ar2' 우리 HUD v2(개선 후, hud2.js)
+const HUD_VER = {nav:'현대 3.2', ar:'우리 1.8', ar2:'우리 2.0'};
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
+  $('#arHud2').style.display = m==='ar2' ? '' : 'none';
   $('#navHud').style.display = m==='nav' ? '' : 'none';
   $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode===m)));
 }
-// 왼쪽 '시연 상황' 패널: 사용자가 고른 맵 · 목적지 · 정체 (테스트가 덮어쓰지 않음)
+// 연구자 설정의 '시연': 고른 맵 · 목적지 · 상황 (테스트가 덮어쓰지 않음)
 function renderScenario(){
   const m = mapById(S.demoMap);
   $$('#mapSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === S.demoMap)));
-  $('#mapName').textContent = `${m.no} ${m.name}`;
+  $('#mapName').textContent = m.name;
   const seg = $('#targetSeg');
   seg.hidden = $('#jamSeg').hidden = !!m.city;   // 일반도로(④ 좌회전 · ⑤ 우회전)는 맵이 곧 상황 — 목적지 · 정체 고르기 없음 (D71)
   if(seg.dataset.map !== m.id){
     seg.dataset.map = m.id; seg.innerHTML = '';
     m.leaves.forEach((l, i) => {
       const b = document.createElement('button'); b.dataset.t = i; b.textContent = l.label;
-      b.onclick = () => { if(stopDemo()){ S.demoTarget = i; prepDemo(); update(1); } };
+      b.onclick = () => { if(stopDemo()){ S.demoTarget = i; prepDemo(); update(1); renderStatus(); } };
       seg.appendChild(b);
     });
   }
@@ -103,7 +123,7 @@ function renderScenario(){
 // 시연 중에 시연 상황을 바꾸면 시연을 멈추고 바로 바꾼다 (주행 테스트 중에는 잠금)
 function stopDemo(){
   if(S.testing) return false;
-  if(S.running){ S.running = false; S.paused = false; $('#pauseBtn').textContent = '일시정지'; setCard({title:mapLabel(S.demoMap)}); $('#intro').hidden = false; }
+  if(S.running){ S.running = false; S.paused = false; $('#pauseBtn').textContent = '일시정지'; }
   return true;
 }
 function prepDemo(){
@@ -116,16 +136,22 @@ function prepDemo(){
   cityFrame(0);
 }
 
-/* ---------- 안내 카드: 아이콘 + 짧은 말 ----------
-   tone: '' | 'ok' | 'bad'. chips: 짧은 꼬리표(아이콘 HTML 허용). 버튼은 [아이콘, 한 단어] */
-const btnSet = (el, [icon, word]) => { el.innerHTML = ico(icon) + `<span>${word}</span>`; };
-function setCard({icon = '', tone = '', title, chips = [], demo = ['play','시연'], test = ['test','테스트']}){
-  $('#cardIcon').innerHTML = icon ? ico(icon) : '';
-  $('#cardIcon').className = icon ? 'card-icon ' + tone : '';
-  $('#cardTitle').textContent = title;
-  $('#cardText').innerHTML = chips.map(c => `<span class="chip">${c}</span>`).join('');
-  $('#cardText').hidden = !chips.length;
-  btnSet($('#demoBtn'), demo); btnSet($('#testBtn'), test);
+/* ---------- 화면 흐름 (2026-10-29) ----------
+   'home' 처음 카드(주행 테스트 · 연습 · 시연) / 'demo' 시연(위 막대 · 연구자 설정) / 'drive' 연습 · 주행 테스트(운전 화면만, 위 막대 · 설정 숨김) */
+function setScreen(sc){
+  $('#app').dataset.screen = sc;
+  $('#pauseBtn').hidden = $('#homeBtn').hidden = sc !== 'demo';
+  renderStatus();
+}
+function renderStatus(){
+  const sc = $('#app').dataset.screen;
+  $('#statusLine').textContent = sc === 'demo' ? `시연 · ${mapLabel(S.demoMap)} · ${modeName(S.mode)} · ${S.light === 'night' ? '야간' : '주간'}` : '';
+}
+function openSetup(open){ $('#setup').hidden = !open; $('#setupBtn').setAttribute('aria-expanded', String(open)); }
+function goHome(){
+  if(S.testing) return;
+  stopDemo(); $('#sess').hidden = true; $('#intro').hidden = false; $('#drawer').classList.remove('open');
+  setScreen('home'); prepDemo(); update(1);
 }
 
 /* ---------- 정체 대기열 ----------
@@ -170,6 +196,58 @@ function updateWheel(p, f, dt){
   const dx = q.x - p.x, dz = q.z - p.z, sinA = (f.x*dz - f.z*dx)/(Math.hypot(dx,dz)||1); // + = 오른쪽
   const deg = Math.atan(2*WHEELBASE*sinA/STEER_LOOK)*STEER_RATIO*STEER_GAIN*180/Math.PI;
   steer += (deg - steer)*Math.min(1, dt*4);
+}
+
+/* ---------- 안내 판단 (guide.js) ----------
+   내 차 자세(EGO)와 실제 차(시연: 옆 차로 뒤차 · 정체 줄 / 주행: D.cars)로 매 프레임 S.G를 만든다.
+   우리 HUD v2가 그리고, 주행 테스트에서는 어느 HUD든 같은 판단을 기록한다(현대 HUD · v1엔 보이지 않음 — 비교용 잠재 상태).
+   미러(mirrors.js)도 같은 EGO · 같은 차를 쓴다 → HUD에 그린 차 = 판단에 쓴 차 = 미러에 보이는 차 */
+const EGO = {x:0, z:0, psi:0, v:0, halfL:DRV.carL/2};
+const GS = {gate:makeGate(), needWas:false, doneAt:-9, hazard:null};
+function resetGuide(){ GS.gate = makeGate(); GS.needWas = false; GS.doneAt = -9; GS.hazard = null; S.G = null; }
+function setEgo(x, z, psi, v){ EGO.x = x; EGO.z = z; EGO.psi = psi; EGO.v = v; }
+// 판단에 쓸 차 목록 {x, z, v, halfL, lane, kind, ref(3D 차)}. 본선 위(갈림 앞)만 차로 번호가 뜻이 있다
+function trafficList(){
+  const m = S.map, out = [];
+  if(S.drive) D.cars.forEach(c => { if(c.kind !== 'onc' && c.z > FORK_Z - 5) out.push({x:c.x, z:c.z, v:c.v, halfL:halfL(c), lane:laneOf(m, c.x), kind:c.kind, ref:c.mesh}); });
+  else {
+    if(otherCar.visible) out.push({x:otherCar.position.x, z:otherCar.position.z, v:EGO.v + 13, halfL:CAR_TYPES.sedan.L/2, lane:laneOf(m, otherCar.position.x), kind:'rear', ref:otherCar});
+    queueCars.forEach(c => { if(c.visible && c.position.z > FORK_Z - 5) out.push({x:c.position.x, z:c.position.z, v:6, halfL:(c.userData.L || DRV.carL)/2, lane:laneOf(m, c.position.x), kind:'queue', ref:c}); });
+  }
+  return out;
+}
+function guideStep(t, C){
+  const m = S.map, R = S.route, cars = trafficList(), my = laneOf(m, EGO.x), goal = R.leaf.path[0].lanes;
+  const onMain = C.i === 0 && C.phase === 'approach' && EGO.z > FORK_Z;
+  const tl = goal.reduce((a, b) => Math.abs(b - my) < Math.abs(a - my) ? b : a), side = Math.sign(tl - my);
+  const centered = Math.abs(EGO.x - m.laneX(my)) < DRV.settle;
+  const need = onMain && side !== 0 && EGO.z > changeEndOf(m);   // 옮길 차로가 남았고 마감선 전 (고속도로 갈림 25m 앞 · 일반도로 백색실선 시작)
+  const next = my + side, A = side ? assessLane(EGO, cars, next) : {safe:true, clear:true, blockers:[], primary:null};
+  const prev = GS.gate.state;
+  gateStep(GS.gate, t, need, A);
+  if(GS.needWas && !need && side === 0 && centered) GS.doneAt = t;          // 목표 차로에 다 들어옴
+  if(side === 0 && centered) GS.needWas = false; else if(need) GS.needWas = true;
+  // 정체: 목표 차로 줄 끝(가장 뒤 줄 차) · 내 차가 이미 줄 옆인가
+  const qz = cars.filter(c => c.kind === 'queue' && goal.includes(c.lane) && (side ? c.lane === next : c.lane === my)).map(c => c.z);
+  const tail = qz.length ? Math.max(...qz) : null;
+  const jam = tail !== null ? {tail, beside:EGO.z < tail + 2*EGO.halfL + 3} : null;
+  const r = GS.gate.reason, dir = r && r.car ? relDir(EGO, r.car) : null;
+  // 일반도로: 지금 차로에서 멈춰야 하는 이유 (차로 변경 대기와 다른 신호 — v2는 현재 차로를 가로지르는 막대 + 문구)
+  let stop = null;
+  if(m.city && C.i === 0){
+    const e1 = R.leaf.path[0], dStop = EGO.z - FORK_Z;
+    if(dStop > 0 && dStop < 70 && sigOf(e1.key, S.cityT) !== 'green') stop = {kind:'signal', z:FORK_Z};
+    if(m.cw && path.cwS !== null && pedBlock(S.cityT) && EGO.x < m.cw.x0 && S.s > path.cwS - 45 && S.s < path.cwS) stop = {kind:'ped'};
+  }
+  S.G = {need, side, next, tl, my, A, gate:GS.gate.state, reason:r, dir, jam, stop, cars, doneUntil:GS.doneAt + GUIDE.doneShow,
+    text:stop && !need ? (stop.kind === 'ped' ? '보행자 · 정지' : '신호 · 정지') : need ? gateText(GS.gate.state, r, dir && dir.side, side, !!jam, dir && dir.zone) : t < GS.doneAt + GUIDE.doneShow ? '차로 유지' : ''};
+  // 기록 (주행 테스트): 판단 상태가 바뀐 시점 · 위험 발생/해소
+  if(S.drive && D.events){
+    if(GS.gate.state !== prev) D.events.push({t:+t.toFixed(2), type:'gate', from:prev, to:GS.gate.state, rel:r ? r.rel : '', side:dir ? dir.side : 0, shown:S.mode === 'ar2'});
+    const haz = need && !A.safe;
+    if(haz !== !!GS.hazard){ GS.hazard = haz || null; D.events.push({t:+t.toFixed(2), type:haz ? 'hazardOn' : 'hazardOff', lane:next, with:A.primary ? KIND_NAME[A.primary.c.kind] : ''}); }
+  }
+  return S.G;
 }
 
 /* ---------- 매 프레임 ---------- */
@@ -244,7 +322,10 @@ function update(dt){
   const kmh = S.running && !S.paused ? Math.max(0, Math.round(cruiseOf(S.map)*(S.speedFactor ?? 1)*3.6 + Math.sin(performance.now()/900))) : 0;
   const remainKm = Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1);
 
+  setEgo(p.x, p.z, Math.atan2(f.x, -f.z), S.running && !S.paused ? cruiseOf(S.map)*(S.speedFactor ?? 1) : 0);
+  guideStep(S.cityT, C);
   if(S.mode === 'ar') drawAr(p, f, C, k, dangerOn);
+  else if(S.mode === 'ar2') drawAr2(p, f, C, k);
   else drawNav(p, f, C, kmh, remainKm, dangerOn);
   updateCabin(steer, kmh);
   cityFrame(S.cityT);
@@ -264,8 +345,13 @@ function startDrive(cfg){
 }
 function driveRoute(lane){ S.route = makeRoute(S.map, S.target, lane); path = buildPath(S.route, 0); pathHint = -1; }
 function stopDrive(){ S.drive = false; S.running = false; driveClear(); S.rearActive = false; }
+// 주행은 고정 간격(1/60초)으로 나눠 계산 — 화면 프레임률(미러를 그리느라 느려져도)과 상관없이 조향 · 충돌 · 위험 판정이 같다
+const DRIVE_STEP = 1/60; let driveAcc = 0;
 function updateDrive(dt){
-  if(S.running && !S.paused && !D.frozen) driveStep(dt);
+  if(S.running && !S.paused && !D.frozen){
+    driveAcc = Math.min(driveAcc + dt, .1);
+    while(driveAcc >= DRIVE_STEP - 1e-9 && S.running){ driveStep(DRIVE_STEP); driveAcc -= DRIVE_STEP; }
+  } else driveAcc = 0;
   const f = {x:Math.sin(D.psi), z:-Math.cos(D.psi)}, p = {x:D.x, z:D.z};
   // 운전자 눈: 차 중심에서 왼쪽 DRIVER_X (좌핸들), 차가 보는 방향 그대로
   const lx = f.z*DRIVER_X, lz = -f.x*DRIVER_X;
@@ -273,7 +359,10 @@ function updateDrive(dt){
   const r = project(path.P, p.x, p.z, pathHint); pathHint = r.i; S.s = r.s; S.cityT = D.t;
   const C = navCtx(S.s), k = Math.min(1, dt*4), kmh = Math.round(D.v*3.6);
   showStage(C.st);
+  setEgo(D.x, D.z, D.psi, D.v);
+  guideStep(D.t, C);
   if(S.mode === 'ar') drawAr(p, f, C, k, S.rearBlock);
+  else if(S.mode === 'ar2') drawAr2(p, f, C, k);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1), S.rearBlock);
   updateCabin(clamp(D.wheel*STEER_RATIO*STEER_GAIN*180/Math.PI, -360, 360), kmh);
   cityFrame(D.t);
@@ -290,8 +379,9 @@ function frame(now){
 
 /* ---------- 시연 흐름 ---------- */
 function start(){
-  $('#intro').hidden = true; $('#drawer').classList.remove('open');
-  // 시연: 사용자가 왼쪽에서 고른 맵·목적지·정체 그대로
+  $('#intro').hidden = true; $('#sess').hidden = true; $('#drawer').classList.remove('open');
+  setScreen('demo');
+  // 시연: 연구자 설정에서 고른 맵 · 목적지 · 상황 그대로
   prepDemo();
   // 옮겨야 하는 목적지 + 정체 없음이면 뒤차가 뒤에서 다가와 옆으로 지나가는 상황
   S.rearActive = (S.route.side !== 0 && S.demoJam === 0 && !S.map.city);   // 일반도로는 맵에 딸린 상황(줄 · 버스 · 보행자)
@@ -302,36 +392,36 @@ function start(){
 }
 function finish(){
   S.running = false;
-  // 시연 끝: '도착 · 완료' 같은 글자 없이 맵 이름 + 다시 보기만 (끝난 건 HUD 경로가 짧아지며 초록으로 사라지는 것으로 보여 줌, D49)
-  setCard({title:mapLabel(S.map.id), demo:['replay','다시']});
-  $('#intro').hidden = false;
+  sesCard({eyebrow:'시연 끝', title:mapLabel(S.map.id), btn:['다시 보기', start], btn2:['처음으로', goHome]});
 }
 
 /* ---------- 이벤트 (주행 테스트 · 기록 서랍 · 방향키는 session.js) ---------- */
-$('#demoBtn').onclick = $('#demoSide').onclick = () => start();
-$$('#modeSeg button').forEach(b => b.onclick = () => { setMode(b.dataset.mode); update(1); });
-$$('#lightSeg button').forEach(b => b.onclick = () => { setLight(b.dataset.light); update(1); });
+$('#demoBtn').onclick = () => { openSetup(true); start(); };
+$('#demoSide').onclick = () => start();
+$('#homeBtn').onclick = goHome;
+$('#setupBtn').onclick = () => openSetup($('#setup').hidden);
+$$('#modeSeg button').forEach(b => b.onclick = () => { setMode(b.dataset.mode); update(1); renderStatus(); });
+$$('#lightSeg button').forEach(b => b.onclick = () => { setLight(b.dataset.light); update(1); renderStatus(); });
 $$('#mapSeg button').forEach(b => b.onclick = () => {
   if(!stopDemo()) return;
-  S.demoMap = b.dataset.m; S.demoTarget = defaultLeaf(mapById(S.demoMap)); prepDemo();
-  setCard({title:mapLabel(S.demoMap)});
-  update(1);
+  S.demoMap = b.dataset.m; S.demoTarget = defaultLeaf(mapById(S.demoMap)); prepDemo(); update(1); renderStatus();
 });
 $$('#jamSeg button').forEach(b => b.onclick = () => { if(stopDemo()){ S.demoJam = +b.dataset.j; prepDemo(); update(1); } });
+$('#mirrorChk').onchange = e => { MIR.on = e.target.checked; };
+$('#mirrorChk').checked = MIR.on;
 function togglePause(){
-  if(!S.running) return;
+  if(!S.running || S.testing) return;
   S.paused = !S.paused; $('#pauseBtn').textContent = S.paused ? '계속' : '일시정지';
 }
 $('#pauseBtn').onclick = togglePause;
 addEventListener('keydown', e => {
   if(e.target.tagName === 'INPUT' || S.testing) return;   // 주행 테스트 중 키는 session.js
-  if(e.code === 'Space'){ e.preventDefault(); togglePause(); }
+  if(e.code === 'Space' && $('#app').dataset.screen === 'demo'){ e.preventDefault(); togglePause(); }
 });
 
 /* ---------- 시작 ---------- */
 $$('[data-ico]').forEach(el => el.insertAdjacentHTML('afterbegin', ico(el.dataset.ico)));   // 버튼 아이콘 채우기
 $('#hudWrap').style.bottom = (cowlBottomPct() + .2).toFixed(1) + '%';   // HUD 아래끝 = 대시보드 윗선 바로 위
-setMode('ar'); setLight('day'); prepDemo(); update(1);
-setCard({title:mapLabel(S.demoMap)});
+setMode('ar2'); setLight('day'); prepDemo(); update(1); setScreen('home');
 requestAnimationFrame(frame);
 prebuildMaps(() => !S.running);   // 멈춰 있을 때 나머지 맵을 미리 지어 둔다
