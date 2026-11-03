@@ -1,6 +1,6 @@
 /* ============================================================
    config.js — 공용 헬퍼 · 상수 · 경로 곡선
-   (가장 먼저 로드. 이후 maps.js → scene.js → hud.js → main.js 순서)
+   (가장 먼저 로드. 이후 guide.js → maps.js → scene.js … → main.js 순서 — index.html · README.md)
    ============================================================ */
 
 const $ = s => document.querySelector(s);

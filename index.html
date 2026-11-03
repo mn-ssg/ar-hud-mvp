@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="hud.css">
+<link rel="stylesheet" href="styles/styles.css">
+<link rel="stylesheet" href="styles/hud.css">
 </head>
 <body>
 <div class="app" id="app" data-screen="home">
@@ -321,20 +321,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <!-- 엑셀 내보내기: SheetJS 0.18.5 (Apache-2.0). 못 불러오면 session.js가 CSV로 대신 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- 순서 중요: 상수 → 맵 → 3D장면 → 실내 → HUD(개선 전 hud.js · 개선 후 hud2.js) → 주행 → 일반도로(교차로 · 신호 · 보행자) → 로직 → 주행 테스트 진행 -->
-<script src="config.js"></script>
-<script src="guide.js"></script>
-<script src="maps.js"></script>
-<script src="scene.js"></script>
-<script src="cabin.js"></script>
-<script src="mirrors.js"></script>
-<script src="props.js"></script>
-<script src="hud.js"></script>
-<script src="hud2.js"></script>
-<script src="drive.js"></script>
-<script src="city.js"></script>
-<script src="main.js"></script>
-<script src="session.js"></script>
-<script src="explain.js"></script>
+<!-- 순서 중요(모듈 없이 전역 스크립트, 앞 파일이 정의한 이름을 뒤 파일이 씀): src/core 상수 · 판단 · 맵 → src/scene 3D 장면 · 실내 · 미러 · 소품 → src/hud HUD(개선 전 hud.js · 개선 후 hud2.js) → src/drive 주행 → src/scene/city 일반도로 → src/app 루프 · 주행 테스트 진행 → src/hud/explain 발표용. 폴더 구조는 README.md -->
+<script src="src/core/config.js"></script>
+<script src="src/core/guide.js"></script>
+<script src="src/core/maps.js"></script>
+<script src="src/scene/scene.js"></script>
+<script src="src/scene/cabin.js"></script>
+<script src="src/scene/mirrors.js"></script>
+<script src="src/scene/props.js"></script>
+<script src="src/hud/hud.js"></script>
+<script src="src/hud/hud2.js"></script>
+<script src="src/drive/drive.js"></script>
+<script src="src/scene/city.js"></script>
+<script src="src/app/main.js"></script>
+<script src="src/app/session.js"></script>
+<script src="src/hud/explain.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // guide.js 판단 로직 단위 테스트 — 실행: node --test tests/
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const G = require('../guide.js');
+const G = require('../src/core/guide.js');
 
 const LANE = 3.5, HL = 2.3;
 const ego = (o = {}) => ({x:0, z:0, psi:0, v:18, halfL:HL, ...o});
