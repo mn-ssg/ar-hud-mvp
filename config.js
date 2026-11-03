@@ -98,4 +98,9 @@ const qFrontOf = m => m && m.city ? FORK_Z + 3 : Q_FRONT;             // 정체 
 const jamBackOf = (m, jam) => m && m.city ? (m.queue ? m.queue.back : null) : (JAM_LV[jam] ? JAM_LV[jam].back : null);
 const CITY_DRV = {timeout:90, endAfter:30};                          // 일반도로: 한 판 최대(초) · 꺾은 뒤 끝나는 거리(m) (AI 꺾는 속도는 drive.js curveV)
 const V = (x,z) => new THREE.Vector3(x,0,z);
-const curveOf = (pts,div) => { const c = new THREE.CatmullRomCurve3(pts,false,'centripetal'); c.arcLengthDivisions = div; return c; };
+// 호 길이 표(arcLengthDivisions): getPointAt(u)가 같은 거리마다 같은 u를 주려면 점 하나 사이마다 표본이 넉넉해야 한다.
+// 2026-11-03: 경로 점을 2m 간격으로 늘린 뒤(10-29) 점이 180개 안팎이 되자 1000칸 표로는 점 사이 5칸뿐 → 시연 내 차가 같은 S.s 증가에 8 ~ 24 m/s로 흔들렸음(뒤차도 같이 덜컹). 점마다 최소 24칸
+// 겹치는 점(앞 점과 1cm 안)은 뺀다 — 길이 0인 구간에 표본이 여럿 들어가면 u → t 변환이 0으로 나누어(NaN) 곡선 점이 깨진다
+// u가 1을 아주 조금 넘으면(부동소수점, 예 1.0000000000000002) three.js가 표 밖을 읽어 NaN 점을 돌려준다 → 0 ~ 1로 잘라 넣는다
+const curveOf = (pts,div) => { const P = pts.filter((q, i) => i === 0 || q.distanceTo(pts[i-1]) > .01); const c = new THREE.CatmullRomCurve3(P,false,'centripetal'); c.arcLengthDivisions = Math.max(div, P.length*24);
+  c.getUtoTmapping = function(u, d){ return THREE.CatmullRomCurve3.prototype.getUtoTmapping.call(this, clamp(u, 0, 1), d); }; return c; };

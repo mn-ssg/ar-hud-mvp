@@ -158,29 +158,54 @@ function goHome(){
 /* ---------- 정체 대기열 ----------
    줄이 분기점 쪽으로 천천히 빠진다(qShift). 카메라는 update()의 하드 클램프로
    '맨 뒤차 뒤'에 고정돼 줄을 따라 서행할 뿐 절대 통과하지 않는다. */
-let qShift = 0; // 대기열 누적 전진량(주행마다 0)
-function tailZ(){ const b = S.jam > 0 ? jamBackOf(S.map, S.jam) : null; return b !== null ? b - qShift : null; } // 현재 맨 뒤차 z
+let qShift = 0, qV = 0; // 대기열 누적 전진량 · 줄 속도(주행마다 0)
+function tailZ(){ const b = S.jam > 0 ? jamBackOf(S.map, S.jam) : null; return b !== null ? b - qShift : null; } // 현재 맨 뒤차 z (직선 기준 — 내 차 따라가기는 아래 demoLeader가 실제 위치로)
+// 갈림을 지난 줄 차의 자리: 출구 가운데 곡선 위 거리 d(모든 차로 같음)의 점에서 차로만큼 옆으로 — 안쪽 · 바깥쪽 차로 차가 같은 각도에 나란히(동심원).
+// 차로마다 제 길의 거리로 놓으면(예전) 안쪽 차로가 짧아 모퉁이에서 엇갈려 옆 차와 닿았다(2026-11-03 측정 4 ~ 7cm). 출구 구간을 지나면 그 차로의 길(골목 · 램프 뒤)을 이어 간다
+// 차로 정보: 출구 e · 가운데 곡선에서의 옆 거리 off · 그 차로 길의 출구 구간 길이 Ll(lanePath와 같은 2m 표본 꺾은선 길이 — 같은 값이어야 구간 끝에서 튀지 않음)
+function laneInfo(m, lane){
+  m._li = m._li || {};
+  if(!m._li[lane]){ const e = m.exits.find(x => x.lanes.includes(lane)), off = -e.k*LANE/2 + (e.lanes.indexOf(lane) + .5)*LANE, pts = sampleCurve(e.curve, off); let L = 0;
+    for(let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]); m._li[lane] = {e, off, Ll:L}; }
+  return m._li[lane];
+}
+// 줄의 거리 d(갈림부터, 가운데 곡선 기준 · 모든 차로 같음) ↔ 그 차로 길의 실제 진행도 sp. 꺾는 구간에서 안쪽 차로는 짧게, 바깥쪽은 길게 간다(동심원)
+const laneProg = (I, d) => d <= 0 ? d : d < I.e.L ? d*(I.Ll/I.e.L) : I.Ll + (d - I.e.L);
+const laneProgInv = (I, sp) => sp <= 0 ? sp : sp < I.Ll ? sp*(I.e.L/I.Ll) : I.e.L + (sp - I.Ll);
+// 자리: 출구 구간 안이면 가운데 곡선 위 거리 d의 점에서 옆으로 off(동심원), 그 밖은 그 차로의 길(골목 · 램프 뒤)
+function laneTurnPos(m, lane, s){
+  const I = laneInfo(m, lane), s0 = LANE_START - FORK_Z, d = s - s0;
+  if(d <= 0 || d >= I.e.L) return pathAt(lanePath(m, lane, 0), d <= 0 ? s : s0 + I.Ll + (d - I.e.L));
+  const q = I.e.curve.getPointAt(d/I.e.L), t = I.e.curve.getTangentAt(d/I.e.L), l = Math.hypot(t.x, t.z) || 1;
+  return [q.x - t.z/l*I.off, q.z + t.x/l*I.off, t.x/l, t.z/l];
+}
 function updateQueue(p, dt){
   const m = S.map, back0 = S.jam > 0 ? jamBackOf(m, S.jam) : null, QF = qFrontOf(m);
   if(back0 === null || !S.running){ queueCars.forEach(c => c.visible = false); return {backZ:null, mergeNear:false}; }
-  // 정체 서서히 해소. 일반도로 좌회전 줄은 화살표가 켜져야 움직이고, 정지선을 지난 차는 좌회전 길을 따라 꺾어 나감
-  if(!S.paused && (!m.city || sigOf('L', S.cityT) === 'green')) qShift += 6*dt;
+  // 정체 서서히 해소(6 m/s). 일반도로 좌회전 줄은 화살표가 켜져야 움직이고 — 서 있다가 0 → 6 m/s로 한 번에 뛰지 않게 2 m/s²로 올림(2026-11-03). 고속도로 줄은 처음부터 6 m/s(1차 장면 그대로)
+  if(!S.paused){ const go = !m.city || sigOf('L', S.cityT) === 'green'; qV = m.city ? (go ? Math.min(6, qV + 2*dt) : 0) : 6; qShift += qV*dt; }
   const tx = S.route.tx, t = performance.now()/1000, back = back0 - qShift;
   const lanes = m.city ? m.queue.lanes : [laneOf(m, tx)], per = Math.floor(queueCars.length/lanes.length);   // 일반도로: 좌회전 차로들
   const n = Math.min(per, Math.max(1, Math.round((back0 - QF)/Q_SPACE)));
-  const zs = [];
-  for(let idx=0;idx<queueCars.length;idx++){
+  const zs = [], s0 = LANE_START - FORK_Z, spOf = {};
+  // 앞차부터(k 큰 차부터) 놓으며 앞차와 범퍼 간격 1m를 남긴다 — 물결(±2.6m)과 꺾는 구간의 안쪽 차로 몰림으로 간격이 0.3m → 0m까지 좁아졌음(2026-11-03). 간격 · 물결 값(1차 시연과 같음)은 그대로
+  for(let idx = queueCars.length - 1; idx >= 0; idx--){
     const c = queueCars[idx], k = Math.floor(idx/lanes.length), lane = lanes[idx % lanes.length], x = m.laneX(lane);
     if(k >= n){ c.visible = false; continue; }
-    const z = back - k*Q_SPACE + (m.city ? 0 : Q_WAVE*Math.sin(t*1.4 + k*0.7)); // 늘어선 줄 + 서행 물결
+    const zWave = back - k*Q_SPACE + (m.city ? 0 : Q_WAVE*Math.sin(t*1.4 + k*0.7)); // 늘어선 줄 + 서행 물결
+    const I = laneInfo(m, lane), front = idx + lanes.length;   // 같은 차로 바로 앞 차(k+1)
+    let sp = laneProg(I, FORK_Z - zWave);   // 그 차로 길의 실제 진행도(갈림 = 0)
+    if(spOf[front] !== undefined) sp = Math.min(sp, spOf[front] - (c.userData.L + queueCars[front].userData.L)/2 - 1);
+    spOf[idx] = sp;
+    const d = laneProgInv(I, sp), z = FORK_Z - d;
     if(z < QF - 4){
-      if(!m.city || LANE_START - z > LANE_START - FORK_Z + 150){ c.visible = false; continue; } // 분기점 지난 차는 빠져나감 (일반도로: 꺾은 뒤 멀리 가서 사라짐)
-      const [px, pz, ptx, ptz] = pathAt(lanePath(m, lane, idx % 2), LANE_START - z);       // 일반도로: 꺾어 나감
+      // 갈림(정지선)을 지난 차는 그 차로의 길(출구 · 회전)을 따라 150m 더 가서 사라진다 — 2026-11-03까지 고속도로는 갈림을 지나는 순간 사라져 내 차 25m 앞에서 줄이 통째로 없어졌음
+      if(d > 150 && Math.hypot(c.position.x - p.x, c.position.z - p.z) > 60){ c.visible = false; continue; }   // 내 차가 60m 안에서 보고 있으면 아직 지우지 않음
+      const [px, pz, ptx, ptz] = laneTurnPos(m, lane, s0 + d);
       c.visible = true; c.position.set(px, 0, pz); c.rotation.y = Math.atan2(-ptx, -ptz); continue;
     }
     if(Math.abs(x - tx) < .1) zs.push(z);
-    if(Math.abs(x - p.x) < 1.4 && Math.abs(z - p.z) < 7){ c.visible = false; continue; } // 안전망: 카메라 클리핑 방지
-    c.visible = true; c.position.set(x, 0, z); c.rotation.y = 0;
+    c.visible = true; c.position.set(x, 0, z); c.rotation.y = 0;   // (2026-11-03) 내 차 7m 안 차를 숨기던 '안전망' 삭제 — 줄 뒤에 붙으면 맨 뒤차가 깜빡 사라졌음. 겹침은 demoLeader가 막는다
   }
   const backZ = zs.length ? Math.max(...zs) : null;
   let mergeNear = false;
@@ -193,7 +218,7 @@ function updateQueue(p, dt){
    시연용. 주행 테스트는 참가자가 돌린 앞바퀴 각을 그대로(updateDrive). 3D 핸들은 cabin.js */
 let steer = 0;
 function updateWheel(p, f, dt){
-  const q = path.curve.getPointAt(clamp((S.s + STEER_LOOK)/path.L));
+  const qq = pathAt(path.P, S.s + STEER_LOOK), q = {x:qq[0], z:qq[1]};
   const dx = q.x - p.x, dz = q.z - p.z, sinA = (f.x*dz - f.z*dx)/(Math.hypot(dx,dz)||1); // + = 오른쪽
   const deg = Math.atan(2*WHEELBASE*sinA/STEER_LOOK)*STEER_RATIO*STEER_GAIN*180/Math.PI;
   steer += (deg - steer)*Math.min(1, dt*4);
@@ -255,18 +280,24 @@ function guideStep(t, C){
 /* ---------- 매 프레임 ---------- */
 let lastStage = 0;
 const showStage = st => { if(st !== lastStage){ lastStage = st; $$('#stages li').forEach(li => li.classList.toggle('on', +li.dataset.s === st)); } };
+// 시연 내 차가 따라갈 앞차: 보이는 차(정체 줄 · 옆 차로 뒤차 · 버스) 중 내 경로 위(옆 1.6m 안) · 앞 60m 안에서 가장 가까운 것 → 경로 위 거리 s (중심)
+// 2026-11-03: 예전엔 직선 z로 줄 맨 뒤를 재서(tailZ) 줄이 정지선을 지나면 풀렸고, 일반도로 ④에선 꺾어 나가는 줄을 내 차가 13.9 m/s로 따라잡아 뚫고 지나갔음(E35로 줄 차가 150m 더 가게 되자 드러남)
+function demoLeader(){
+  let best = null;
+  const see = (mesh, L) => { if(!mesh.visible) return; const r = project(path.P, mesh.position.x, mesh.position.z, -1);
+    if(Math.abs(r.d) < 1.6 && r.s > S.s - 2 && r.s - S.s < 60 && (!best || r.s < best.s)) best = {s:r.s, L}; };
+  queueCars.forEach(c => see(c, c.userData.L)); see(otherCar, otherCar.userData.L); see(busMesh, 11.4);
+  return best;
+}
 function update(dt){
   if(S.drive) return updateDrive(dt);
-  // 정체(시연): 맨 뒤차(빠지면서 앞으로 이동)보다 앞으로 못 가게 하드 클램프.
-  // 줄을 따라 서행하다 정체가 풀리면 다시 주행.
-  const tz = tailZ();
-  const jamActive = S.jam > 0 && S.running && tz !== null && tz > qFrontOf(S.map) && (!S.map.city || S.map.queue.lanes.includes(S.route.tl));   // 일반도로: 줄 차로로 갈 때만
-  const guardZ = tz + 9; // 맨 뒤차보다 9m 뒤
-  if(jamActive){
-    let z = path.curve.getPointAt(clamp(S.s/path.L)).z, g = 0;
-    while(z < guardZ && S.s > 0 && g++ < 80){ S.s -= 1; z = path.curve.getPointAt(clamp(S.s/path.L)).z; }
-    if(!S.map.city && z <= guardZ + 2.5){ S.jamHoldT += dt; if(S.jamHoldT > 5){ finish(); } } // 5초 서행 뒤 마무리 (일반도로는 신호 따라 끝까지)
-  }
+  // 시연: 경로 위 앞차 뒤 9m(중심 거리)에서 멈추고 30m부터 서서히 줄인다 — 직선 · 꺾는 길 모두 같은 규칙. 정체 줄이면 5초 따라간 뒤 마무리(일반도로는 끝까지)
+  const lead = S.running ? demoLeader() : null;
+  const jamActive = !!lead;
+  const limS = lead ? lead.s - 9 : Infinity;
+  if(lead && S.s > limS) S.s = limS;
+  // 줄 뒤에 자리 잡은 지 5초면 마무리(설계 2장: 그 뒤는 줄을 따라 기어갈 뿐). 자리 잡음 = 앞차 뒤 13m 안 — 감속 곡선(30m)과 줄 속도(6 m/s)의 균형점이 10m라 그 안쪽은 못 들어감
+  if(lead && S.jam > 0 && !S.map.city && limS - S.s <= 13){ S.jamHoldT += dt; if(S.jamHoldT > 5){ finish(); } }
   // 일반도로 시연: 빨간불이면 정지선 앞, 보행자가 건너면 횡단보도 앞에 선다 (이미 지났으면 무시)
   S.cityLim = Infinity;
   if(S.map.city && S.running){
@@ -276,9 +307,10 @@ function update(dt){
     S.s = Math.min(S.s, S.cityLim);
   }
 
-  const u = clamp(S.s/path.L);
-  const p = path.curve.getPointAt(u), f = path.curve.getTangentAt(u);
-  const ahead = path.curve.getPointAt(clamp((S.s+22)/path.L));
+  // 위치는 1m 간격 점 목록(path.P)으로 — 곡선 getPointAt은 점 간격이 고르지 않아(2m 경로 점 + 40 ~ 100m 점이 섞임) 같은 거리를 가도 8 ~ 24 m/s로 흔들렸음(2026-11-03)
+  const u = clamp(S.s/path.L), pa = pathAt(path.P, S.s), aa = pathAt(path.P, S.s + 22);
+  const p = {x:pa[0], z:pa[1]}, f = {x:pa[2], z:pa[3]};
+  const ahead = {x:aa[0], z:aa[1]};
   // 운전자 눈: 차 중심(p)에서 왼쪽으로 DRIVER_X (좌핸들). 보는 방향은 차 진행 방향과 나란히
   const lx = f.z*DRIVER_X, lz = -f.x*DRIVER_X;
   // 일반도로는 차가 향한 방향을 봄 — 22m 앞 경로 점을 보면 90도로 꺾을 때 차보다 먼저 고개가 돌아가 어색했음 (고속도로는 완만해서 그대로)
@@ -290,15 +322,18 @@ function update(dt){
 
   // 정체 대기열 + 줄 뒤에 다가갈수록 부드럽게 감속(시연)
   S.q = updateQueue(p, dt);
+  const sfPrev = S.speedFactor ?? 1;
   S.speedFactor = 1;
   if(jamActive){
-    const df = p.z - guardZ;
-    if(df < 30) S.speedFactor = clamp(df/30, 0, 1); // 줄 뒤 30m부터 서서히 감속
+    const df = limS - S.s;
+    if(df < 30) S.speedFactor = clamp(df/30, 0, 1); // 앞차 뒤 30m부터 서서히 감속
   }
   if(S.map.city){
     if(Math.abs(S.s - (path.nodeS[0] + 8)) < 28) S.speedFactor = Math.min(S.speedFactor, .45);   // 꺾을 땐 천천히
     if(S.cityLim < Infinity) S.speedFactor = Math.min(S.speedFactor, clamp((S.cityLim - S.s)/25, 0, 1));
   }
+  // 속도 배율은 한 번에 뛰지 않게(초당 최대 0.7) — 일반도로 꺾는 구간 0.45배가 한 프레임에 걸려 13.9 → 6.3 m/s로 덜컹였음(2026-11-03)
+  if(dt > 0 && dt < .5) S.speedFactor = clamp(S.speedFactor, sfPrev - .7*dt, sfPrev + .7*dt);   // 초당 0.7 = 65km/h에서 12.6 m/s² 한도. 멈출 곳 · 앞차 앞 감속 곡선(초당 0.6 안팎)은 그대로 지나감
 
   // 뒤차 이벤트(시연): 뒤에서 다가와 옆 차로로 실제 지나감 — 가운데 도로 HUD로만 표시(옆 레이더 없음). 관통 없음.
   let dangerOn = false;
@@ -309,7 +344,9 @@ function update(dt){
     S.danger += ((dangerOn?1:0) - S.danger) * Math.min(1, dt*6);
     // 옮길 차로(rtx)에 3D 차 배치 — 뒤에서 와서 앞으로 지나감. 내 차는 아직 옆 차로라 관통 없음.
     otherCar.visible = R.side !== 0 && S.rearGap < 60 && S.rearGap > -95;
-    if(otherCar.visible){ otherCar.position.set(rtx, 0, p.z + S.rearGap); otherCar.rotation.y = 0; }
+    if(otherCar.visible){ const oz = p.z + S.rearGap;
+      if(oz < FORK_Z){ const [ox, ozz, otx, otz] = laneTurnPos(S.map, laneOf(S.map, rtx), LANE_START - oz); otherCar.position.set(ox, 0, ozz); otherCar.rotation.y = Math.atan2(-otx, -otz); }   // 갈림을 지나면 출구를 따라 (예전엔 곧장 가 갓길 · 코 위를 달렸음, 2026-11-03)
+      else { otherCar.position.set(rtx, 0, oz); otherCar.rotation.y = 0; } }
     if(S.rearGap < -95) S.rearActive = false;
     S.car = { pos:{ x:rtx, z: p.z + S.rearGap } };
   } else {
@@ -388,7 +425,7 @@ function start(){
   // 옮겨야 하는 목적지 + 정체 없음이면 뒤차가 뒤에서 다가와 옆으로 지나가는 상황
   S.rearActive = (S.route.side !== 0 && S.demoJam === 0 && !S.map.city);   // 일반도로는 맵에 딸린 상황(줄 · 버스 · 보행자)
   if(S.rearActive) S.rearGap = 45;
-  qShift = 0;
+  qShift = 0; qV = 0;
   S.running = true; S.paused = false; $('#pauseBtn').textContent = '일시정지';
   update(1);
 }
