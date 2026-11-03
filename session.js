@@ -1,7 +1,8 @@
 /* ============================================================
    session.js — 주행 테스트 진행 · 기록 · 내보내기 (2026-10-29 개편, 예전 D60 · D64 · D65 · D68 · D70 위에)
-   흐름: 참가자 정보 → (연습 주행) → HUD A 3판 → 질문 2개 → HUD B 3판 → 질문 2개 → 요약 + 엑셀 자동 저장
-   · 비교: 현대 HUD · 우리 HUD, 순서는 늘 현대 HUD 먼저 (2026-10-29 — 교대 · 고르기 없음, 1차 실험과 같음)
+   흐름: 참가자 정보 → (연습 주행) → HUD A 3회 → 질문 2개 → HUD B 3회 → 질문 2개 → 요약 + 엑셀 자동 저장
+   · 비교 (2026-11-03, 2차 실험): 우리 HUD 개선 전(ar, 1차 실험 v1.9) · 개선 후(ar2, 2.1). 순서는 참가자 번호 홀수 = 개선 전 먼저 · 짝수 = 개선 후 먼저.
+     현대 HUD(nav)는 시연에만 — 1차 기록(현대 · 우리)과 칸이 같아 같은 엑셀에 섞여도 'HUD' · 'HUD 버전' 칸으로 구분됨
    · 시나리오(맵 · 상황 · 시간대 · 교통 번호 · 시작 차로 · 목적지 · 신호 시각)는 짝마다 한 번 정해 두 HUD 블록이 그대로 다시 씀
      → HUD만 다르고 교통은 같다 (예전엔 블록마다 교통 번호 · 목적지를 새로 뽑았음)
    · 연습 주행은 HUD 없이, 본 기록(hud-drive-v1)과 따로(hud-drive-practice-v1) 저장 → 결과에 섞이지 않음
@@ -14,32 +15,35 @@ const loadArr = k => { try{ const v = JSON.parse(localStorage.getItem(k) || '[]'
 const saveArr = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
 let drives = loadArr(DKEY), surveys = loadArr(QKEY), practices = loadArr(PKEY);
 const shuffle = (a, R = Math.random) => { for(let i=a.length-1;i>0;i--){ const j = Math.floor(R()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-// HUD 이름. 어느 때의 우리 HUD였는지는 기록의 'HUD 버전'(내부 값, 예전 기록은 빈칸 = 1차 실험 때 HUD)으로 구분.
-// 'ar2'는 10.29 중간 시험판 기록(있다면)을 읽기 위한 것 — 지금은 만들지 않음
-const hudKey = h => h === 'ar2' ? 'ar' : h;
-const modeName = m => ({ar:'우리 HUD', nav:'현대 HUD', off:'HUD 없음'})[hudKey(m)] || m;
-const modeShort = m => ({ar:'우리', nav:'현대'})[hudKey(m)] || m;
+// HUD 이름. 'ar' = 1차 실험 때 우리 HUD(개선 전) — 1차 기록의 '우리 HUD'와 같은 HUD. 'ar2' = 개선 후(2026-11-03). 'HUD 버전' 칸이 비어 있으면 1차 실험 기록
+const hudKey = h => h;
+const modeName = m => ({ar:'우리 HUD (개선 전)', ar2:'우리 HUD (개선 후)', nav:'현대 HUD', off:'HUD 없음'})[m] || m;
+const modeShort = m => ({ar:'개선 전', ar2:'개선 후', nav:'현대'})[m] || m;
+const hudVerOf = m => m === 'ar2' ? HUD_VER.ar2 + '-' + (S.tone || 'A') : HUD_VER[m] || '';   // 개선 후는 마감(A 절제 · B 선명)까지
+const orderText = (o, pair = EXP.pair) => o === 'AB' ? `${modeShort(pair[0])} → ${modeShort(pair[1])}` : o === 'BA' ? `${modeShort(pair[1])} → ${modeShort(pair[0])}` : o || '';
 const RESULT = {ok:'성공', wrong:'다른 출구', crash:'충돌', timeout:'시간 초과', signal:'신호 위반'};   // 신호 위반: 일반도로(D69)
 const CITY_SITU = {CL2:'좌회전 대기 줄 · 신호', CRT:'정류장 버스 · 보행자'};
 const situName = r => (r.type === 'practice' ? '연습' : r.type === 'city' ? CITY_SITU[r.map] || '일반도로' : r.type === 'jam' ? ({1:'정체 보통(예전)', 2:'정체 심함(예전)'}[r.jam] || '정체') : `뒤차 ${r.rearN}대`) + (r.brake ? ' · 앞차 급정거' : '');
 const kindOf = r => r.type === 'city' ? '일반도로' : r.type === 'jam' ? '고속도로 정체' : r.type === 'practice' ? '연습' : '고속도로 뒤차';
 const lightName = l => l === 'night' ? '야간' : '주간';
 const resultName = r => r.result === 'crash' && r.crash ? `충돌 (${r.crash.split(' · ')[0]})` : RESULT[r.result];
-// 차로 옮긴 곳 = 목표 차로에 자리 잡은 곳이 '마감선' 몇 m 앞인가 (기준 그대로)
-const marginOf = r => { if(r.change === null || r.change === undefined) return null; const m = mapById(r.map) || MAPS_OFF.find(o => o.id === r.map); return Math.round(r.change - (FORK_Z - changeEndOf(m))); };
+// 차로 옮긴 곳 = 목표 차로에 자리 잡은 곳이 '마감선' 몇 m 앞인가 (기준 그대로). change = 갈림 앞 m, 마감선 = 갈림 25m 앞(고속도로) · 35m 앞(일반도로) → 마감선 앞 = change − 25 (· 35)
+// 2026-11-03 고침: 1차 실험 때 코드(470a8f7)는 change − (FORK_Z − changeEnd) = change + 25로 부호가 뒤집혀 있었음 → 1차 엑셀의 이 칸은 고속도로 +50m · 일반도로 +70m 치우침
+// (저장된 change 값은 맞음 — 브라우저 기록을 다시 내보내면 바른 값). 1차 문서 수치는 그대로 두고 04_실험로그 EXP-01에 적어 둠
+const marginOf = r => { if(r.change === null || r.change === undefined) return null; const m = mapById(r.map) || MAPS_OFF.find(o => o.id === r.map); return Math.round(r.change - (changeEndOf(m) - FORK_Z)); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const envName = () => `환경 ${ENV_VER} · 미러 ${MIR.on ? '켬' : '끔'}`;
 
 /* ---------- 실험 설정 (연구자 설정 패널) ---------- */
-const EXP = Object.assign({practice:true}, (() => { try{ const o = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); return {practice:o.practice !== false}; }catch(e){ return {}; } })(), {pair:['nav', 'ar'], order:'AB'});   // 늘 현대 → 우리
+const EXP = Object.assign({practice:true}, (() => { try{ const o = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); return {practice:o.practice !== false}; }catch(e){ return {}; } })(), {pair:['ar', 'ar2']});   // A = 개선 전 · B = 개선 후
 const saveExp = () => { try{ localStorage.setItem(CFG_KEY, JSON.stringify(EXP)); }catch(e){} renderExp(); };
 function renderExp(){
   $('#practiceChk').checked = EXP.practice;
 }
 $('#practiceChk').onchange = e => { EXP.practice = e.target.checked; saveExp(); };
-// 제시 순서: 늘 현대 HUD → 우리 HUD ('AB')
-const orderFor = () => 'AB';
+// 제시 순서: 참가자 번호 홀수 = 개선 전 먼저('AB') · 짝수 = 개선 후 먼저('BA'). 번호가 없으면 'AB' (2026-11-03, 10주차 발표 '실험 조건 보완')
+const orderFor = pid => { const n = (String(pid || '').match(/(\d+)\s*$/) || [])[1]; return n !== undefined && +n % 2 === 0 ? 'BA' : 'AB'; };
 
 /* ---------- 진행 순서 ---------- */
 const SES = {on:false, pid:'', steps:[], i:-1, rows:[], qs:[], prs:[], order:'AB', cur:null, timer:0, seq:0};
@@ -100,7 +104,7 @@ function openSession(){
     <p class="ses-meta" id="sesMeta"></p>`,
     btn:['시작', beginSession], btn2:['뒤로', goHome]});
   const meta = () => { const o = orderFor($('#sesPid').value || 'P1'), [x, y] = o === 'AB' ? EXP.pair : EXP.pair.slice().reverse();
-    $('#sesMeta').innerHTML = `연구자 확인 · 순서 <b>${modeShort(x)} → ${modeShort(y)}</b> · 연습 주행 ${EXP.practice ? '있음' : '없음'} · ${envName()}`; };
+    $('#sesMeta').innerHTML = `연구자 확인 · 순서 <b>${modeShort(x)} → ${modeShort(y)}</b> (번호 ${o === 'AB' ? '홀수' : '짝수'}) · 연습 주행 ${EXP.practice ? '있음' : '없음'} · 개선 후 마감 ${S.tone || 'A'} · ${envName()}`; };
   $('#sesPid').oninput = meta; meta();
 }
 function beginSession(){
@@ -150,10 +154,10 @@ function runPractice(){
   countdown(true);
 }
 
-/* 블록 끝 질문 2개 (2026-10-29: ② '대기' 이해 질문 추가 — 로드맵 2회차). 문항은 [가정 — 파일럿에서 확인] */
+/* 블록 끝 질문 2개: ① 확신 1~5(1차와 같음) ② '기다려' 신호를 읽었는지 (2026-11-03, 10주차 발표 '실험 조건 보완'. 10-29 초안을 다듬음). 문항은 [가정 — 파일럿에서 확인] */
 const Q_TEXT = '차로를 옮길 때 얼마나 확신했나요?';
-const Q2_TEXT = '옆 차로로 옮기려는데 뒤차 때문에 HUD에 기다리라는 표시가 나왔을 때, 그 뜻을 어떻게 이해했나요?';
-const Q2_OPTS = ['지금 차로를 유지하고 기다린다', '브레이크를 밟아 멈춘다', '빨리 옮긴다', '표시를 못 봤다 · 모르겠다'];
+const Q2_TEXT = '옆 차로로 옮기려는데 뒤차 때문에 HUD에 \'기다려\' 표시가 나왔을 때, 그 표시를 봤나요? 봤다면 어떤 뜻으로 읽었나요?';
+const Q2_OPTS = ['봤다 · 지금 차로를 유지하고 기다린다', '봤다 · 브레이크를 밟아 멈춘다', '봤다 · 빨리 옮긴다', '못 봤다 · 모르겠다'];
 function surveyCard(st){
   SES.rate = 0; SES.wait = -1;
   sesCard({eyebrow:`${st.block}/2 블록 끝 · 질문`, title:'방금 3회 주행', body:`<div class="q"><p class="q-title">1. ${Q_TEXT}</p>
@@ -163,7 +167,7 @@ function surveyCard(st){
       <div class="choice" id="choice">${Q2_OPTS.map((o, i) => `<button data-c="${i}"><span>${'ABCD'[i]}</span>${o}</button>`).join('')}</div></div>`,
     btn:[st.block === 1 ? '다음 블록' : '마치기', () => {
       if(!SES.rate || SES.wait < 0) return;
-      const q = {p:SES.pid, block:st.block, hud:st.hud, ver:HUD_VER[st.hud], rate:SES.rate, wait:SES.wait + 1, waitText:Q2_OPTS[SES.wait], order:SES.order, at:new Date().toISOString()};
+      const q = {p:SES.pid, block:st.block, hud:st.hud, ver:hudVerOf(st.hud), rate:SES.rate, wait:SES.wait + 1, waitText:Q2_OPTS[SES.wait], order:SES.order, at:new Date().toISOString()};
       surveys.push(q); saveArr(QKEY, surveys); SES.qs.push(q); nextStep();
     }]});
   $('#sesBtn').disabled = true; $('#sesBtn').focus();
@@ -205,7 +209,7 @@ function onDriveEnd(){
     lane:cfg.lane + 1, dest:exitName(cfg.map.leaves[cfg.leaf].path.slice(-1)[0]), exit:D.exitName, result:res,
     change:D.changeDist, react:D.reactT, risky:D.risky, offroad:D.offroad, ped:D.ped, crash:D.crashWith || '', secs:+D.t.toFixed(2), at:new Date().toISOString(),
     // 2026-10-29 추가 (예전 기록엔 없음)
-    scn:st ? st.scn : 'practice-ICR', ver:practice ? '-' : HUD_VER[st.hud], env:envName(), order:SES.order, seq:practice ? 0 : ++SES.seq, practice:!!practice,
+    scn:st ? st.scn : 'practice-ICR', ver:practice ? '-' : hudVerOf(st.hud), env:envName(), order:SES.order, seq:practice ? 0 : ++SES.seq, practice:!!practice,
     waitSecs:es.waitSecs, waitMoves:es.waitMoves, goReact:es.goReact, hazards:es.hazards, lcN, riskyWith, events:ev};
   if(practice){
     practices.push(row); saveArr(PKEY, practices); SES.prs.push(row);
@@ -246,7 +250,7 @@ $('#abortBtn').onclick = abortRun;
 /* ---------- 요약 · 내보내기 (D70 — 디자이너가 읽을 칸만, 2026-10-29 새 칸은 뒤에) ---------- */
 const avg = a => a.length ? a.reduce((x, y) => x + y, 0)/a.length : null;
 const r1 = v => v === null ? '' : Math.round(v*10)/10;
-const HUDS_IN = rows => ['nav', 'ar'].filter(h => rows.some(r => hudKey(r.hud) === h));
+const HUDS_IN = rows => ['nav', 'ar', 'ar2'].filter(h => rows.some(r => hudKey(r.hud) === h));
 // 차로 옮긴 곳 평균은 위험한 끼어들기 0인 판만 (D65 분석 규칙)
 function summarize(rows, hud, qs = [], kind = null){
   const l = rows.filter(r => hudKey(r.hud) === hud && (!kind || kindOf(r) === kind));
@@ -262,17 +266,19 @@ function summaryHtml(rows){
   return '<div class="ses-sum">' + HUDS_IN(rows).map(h => { const s = summarize(rows, h);
     return `<div><strong>${modeName(h)}</strong>성공 <em>${s.rate === null ? '-' : s.rate + '%'}</em> · 다른 출구 <em>${s.wrong}</em><br>충돌 <em>${s.crash}</em> · 위험 끼어들기 <em>${s.risky}</em><br>대기 중 이동 <em>${s.waitMoves ?? '-'}</em></div>`; }).join('') + '</div>';
 }
-// 기록: 한 판 = 한 줄. 앞 11칸은 예전 그대로, 뒤는 2026-10-29 추가
+// 기록: 한 회 = 한 줄. 앞 11칸은 1차 실험 그대로(정의 · 순서 바꾸지 않음), 뒤는 2026-10-29 추가(시나리오 ~ 충돌 상대), 맨 뒤 '연습 여부'는 2026-11-03 추가
 const HEAD = ['참가자','HUD','시간대','맵','상황','결과','차로 옮긴 곳 (마감선 앞 m)','안전해진 뒤 옮기기까지 (초)','위험한 끼어들기 (번)','보행자 양보 안 함 (번)','도로 벗어남 (번)',
-  '시나리오 ID','HUD 버전','환경 버전','제시 순서','판 순서','대기 판단 시간 (초)','대기 · 확인 중 옮기기 시작 (번)','이동 판단 뒤 옮기기까지 (초)','위험 발생 (번)','차로 변경 완료 (번)','위험한 끼어들기 상대','충돌 상대'];
+  '시나리오 ID','HUD 버전','환경 버전','제시 순서','판 순서','대기 판단 시간 (초)','대기 · 확인 중 옮기기 시작 (번)','이동 판단 뒤 옮기기까지 (초)','위험 발생 (번)','차로 변경 완료 (번)','위험한 끼어들기 상대','충돌 상대','연습 여부','정체 줄 합류 방식'];
+// 정체 판 성공이 '줄 합류'였는지, 줄을 건너뛰고 갈림 뒤에 출구로 들어갔는지 (2026-11-03 — 자동 운전에서 후자가 '성공 · 옮긴 곳 빈칸 · 반응 빈칸'으로 남는 것을 확인, 결과 정의는 바꾸지 않고 칸만 추가)
+const jamJoinOf = r => r.type !== 'jam' ? '' : r.result !== 'ok' ? '' : /줄 합류$/.test(r.exit || '') ? '줄 합류' : '줄 건너뜀 (갈림 뒤 진입)';
 const rowCells = r => [r.p, modeName(r.hud), lightName(r.light), mapLabel(r.map), situName(r), resultName(r), marginOf(r) ?? '', r.react ?? '',
   r.risky, (mapById(r.map) || {}).cw ? (r.ped ?? '') : '', r.offroad,
-  r.scn ?? '', r.ver ?? '', r.env ?? '', r.order ?? '', r.seq ?? '', r.waitSecs ?? '', r.waitMoves ?? '', r.goReact ?? '', r.hazards ?? '', r.lcN ?? '', r.riskyWith ?? '', r.crash ?? ''];
+  r.scn ?? '', r.ver ?? '', r.env ?? '', orderText(r.order), r.seq ?? '', r.waitSecs ?? '', r.waitMoves ?? '', r.goReact ?? '', r.hazards ?? '', r.lcN ?? '', r.riskyWith ?? '', r.crash ?? '', r.practice ? '연습' : r.scn ? '본 실험' : '', jamJoinOf(r)];
 const SUM_HEAD = ['HUD','판 종류','판 수','성공률 (%)','다른 출구 (판)','충돌 (판)','위험한 끼어들기 (번)','신호 위반 (판)','보행자 양보 안 함 (번)','도로 벗어남 (번)','차로 옮긴 곳 평균 (마감선 앞 m, 위험 0인 판)','안전해진 뒤 옮기기까지 평균 (초)','확신 평균 (1~5)','대기 · 확인 중 옮기기 시작 (번)','대기 이해 정답 (A / 답한 수)'];
 const sumCells = (rows, qs) => HUDS_IN(rows).flatMap(h => [null, '고속도로 뒤차', '고속도로 정체', '일반도로'].map(k => { const s = summarize(rows, h, qs, k);
   return [modeName(h), k || '전체', s.n, s.rate ?? '', s.wrong, s.crash, s.risky, s.sig, s.ped, s.off, r1(s.margin), s.react === null ? '' : Math.round(s.react*100)/100, k ? '' : r1(s.sure), s.waitMoves ?? '', k ? '' : (summarize(rows, h, qs).waitOk || '')]; }));
 const Q_HEAD = ['참가자','HUD','질문','답 (1 전혀 ~ 5 매우)','질문 2','답 2','HUD 버전','제시 순서'];
-const qCells = q => [q.p, modeName(q.hud), Q_TEXT, q.rate, q.wait ? Q2_TEXT : '', q.wait ? `${'ABCD'[q.wait - 1]} ${q.waitText}` : '', q.ver ?? '', q.order ?? ''];
+const qCells = q => [q.p, modeName(q.hud), Q_TEXT, q.rate, q.wait ? Q2_TEXT : '', q.wait ? `${'ABCD'[q.wait - 1]} ${q.waitText}` : '', q.ver ?? '', orderText(q.order)];
 const EV_NAME = {gate:'판단 상태', hazardOn:'위험 발생', hazardOff:'위험 해소', lcStart:'차로 변경 시작', lcDone:'차로 변경 완료', lcAbort:'차로 변경 취소', cutIn:'옆 차로 진입', crash:'충돌'};
 const GATE_NAME = {none:'없음', wait:'대기', clearing:'확인', go:'이동'};
 const EV_HEAD = ['참가자','HUD','시나리오 ID','판 순서','시각 (초)','이벤트','내용'];
@@ -281,7 +287,10 @@ const evDetail = e => e.type === 'gate' ? `${GATE_NAME[e.from]} → ${GATE_NAME[
   : e.type === 'cutIn' ? `${e.lane + 1}차로${e.risky ? ' · 위험 (' + e.with + ')' : ''}` : e.type === 'hazardOn' ? `${e.lane + 1}차로 · ${e.with}` : e.type === 'crash' ? e.with : e.type === 'lcAbort' ? `${e.from + 1} → ${e.to + 1}차로` : '';
 const evRows = rows => rows.flatMap(r => (r.events || []).map(e => [r.p, modeName(r.hud), r.scn ?? '', r.seq ?? '', e.t, EV_NAME[e.type] || e.type, evDetail(e)]));
 const EXPLAIN = [['칸','뜻','어떻게 읽나'],
-  ['HUD','현대 HUD = 지금 차에 있는 HUD(대조군) · 우리 HUD = 초보자용으로 만든 HUD. 어느 때의 HUD였는지는 \'HUD 버전\' 칸(빈칸 = 1차 실험 때)','같은 사람이 현대 HUD 3판 → 우리 HUD 3판 (순서 고정)'],
+  ['HUD','우리 HUD (개선 전) = 1차 실험(10.12) 때 우리 HUD 그대로 · 우리 HUD (개선 후) = 뒤차 표현만 고친 HUD(2026-11-03) · 현대 HUD = 지금 차에 있는 HUD(1차 대조군). \'HUD 버전\' 칸이 빈칸이면 1차 실험 기록(그때 \'우리 HUD\' = 개선 전)','2차: 같은 사람이 개선 전 3회 · 개선 후 3회. 같은 시나리오 ID끼리 짝'],
+  ['제시 순서','개선 전 → 개선 후 (참가자 번호 홀수) / 개선 후 → 개선 전 (짝수)','순서 효과를 둘로 나눠 상쇄. 순서별로 나눠서도 볼 것'],
+  ['연습 여부','본 실험 / 연습. 연습 주행은 \'연습\' 시트에만 있고 요약 · 기록에 들어가지 않음',''],
+  ['정체 줄 합류 방식','정체 판 성공이 \'줄 합류\'(목표 차로 줄 뒤에 붙어 3초)였는지 \'줄 건너뜀\'(줄 옆을 지나 갈림 뒤에 출구로 들어감)이었는지. 건너뜀이면 차로 옮긴 곳 · 반응 시간이 빈칸으로 남음','정체 판 성공률을 읽을 때 둘을 나눠 볼 것. 1차 엑셀엔 이 칸이 없음'],
   ['시간대','주간 · 야간 (시나리오마다, 같은 시나리오는 두 HUD가 같은 시간대)','야간에 차이가 더 커지는지 볼 수 있음'],
   ['맵 · 상황','고속도로 ① IC 진출 · ② JC 4차로 · ③ 연속 분기 / 일반도로 ④ 이중 좌회전 · ⑤ 우회전 · 횡단보도','같은 상황끼리 HUD를 비교'],
   ['결과','성공 = 목적지 출구로 감 · 다른 출구 · 충돌(무엇과) · 시간 초과 · 신호 위반','성공률이 높을수록 좋음'],

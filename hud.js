@@ -1,7 +1,8 @@
 /* ============================================================
    hud.js — 유리 위 HUD 상자(SVG) 그리기
    · 현대 HUD(대조군): 사용자가 준 현대 HUD 사진을 그대로 재현 — 근거는 01_프로젝트/13_현대HUD_재현.md
-   · 우리 HUD: 중간고사 1차 실험 때(v1.9, 커밋 470a8f7) 그대로 — 이 파일 아래쪽 drawAr()
+   · 우리 HUD (개선 전): 중간고사 1차 실험 때(v1.9, 커밋 470a8f7) 그대로 — 이 파일 아래쪽 drawAr(). 바꾸지 않는다(2차 실험의 비교 기준)
+   · 우리 HUD (개선 후, 2.1): hud2.js drawAr2() — 같은 자리 · 같은 길 안내, 뒤차 표현만 다름
    · 맵 5종(maps.js): 분기 그림 · 차로 안내 칸을 맵 데이터로 그린다. C = 다음 갈림 정보(main.js navCtx)
    config.js, maps.js, scene.js 다음에 로드. 상태 S·path는 main.js에서 정의(호출 시점엔 존재).
    ============================================================ */
@@ -83,7 +84,7 @@ $('#navHud').innerHTML = navMarkup();
 
 // 제한속도 · 고속도로 주행 보조(HDA)는 맵마다: 일반도로 50 · HDA 없음 (D69)
 function setLimitSign(m){
-  $('#limA').textContent = $('#nvLimitN').textContent = m.limit || 80;
+  $('#limA').textContent = $('#nvLimitN').textContent = $('#bLim').textContent = m.limit || 80;
   $('#nvAdas').style.display = m.city ? 'none' : '';
 }
 // 차로 화살표: 본선 차로마다 그 차로가 가는 방향(곧장 ↑ · 오른쪽 ↱ · 왼쪽 ↰), 권장 차로(목적지 출구의 차로)는 파랑, 사이는 점선

@@ -59,7 +59,7 @@ function navCtx(s){
 
 /* ---------- 상태 ---------- */
 // testing = 주행 테스트 진행 중(결과 카드 · 쉬는 화면 포함, 설정 잠금) · drive = 내 차를 키보드로 모는 중 (drive.js D)
-const S = {mode:'ar', map:null, route:null, target:0, startLane:1, running:false, paused:false, s:40, testing:false, drive:false,
+const S = {mode:'ar2', tone:'A', map:null, route:null, target:0, startLane:1, running:false, paused:false, s:40, testing:false, drive:false,
   fill:0, danger:0, car:null, jam:0, speedFactor:1, q:null, jamHoldT:0,
   rearGap:56, rearActive:false, rearBlock:false, threatCar:null, bswL:false, bswR:false, demoMap:'ICR', demoTarget:1, demoJam:0, light:'day',
   cityT:0, sigT:0, pedPlan:null, cityLim:Infinity};   // 일반도로(D69): 판 시작부터 시간 · 좌회전 화살표 켜지는 시각 · 보행자 계획 · 시연에서 설 곳(s)
@@ -82,7 +82,7 @@ function setTarget(i, lane){
   path = buildPath(S.route, S.drive ? 0 : S.jam); S.s = path.sStart;
   S.fill = 0; S.danger = 0; S.jamHoldT = 0;
   S.car = null; otherCar.visible = false;
-  resetHud(); resetGuide();
+  resetHud(); resetHud2(); resetGuide();
 }
 // 주간 · 야간: 3D 장면(scene.js) + HUD 밤 밝기(hud.css .night) + 페이지 다크 테마(styles.css [data-light])
 function setLight(l){
@@ -93,12 +93,13 @@ function setLight(l){
   $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임
   $$('#lightSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.light === l)));
 }
-// HUD 두 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD (중간고사 때 v1.9, hud.js drawAr). 'off' = 연습 주행(HUD 없음)
-// HUD_VER는 기록 식별용 내부 값(엑셀 'HUD 버전' 칸) — 화면에 고르는 버전은 없다. 예전 기록은 이 칸이 비어 있음
-const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9'};
+// HUD 세 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD 개선 전(1차 실험 v1.9, hud.js drawAr) · 'ar2' 우리 HUD 개선 후(2.1, hud2.js drawAr2). 'off' = 연습 주행(HUD 없음)
+// HUD_VER는 기록 식별용(엑셀 'HUD 버전' 칸). 개선 후는 마감(A · B)을 뒤에 붙인다(session.js). 1차 실험 기록은 이 칸이 비어 있음
+const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9', ar2:'우리 2.1'};
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
+  $('#arHud2').style.display = m==='ar2' ? '' : 'none';
   $('#navHud').style.display = m==='nav' ? '' : 'none';
   $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode===m)));
 }
@@ -326,6 +327,7 @@ function update(dt){
   setEgo(p.x, p.z, Math.atan2(f.x, -f.z), S.running && !S.paused ? cruiseOf(S.map)*(S.speedFactor ?? 1) : 0);
   guideStep(S.cityT, C);
   if(S.mode === 'ar') drawAr(p, f, C, k, dangerOn);
+  else if(S.mode === 'ar2') drawAr2(p, f, C, k);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, remainKm, dangerOn);
   updateCabin(steer, kmh);
   cityFrame(S.cityT);
@@ -362,6 +364,7 @@ function updateDrive(dt){
   setEgo(D.x, D.z, D.psi, D.v);
   guideStep(D.t, C);
   if(S.mode === 'ar') drawAr(p, f, C, k, S.rearBlock);
+  else if(S.mode === 'ar2') drawAr2(p, f, C, k);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1), S.rearBlock);
   updateCabin(clamp(D.wheel*STEER_RATIO*STEER_GAIN*180/Math.PI, -360, 360), kmh);
   cityFrame(D.t);
@@ -408,6 +411,14 @@ $$('#mapSeg button').forEach(b => b.onclick = () => {
 $$('#jamSeg button').forEach(b => b.onclick = () => { if(stopDemo()){ S.demoJam = +b.dataset.j; prepDemo(); update(1); } });
 $('#mirrorChk').onchange = e => { MIR.on = e.target.checked; };
 $('#mirrorChk').checked = MIR.on;
+// 개선 후 HUD 마감(디자인 토큰 세트): A 절제(기본) · B 선명 — hud.css #cab[data-tone]. 기록의 'HUD 버전'에 붙는다
+const TONE_KEY = 'hud-tone';
+function setTone(t){
+  S.tone = t === 'B' ? 'B' : 'A'; $('#cab').dataset.tone = S.tone;
+  $$('#toneSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tone === S.tone)));
+  try{ localStorage.setItem(TONE_KEY, S.tone); }catch(e){}
+}
+$$('#toneSeg button').forEach(b => b.onclick = () => { setTone(b.dataset.tone); update(1); });
 function togglePause(){
   if(!S.running || S.testing) return;
   S.paused = !S.paused; $('#pauseBtn').textContent = S.paused ? '계속' : '일시정지';
@@ -421,6 +432,7 @@ addEventListener('keydown', e => {
 /* ---------- 시작 ---------- */
 $$('[data-ico]').forEach(el => el.insertAdjacentHTML('afterbegin', ico(el.dataset.ico)));   // 버튼 아이콘 채우기
 $('#hudWrap').style.bottom = (cowlBottomPct() + 2.5).toFixed(1) + '%';   // HUD 아래끝 = 대시보드 윗선보다 화면 높이 2.5%만큼 위 (2026-10-29 사용자: 살짝 올림, 예전 +0.2%)
-setMode('ar'); setLight('day'); prepDemo(); update(1); setScreen('home');
+setTone((() => { try{ return localStorage.getItem(TONE_KEY) || 'A'; }catch(e){ return 'A'; } })());
+setMode('ar2'); setLight('day'); prepDemo(); update(1); setScreen('home');
 requestAnimationFrame(frame);
 prebuildMaps(() => !S.running);   // 멈춰 있을 때 나머지 맵을 미리 지어 둔다

@@ -34,7 +34,8 @@
     <p class="field">HUD</p>
     <div class="seg" id="modeSeg">
       <button data-mode="nav" aria-pressed="false">현대 HUD</button>
-      <button data-mode="ar" aria-pressed="true">우리 HUD</button>
+      <button data-mode="ar" aria-pressed="false">개선 전</button>
+      <button data-mode="ar2" aria-pressed="true">개선 후</button>
     </div>
     <p class="field">시간대</p>
     <div class="seg ico-seg" id="lightSeg">
@@ -59,13 +60,18 @@
 
   <section id="expSetup">
     <h2>실험</h2>
-    <p class="field">순서: 현대 HUD 3판 → 질문 → 우리 HUD 3판 → 질문 (고정)</p>
+    <p class="field">비교: 우리 HUD 개선 전 · 개선 후 3회씩. 순서는 참가자 번호 홀수 = 개선 전 먼저 · 짝수 = 개선 후 먼저</p>
     <label class="check"><input type="checkbox" id="practiceChk" checked> 본 실험 전 연습 주행</label>
   </section>
 
   <section>
     <h2>보기</h2>
     <label class="check"><input type="checkbox" id="mirrorChk" checked> 룸미러</label>
+    <p class="field">개선 후 HUD 마감 <span class="field-note">hud.css 토큰</span></p>
+    <div class="seg" id="toneSeg">
+      <button data-tone="A" aria-pressed="true">A 절제</button>
+      <button data-tone="B" aria-pressed="false">B 선명</button>
+    </div>
     <button class="btn block" id="explainBtn" aria-pressed="false">HUD 설명 보기 (발표용)</button>
   </section>
 </aside>
@@ -109,6 +115,23 @@
           <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
         <radialGradient id="dangerRad"><stop offset="0" stop-color="#ff4d4d" stop-opacity=".75"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/></radialGradient>
+        <!-- ===== 우리 HUD 2.1(개선 후) 전용 — 미니 도로가 내 차 뒤(상자 아래끝)까지 이어지므로 마스크를 아래까지. 색 · 흐림은 hud.css 토큰(--h2-*)을 hud2.js가 읽어 넣는다 ===== -->
+        <mask id="roadMask2" maskUnits="userSpaceOnUse" x="0" y="0" width="520" height="270">
+          <rect x="0" y="80" width="520" height="190" fill="url(#fadeTop)"/>
+        </mask>
+        <linearGradient id="laneGrad2" gradientUnits="userSpaceOnUse" x1="0" y1="228" x2="0" y2="88">
+          <stop id="lg2A" offset="0" stop-color="#5fd4ea"/><stop id="lg2B" offset=".55" stop-color="#5fd4ea"/><stop id="lg2C" offset="1" stop-color="#5fd4ea"/>
+        </linearGradient>
+        <linearGradient id="arrowGrad2" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1" y2="0">
+          <stop id="ag2A" offset="0" stop-color="#4cd38a" stop-opacity=".3"/><stop id="ag2B" offset="1" stop-color="#4cd38a" stop-opacity="1"/>
+        </linearGradient>
+        <linearGradient id="edgeGrad2" x1="0" y1="0" x2="0" y2="1">
+          <stop id="eg2A" offset="0" stop-color="#ff5a4f" stop-opacity="0"/><stop id="eg2B" offset=".5" stop-color="#ff5a4f" stop-opacity="1"/><stop id="eg2C" offset="1" stop-color="#ff5a4f" stop-opacity="0"/>
+        </linearGradient>
+        <filter id="glow2" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="1.2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
       </defs>
       <g clip-path="url(#hudClip)">
         <!-- ===== 우리 HUD v1.4 — 정보 위계(01_프로젝트/10_HUD_GUI_설계.md)
@@ -176,6 +199,66 @@
           </g>
         </g>
 
+        <!-- ===== 우리 HUD 2.1 (개선 후, 2026-11-03 — 10주차 발표 '상태 6개') =====
+             자리 · 크기 · 길 안내(① 들어갈 차로 ② 갈 방향 ③ 막대 ④ 제한속도)는 개선 전과 같다. 바뀐 것은 뒤차 표현뿐:
+             간격 막대(bGapBar) · 움직이는 뒤차 + 꺾쇠(bRear) · 가장자리 빛(bEdgeL/R) · 깜빡임, 대기의 위험 구간(bZone) · 위험 강화의 경계 빨간 선(bBound) · 해소의 초록 훑기(bSweep).
+             상태는 data-level(0 안전 · 1 감지 · 2 주의 · 3 대기 · 4 위험 강화). 색 · 굵기 · 투명도 · 시간은 hud.css 맨 위 토큰, 그리기는 hud2.js drawAr2() -->
+        <g id="arHud2" data-level="0" style="display:none">
+          <g mask="url(#roadMask2)">
+            <path id="bSurf" class="b-surf"/>
+            <path id="bLaneFill" fill="url(#laneGrad2)"/>
+            <path id="bEdges" class="b-edges"/>
+            <path id="bDash" class="b-dash"/>
+            <path id="bJam" fill="url(#jamHatch)" opacity="0"/>
+            <path id="bPulses" class="b-pulses"/>
+            <path id="bRails" class="b-rails" filter="url(#glow2)"/>
+            <path id="bSweepBase" class="b-sweep"/>
+            <path id="bSweep" class="b-sweep"/>
+            <path id="bZone" class="b-zone"/>
+            <g id="bVeh"></g>
+            <path id="bGapMark" class="b-gapmark" filter="url(#glow2)"/>
+            <path id="bSlot" class="b-slot"/>
+            <path id="bGate" filter="url(#glow2)"/>
+            <path id="bCityStop" class="b-citystop" filter="url(#glow2)"/>
+            <path id="bPed" class="b-ped"/>
+            <path id="bBound" class="b-bound" filter="url(#glow2)"/>
+            <path id="bBoundCore" class="b-boundcore"/>
+            <path id="bGapBar" class="b-gapbar"/>
+            <!-- 뒤차: 크기 고정(원근 축소 없음 — 가까울수록 작아져 반대로 읽힘). 꺾쇠 수 = 접근 속도 -->
+            <g id="bRear" class="b-rear" opacity="0">
+              <rect id="bRearBody" x="-15" y="-10" width="30" height="20" rx="4"/>
+              <rect class="b-rear-glass" x="-10" y="-6" width="20" height="5" rx="1.5"/>
+              <g id="bChev" class="b-chev"><path d="M-7 -15 L0 -21 L7 -15"/><path d="M-7 -22 L0 -28 L7 -22"/><path d="M-7 -29 L0 -35 L7 -29"/></g>
+            </g>
+          </g>
+          <g id="bMoveGrp" filter="url(#glow2)">
+            <path id="bMove" class="b-move" fill="none" stroke="url(#arrowGrad2)" stroke-linecap="round"/>
+            <path id="bHead" stroke="none" stroke-linejoin="round"/>
+          </g>
+          <g id="bEgo" class="b-ego" transform="translate(260 221)">
+            <path d="M-15 4 Q-15 -3 -11 -4 L-7 -10 Q-6 -12 -3 -12 H3 Q6 -12 7 -10 L11 -4 Q15 -3 15 4 V7 Q15 9 13 9 H-13 Q-15 9 -15 7 Z" fill-opacity=".92"/>
+            <rect x="-12" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/><rect x="7" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/>
+            <path d="M-5 -9 H5 L8 -4 H-8 Z" fill="#0b0d10" fill-opacity=".55"/>
+          </g>
+          <rect id="bEdgeL" x="0" y="96" width="0" height="140" rx="3.5" fill="url(#edgeGrad2)" opacity="0"/>
+          <rect id="bEdgeR" x="520" y="96" width="0" height="140" rx="3.5" fill="url(#edgeGrad2)" opacity="0"/>
+          <g id="bAct" filter="url(#glow2)">
+            <g id="bIcon" class="b-icon" transform="scale(1.55)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <g id="bIcoRight"><path d="M-6 13 V4 Q-6 -4 5 -9 M-1 -13 L8 -9 L4 -1"/></g>
+              <g id="bIcoLeft"><path d="M6 13 V4 Q6 -4 -5 -9 M1 -13 L-8 -9 L-4 -1"/></g>
+              <g id="bIcoUp"><path d="M0 13 V-12 M-8 -4 L0 -13 L8 -4"/></g>
+            </g>
+          </g>
+          <g id="bCd" filter="url(#glow2)">
+            <rect id="bCdBg" x="200" y="62" width="120" height="6" rx="3" fill-opacity=".16"/>
+            <rect id="bCdBar" x="200" y="62" width="120" height="6" rx="3"/>
+          </g>
+          <g id="bInfo" transform="translate(112 34)">
+            <circle r="21" fill="#fff" fill-opacity=".92" stroke="#e5262b" stroke-width="5"/>
+            <text id="bLim" y="6.8" text-anchor="middle" font-size="19" font-weight="700" fill="#111" class="hud-t tnum">80</text>
+          </g>
+        </g>
+
         <!-- 현대 HUD (대조군): 현대 HUD 사진을 그대로 재현. hud.js navMarkup()이 채운다 -->
         <g id="navHud" class="hud-t"></g>
       </g>
@@ -238,7 +321,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <!-- 엑셀 내보내기: SheetJS 0.18.5 (Apache-2.0). 못 불러오면 session.js가 CSV로 대신 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- 순서 중요: 상수 → 맵 → 3D장면 → 실내 → HUD → 주행 → 일반도로(교차로 · 신호 · 보행자) → 로직 → 주행 테스트 진행 -->
+<!-- 순서 중요: 상수 → 맵 → 3D장면 → 실내 → HUD(개선 전 hud.js · 개선 후 hud2.js) → 주행 → 일반도로(교차로 · 신호 · 보행자) → 로직 → 주행 테스트 진행 -->
 <script src="config.js"></script>
 <script src="guide.js"></script>
 <script src="maps.js"></script>
@@ -247,6 +330,7 @@
 <script src="mirrors.js"></script>
 <script src="props.js"></script>
 <script src="hud.js"></script>
+<script src="hud2.js"></script>
 <script src="drive.js"></script>
 <script src="city.js"></script>
 <script src="main.js"></script>
