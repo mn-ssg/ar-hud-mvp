@@ -6,7 +6,7 @@
 /* ============================================================
    우리 HUD 2.1 (개선 후, 2026-11-03) 디자인 토큰 — 개선 후 HUD(#arHud2)만 쓴다. 개선 전(#arHud)은 1차 실험 그대로(아래 V1 규칙 · hud.js 안 값).
    근거: 04_리서치/2026-11-03_데스크리서치_양산AR-HUD_시각마감.md (양산 AR-HUD 3종 · 국내 HUD 시인성 연구 2편 · AR-HUD 주의 연구)
-   · 색: 역할별 4가지(안내 route · 이동/해소 go · 주의 warn · 위험 danger) + 무채색 2(감지 · 도로 윤곽 neutral / 대기 중 막대 idle). 같은 역할은 모든 요소가 같은 값
+   · 색: 역할별 4가지(안내 route · 이동/해소 go · 주의 warn · 위험 danger) + 무채색 2(감지 · 도로 윤곽 neutral / 대기 중 막대 idle). 같은 역할은 모든 요소가 같은 값. 거리 구간 · 흐름 띠 투명도는 config.js REAR2(bandOp · flowOp)
    · 선 굵기 3단계(w1 윤곽 · w2 막대 · w3 경계/멈춤) · 모서리 2단계 · 투명도는 역할별 토큰 · 빛 번짐은 glow 하나(JS가 #glow2에 넣음)
    · 시간: fast(상태 전환) · fade(나타남 · 사라짐) — 깜빡임 · 훑기 시간은 config.js REAR2
    · 야간은 .cab.night에서 투명도 · 번짐만 낮춤(색은 그대로). 마감 B(선명)는 #cab[data-tone="B"]에서 토큰만 바꿈 → 구조 · 코드 같음
@@ -16,11 +16,11 @@
   --h2-neutral:#e3ecf2;  --h2-idle:#9aa6b2;  --h2-core:#ffffff;
   --h2-w1:1px;  --h2-w2:2.6px;  --h2-w3:5px;  --h2-arrow:7px;
   --h2-r1:2px;  --h2-r2:4px;
-  --h2-op-fill:.5;  --h2-op-ctx:.4;  --h2-op-detect:.45;  --h2-op-zone:.2;  --h2-op-edge:.75;  --h2-op-ego:.92;
+  --h2-op-fill:.5;  --h2-op-ctx:.4;  --h2-op-detect:.45;  --h2-op-edge:.75;  --h2-op-ego:1;
   --h2-glow:1.2;
   --h2-t-fast:.18s;  --h2-t-fade:.3s;
 }
-.cab.night{ --h2-op-fill:.42; --h2-op-ctx:.26; --h2-op-detect:.4; --h2-op-zone:.16; --h2-op-edge:.6; --h2-op-ego:.78; --h2-glow:.6; }
+.cab.night{ --h2-op-fill:.42; --h2-op-ctx:.26; --h2-op-detect:.4; --h2-op-edge:.6; --h2-op-ego:.85; --h2-glow:.6; }
 /* 마감 B(선명): 1차의 채도 높은 청록 · 굵은 선 · 센 번짐. 비교용 — 연구자 설정 '개선 후 HUD 마감' */
 #cab[data-tone="B"]{ --h2-route:#00e5ff; --h2-go:#3ddc84; --h2-warn:#ffb020; --h2-danger:#ff4d4d; --h2-w1:1.4px; --h2-w2:3.4px; --h2-w3:6.5px; --h2-arrow:8.5px; --h2-op-fill:.62; --h2-op-ctx:.5; --h2-op-edge:.9; --h2-glow:2.2; }
 #cab[data-tone="B"].night{ --h2-glow:1.1; --h2-op-fill:.5; --h2-op-ctx:.32; }
@@ -30,7 +30,7 @@
 #arHud2 .b-edges{ fill:var(--h2-neutral); fill-opacity:var(--h2-op-ctx); }
 #arHud2 .b-dash{ fill:var(--h2-neutral); fill-opacity:calc(var(--h2-op-ctx)*.6); }
 #lg2A{ stop-opacity:var(--h2-op-fill); } #lg2B{ stop-opacity:calc(var(--h2-op-fill)*.5); } #lg2C{ stop-opacity:.08; }
-#arHud2 .b-ego path:first-child{ fill:var(--h2-neutral); fill-opacity:var(--h2-op-ego); }
+#arHud2 .b-ego path:first-child{ fill:var(--h2-core); fill-opacity:var(--h2-op-ego); stroke:var(--h2-core); stroke-width:.6; stroke-opacity:.9; }   /* 내 차: 흰색 속 참 + 밝은 테 (2026-11-03 키움) */
 #arHud2 .b-icon{ stroke:var(--h2-route); stroke-width:3.4; transition:opacity var(--h2-t-fast) ease; }
 #arHud2 .b-move{ stroke-width:var(--h2-arrow); }
 #arHud2 .b-gapmark{ fill:none; stroke:var(--h2-go); stroke-width:var(--h2-w2); stroke-linecap:round; stroke-linejoin:round; }
@@ -38,12 +38,12 @@
 #arHud2 .b-citystop{ fill:var(--h2-danger); }
 #arHud2 .b-ped{ fill:var(--h2-neutral); fill-opacity:.9; }
 #arHud2 .b-q{ fill:none; stroke:var(--h2-warn); stroke-width:calc(var(--h2-w1)*1.4); }
-#arHud2 .b-zone{ fill:var(--h2-danger); }
 #arHud2 .b-sweep{ fill:var(--h2-go); }
 #arHud2 .b-bound{ fill:var(--h2-danger); }
 #arHud2 .b-boundcore{ fill:var(--h2-core); fill-opacity:.85; }
 #arHud2 .b-rear-glass{ fill:#0b0d10; fill-opacity:.45; }
 #arHud2 .b-chev path{ fill:none; stroke-width:var(--h2-w2); stroke-linecap:round; stroke-linejoin:round; }
+#arHud2 .b-flow{ fill:var(--h2-neutral); }   /* 뒤에 더 오는 차가 있을 때의 흐름 띠 (4-C) */
 /* 개선 후 HUD 야간: 토큰이 이미 낮춤 — 개선 전처럼 요소별 규칙 없음 */
 
 /* ---------- 운전석 영역 ---------- */

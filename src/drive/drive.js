@@ -107,7 +107,7 @@ function driveReset(cfg){
   Object.assign(D, {x:m.laneX(cfg.lane), z:p0.z, psi:0, v:D.cruise, steer:0, wheel:0, t:0, frozen:false, cfg, ped:0, pedIn:false, sigChecked:false,
     seg:null, hint:-1, segS:0, cands:null, lane:cfg.lane, chosen:[], exitName:'',
     enterZ:null, changeDist:null, risky:0, enc:{}, lastCut:{}, offroad:0, lastTouch:-9, followT:0, crashWith:'', result:null, endT:0,
-    safeOn:false, safeSince:0, reactT:null, moved:false,
+    safeOn:false, safeSince:0, reactT:null, moved:false, cutAhead:0, cutAheadGap:null, cutAheadTtc:null,   // 앞으로 끼어들기(2026-11-03): 옮길 차로의 뒤차 앞에 들어간 횟수 · 그때 뒤차 간격(m, 최소) · 닿기까지(초, 최소)
     events:[], lc:null});   // events: 위험 · 판단 상태 · 차로 변경 시작/완료 · 끼어들기 · 충돌 시점 (2026-10-29, session.js가 기록에 붙임)
   Object.keys(KEYS).forEach(k => KEYS[k] = false);
   queueCars.forEach(c => c.visible = false); flowCars.forEach(c => { c.visible = false; c.userData.onc = false; setBrake(c, false); }); otherCar.visible = false; busMesh.visible = false;
@@ -123,17 +123,17 @@ function driveReset(cfg){
   // 내 차로 앞차는 늘 있음. 판마다 둘 중 하나: 앞차가 급정거해 완전히 섬(내 뒤는 비어 있음) / 뒤에 바짝 붙어 오는 차(급하게 서면 받힘, 뒤차 판만)
   // — 둘을 한 판에 같이 두면 세게 밟아도 약하게 밟아도 부딪혀 피할 길이 없음
   cfg.brake = cfg.type !== 'practice' && R() < HARD.brakeAhead;   // 연습 판(session.js)은 급정거 · 뒤차 · 정체 없이 앞차와 옆 차로 차만
-  const lead = add(flowCars[fi++], cfg.lane, D.z - DRV.carL - rr(HARD.lead), V0, 'lead');
+  const lead = add(flowCars[fi++], cfg.lane, D.z - DRV.carL - rr(HARD.block.leadNear ? HARD.leadNearGap : HARD.lead), V0, 'lead');   // block.leadNear: 앞차를 가까이
   lead.brakeAt = cfg.brake ? rr(HARD.brakeAt) : null; lead.phase = 0;
   // 바짝 붙은 뒤차는 뒤차 판에만 — 정체 판은 줄 때문에 누구나 크게 줄여야 해서, 뒤차까지 붙으면 제대로 줄여도 받힘(실제론 뒤차도 정체를 보고 같이 줄임)
   if(!cfg.brake && cfg.type === 'rear') add(flowCars[fi++], cfg.lane, D.z + rr(HARD.tail), V0 + .4, 'tail', {T:.5, s0:2, v0:V0 + 1.5});
   // 뒤차 판: 목표 차로에 3~5대 무리가 바짝 붙어(차간 0.4초) 빠르게 온다. 첫 차가 1.5~5초에 내 옆
   cfg.rearN = 0;
   if(cfg.type === 'rear'){
-    cfg.rearN = ri(HARD.rearN);
+    cfg.rearN = ri(HARD.block.stream ? HARD.streamN : HARD.rearN);   // block.stream: 4 ~ 5대 흐름
     const dv = rr(HARD.rearDv)/3.6;
     let z = D.z + dv*rr(HARD.rearArrive);
-    for(let k=0;k<cfg.rearN;k++){ add(flowCars[fi++], tl, z, V0 + dv, 'rear', {T:.4, s0:2}); z += DRV.carL + rr(HARD.rearGap); }
+    for(let k=0;k<cfg.rearN;k++){ add(flowCars[fi++], tl, z, V0 + dv, 'rear', {T:.4, s0:2}); z += DRV.carL + rr(HARD.block.stream ? HARD.streamGap : HARD.rearGap); }
   }
   // 정체 판: 목표 차로 뒤에서 줄 끝으로 달려와 붙는 차 2~3대 — 일찍 옮기려 해도 이 차들 사이 틈을 찾아야 함
   if(cfg.type === 'jam'){
@@ -256,11 +256,14 @@ function stepCars(dt){
       }
     }
     if(S.map.city) v0 = Math.min(v0, curveV(c));                                                   // 일반도로: 굽은 곳 앞에서 미리 부드럽게 줄임
+    // block.rearMatch: 옮길 차로 뒤차(내 뒤 60m 안)는 내가 순항보다 빨리 달리면 그만큼 더 빨라져 간격을 유지 — 끼워 주지 않는 차처럼. 가속은 matchA까지
+    let Aacc = 1.5;
+    if(HARD.block.rearMatch && c.kind === 'rear' && c.lane === laneOf(S.map, S.route.tx) && c.z > D.z && c.z - D.z < 60 && D.v > D.cruise + .3){ v0 = Math.max(v0, c.base + (D.v - D.cruise)); Aacc = HARD.matchA; }
     // 내 차가 앞차면: 내 속도 변화를 HARD.aiLag초 늦게 알아채고, 최대 HARD.aiDec까지만 밟음
     c.seenV += (D.v - c.seenV)*Math.min(1, dt/HARD.aiLag);
     let gap = ld.gap, lv = ld.me ? c.seenV : ld.v;
     const st = cityStop(c); if(st !== null && st < gap){ gap = st; lv = 0; }                       // 빨간불 정지선 · 보행자 앞 = 서 있는 앞차처럼
-    const a = idm(c.v, v0, gap, c.v - lv, 1.5, T, s0);
+    const a = idm(c.v, v0, gap, c.v - lv, Aacc, T, s0);
     c.v = Math.max(0, c.v + Math.max(ld.me ? -HARD.aiDec : -9, a)*dt);
     c.s += c.v*dt;
   });
@@ -430,7 +433,10 @@ function cutIn(li){
     return gap < DRV.gapRisk || (closing > 0 && gap/closing < DRV.ttcRisk);
   });
   if(by) D.risky++;
-  D.events.push({t:+D.t.toFixed(2), type:'cutIn', lane:li, risky:!!by, with:by ? KIND_NAME[by.kind] + (by.z > D.z ? ' (뒤)' : ' (앞)') : ''});
+  // 앞으로 끼어들기: 그 차로에서 내 뒤 60m 안에 (줄 아닌) 차가 있으면 — 그 차 앞에 들어간 것. 위험 여부와 상관없이 세고, 가장 가까운 차의 간격 · 닿기까지 시간을 남긴다 (2차 가설 '위험한 차로 변경' 지표)
+  const behind = D.cars.filter(c => c.lane === li && c.kind !== 'queue' && c.z > D.z && c.z - D.z < 60 && c.z > FORK_Z - 5).map(c => { const gap = c.z - D.z - halfL(c) - DRV.carL/2, cl = c.v - D.v; return {gap, ttc:cl > 0 ? gap/cl : Infinity}; }).sort((a, b) => a.gap - b.gap)[0];
+  if(behind){ D.cutAhead++; D.cutAheadGap = D.cutAheadGap === null ? +behind.gap.toFixed(1) : Math.min(D.cutAheadGap, +behind.gap.toFixed(1)); if(behind.ttc < Infinity) D.cutAheadTtc = D.cutAheadTtc === null ? +behind.ttc.toFixed(2) : Math.min(D.cutAheadTtc, +behind.ttc.toFixed(2)); }
+  D.events.push({t:+D.t.toFixed(2), type:'cutIn', lane:li, risky:!!by, with:by ? KIND_NAME[by.kind] + (by.z > D.z ? ' (뒤)' : ' (앞)') : '', ahead:!!behind, gap:behind ? +behind.gap.toFixed(1) : null, ttc:behind && behind.ttc < Infinity ? +behind.ttc.toFixed(2) : null});
 }
 
 /* ---------- HUD에 줄 값 (hud.js가 읽음) ----------

@@ -46,7 +46,7 @@ const STATES = [
       const buf = await page.screenshot({clip:{x:box.x, y:box.y, width:box.w, height:box.h}});
       fs.writeFileSync(path.join(OUT, name + '.png'), buf); shots[name] = {buf, label, st, light, lv:box.lv, gate:box.gate};
       // 대비: 요소마다 HUD 켬 / 끔 같은 프레임 (E20 방법). 달라진 픽셀 = HUD 픽셀, 그 자리의 끈 화면 밝기 = 배경
-      const els = hud === 'ar2' ? {'들어갈 차로 테두리':'#bRails', '갈 방향':'#bIcon', '막대':'#bCdBar', '이동 화살표 머리':'#bHead', '뒤차':'#bRearBody', '간격 막대':'#bGapBar', '가장자리 빛':'#bEdgeR', '경계 빨간 선':'#bBound'} : {'들어갈 차로 테두리':'#laneRails', '갈 방향':'#nowIcon', '막대':'#cdBar', '이동 화살표 머리':'#moveHead', '뒤차(대기)':'#carBehind rect', '멈춤 막대':'#moveStop'};
+      const els = hud === 'ar2' ? {'들어갈 차로 테두리':'#bRails', '갈 방향':'#bIcon', '막대':'#bCdBar', '이동 화살표 머리':'#bHead', '뒤차':'#bRearBody', '거리 구간':'#bDistBand', '가장자리 빛':'#bEdgeR', '경계 빨간 선':'#bBound'} : {'들어갈 차로 테두리':'#laneRails', '갈 방향':'#nowIcon', '막대':'#cdBar', '이동 화살표 머리':'#moveHead', '뒤차(대기)':'#carBehind rect', '멈춤 막대':'#moveStop'};
       const boxes = await page.evaluate(sel => { const o = {}; Object.entries(sel).forEach(([k, q]) => { const e = document.querySelector(q); if(!e) return; const b = e.getBoundingClientRect(); if(b.width > 1 && b.height > 1) o[k] = [b.left, b.top, b.width, b.height]; }); return o; }, els);
       const on = await page.screenshot(); await page.evaluate(() => { $('#hudWrap').style.visibility = 'hidden'; }); await page.waitForTimeout(60);
       const off = await page.screenshot(); await page.evaluate(() => { $('#hudWrap').style.visibility = ''; });

@@ -39,6 +39,7 @@ tests/
   capture-states.js   HUD 상태 6개 캡처 + 대비 측정
   autodrive-batch.js  자동 운전 묶음(기록 값 점검)
   demo-audit.js       시연 · 주행 교통 겹침 · 이상 움직임 점검
+  cutin-batch.js      '앞질러 끼어들기' 막기 방법 비교(가속 끼어들기 vs HUD 따라가기 자동 운전)
 ```
 
 읽는 순서: `core(config → guide → maps)` → `scene(scene → cabin → mirrors → props)` → `hud(hud → hud2)` → `drive` → `scene/city` → `app(main → session)` → `hud/explain`.

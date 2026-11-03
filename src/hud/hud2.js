@@ -1,7 +1,7 @@
 /* ============================================================
    hud2.js — 우리 HUD 2.1 (개선 후, 2026-11-03) · 10주차 발표 '2차 HUD 디자인 근거 · 상태 6개'를 그대로 옮김
    · 자리 · 크기 · 정보 구조 · 길 안내(① 들어갈 차로 ② 갈 방향 ③ 막대 ④ 제한속도)는 개선 전(hud.js drawAr, 1차 실험 v1.9)과 같다
-   · 바뀐 것은 뒤차 표현뿐 — 함께 쓰는 4가지: 간격 막대 · 움직이는 뒤차(꺾쇠 = 접근 속도) · 가장자리 빛 · 깜빡임.
+   · 바뀐 것은 뒤차 표현뿐 — 움직이는 뒤차(가장 가까운 한 대, 꺾쇠 = 접근 속도) · 거리 구간(내 차 뒤부터 뒤차까지, 간격 막대 대신) · 더 오는 차 흐름 띠 · 가장자리 빛 · 깜빡임 (2026-11-03 사용자 선택 4-C · 7-B).
      뺀 것: 작은 경고 아이콘(#carBehind) · 크기 변화(원근 도로에서 반대로 읽힘)
    · 상태 6개 (data-level): 0 안전 / 1 감지(흐린 흰색, fade in) / 2 주의(주황, 뒤차가 올라옴, 같은 쪽 가장자리 빛) /
      3 대기(빨강, 이동 화살표 빨간 점으로 멈춤, 위험 구간, 깜빡임, 갈 방향 흐리게, 막대 회색) / 4 위험 강화(차로 경계 빨간 선, 가장자리 빛 최대, 깜빡임 속도 그대로) /
@@ -23,12 +23,13 @@ function makeProj2(p, f){
     return [HX + X*PXM*s, HY_FAR + (HY_NEAR - HY_FAR)*s, s, d];
   };
 }
-const B = {level:0, since:0, gate:'none', prevGate:'none', cand:null, gapDraw:null, alpha:0, edgeW:0, edgeA:0, blinkT0:0, sweepT0:-9, lastT:null, tk:null, tkAt:-1e9, dir:0};
+const B = {level:0, since:0, gate:'none', prevGate:'none', cand:null, others:[], gapDraw:null, alpha:0, edgeW:0, edgeA:0, blinkT0:0, sweepT0:-9, lastT:null, tk:null, tkAt:-1e9, dir:0,
+  primRef:null, old:null};   // old: 기준 차가 바뀔 때 이전 차 {ref, alpha, pt, col} — 제자리에서 0.3초에 걸쳐 사라짐 (튀지 않게)
 const AS2 = {icon:null, since:0, doneUntil:0, wasMove:false};
 function resetHud2(){
-  Object.assign(B, {level:0, since:0, gate:'none', prevGate:'none', cand:null, gapDraw:null, alpha:0, edgeW:0, edgeA:0, blinkT0:0, sweepT0:-9, lastT:null, dir:0});
+  Object.assign(B, {level:0, since:0, gate:'none', prevGate:'none', cand:null, others:[], gapDraw:null, alpha:0, edgeW:0, edgeA:0, blinkT0:0, sweepT0:-9, lastT:null, dir:0, primRef:null, old:null});
   AS2.icon = null; AS2.doneUntil = 0; AS2.wasMove = false;
-  $('#bRear').setAttribute('opacity', 0); $('#bGapBar').setAttribute('d', ''); $('#bZone').setAttribute('d', ''); $('#bSweep').setAttribute('d', ''); $('#bSweepBase').setAttribute('d', '');
+  $('#bRear').setAttribute('opacity', 0); $('#bRearOld').setAttribute('opacity', 0); $('#bDistBand').setAttribute('d', ''); $('#bFlow').setAttribute('d', ''); $('#bSweep').setAttribute('d', ''); $('#bSweepBase').setAttribute('d', '');
   $('#bBound').setAttribute('d', ''); $('#bBoundCore').setAttribute('d', ''); $('#bEdgeL').setAttribute('opacity', 0); $('#bEdgeR').setAttribute('opacity', 0);
   $('#arHud2').dataset.level = 0;
 }
@@ -37,7 +38,7 @@ function tk2(now){
   if(B.tk && now - B.tkAt < 500) return B.tk;
   const cs = getComputedStyle($('#cab')), g = n => cs.getPropertyValue(n).trim();
   B.tk = {route:g('--h2-route'), go:g('--h2-go'), warn:g('--h2-warn'), danger:g('--h2-danger'), neutral:g('--h2-neutral'), idle:g('--h2-idle'), core:g('--h2-core'),
-    opFill:+g('--h2-op-fill'), opCtx:+g('--h2-op-ctx'), opDetect:+g('--h2-op-detect'), opZone:+g('--h2-op-zone'), opEdge:+g('--h2-op-edge'),
+    opFill:+g('--h2-op-fill'), opCtx:+g('--h2-op-ctx'), opDetect:+g('--h2-op-detect'), opEdge:+g('--h2-op-edge'),
     glow:+g('--h2-glow'), w1:parseFloat(g('--h2-w1')), w2:parseFloat(g('--h2-w2')), w3:parseFloat(g('--h2-w3'))};
   B.tkAt = now;
   $('#glow2 feGaussianBlur').setAttribute('stdDeviation', B.tk.glow);
@@ -58,7 +59,8 @@ function rearLevel2(G, needMove, t){
     });
     const rc = G.reason && G.reason.car && G.reason.kind !== 'queue' ? list.find(o => o.c.ref === G.reason.car.ref) : null;
     cand = rc || list.filter(o => o.behind || o.gap < 1).sort((a, b) => a.gap - b.gap)[0] || null;
-  }
+    B.others = list.filter(o => o !== cand && o.behind && o.gap < REAR2.detect).sort((a, b) => a.gap - b.gap);   // 기준 차 뒤에 더 오는 차들(감지 범위 안)
+  } else B.others = [];
   const gate = G ? G.gate : 'none';
   const rearWait = (gate === 'wait' || gate === 'clearing') && !!(G.reason && G.reason.kind !== 'queue');
   let want = 0;
@@ -196,17 +198,21 @@ function drawAr2(p, f, C, k){
      자리: 뒤차는 실제 쪽 차로(옮길 차로) 안, 내 차 뒤 — 간격 0 ~ 감지 범위를 내 차 바로 뒤 2 ~ 13m 자리로 눌러 그린다(가까울수록 내 차 쪽으로 올라옴).
      크기는 고정(원근 축소 없음). 옆에 나란히(간격 < 1m)거나 앞이면 실제 자리 그대로 */
   const next = G ? G.next : null, laneX = next !== null && next >= 0 && next < m.lanes ? m.laneX(next) : tx;
+  const zOfGap = g => p.z + 2 + 11*clamp(g/REAR2.detect);   // 뒤차 간격(m) → 미니 도로 위 자리(내 차 바로 뒤 2 ~ 13m로 눌러 그림)
+  // 기준 차가 바뀌면(앞 차가 지나가 다음 차가 기준) 이전 차는 제자리에서 0.3초에 걸쳐 사라지고 새 차는 0에서 나타난다 — 표시가 튀지 않게
+  const ref = cand ? cand.c.ref : null;
+  if(ref !== B.primRef){ if(B.primRef && B.alpha > .05) B.old = {ref:B.primRef, alpha:B.alpha, col:B.lastCol || T.neutral, cl:B.lastCl || 0}; B.primRef = ref; B.alpha = cand ? 0 : B.alpha; B.gapDraw = null; }
   let carPt = null, zCar = null;
   if(cand){
     if(cand.behind && cand.gap >= 1){
       const g0 = Math.max(0, cand.gap); B.gapDraw = B.gapDraw === null ? g0 : B.gapDraw + (g0 - B.gapDraw)*Math.min(1, dt*10);
-      zCar = p.z + 2 + 11*clamp(B.gapDraw/REAR2.detect);
-      carPt = proj(laneX, zCar);
+      zCar = zOfGap(B.gapDraw); carPt = proj(laneX, zCar);
     } else { zCar = cand.c.z; carPt = proj(cand.c.x, cand.c.z); B.gapDraw = null; }
   } else B.gapDraw = null;
   const alphaTo = lv >= 1 && carPt ? 1 : 0;
   B.alpha += clamp(alphaTo - B.alpha, -dt/REAR2.fade, dt/REAR2.fade);
   const rear = $('#bRear');
+  B.lastCol = col; B.lastCl = cand ? cand.cl : 0;
   if(carPt && B.alpha > .001){
     rear.setAttribute('transform', `translate(${carPt[0].toFixed(1)} ${carPt[1].toFixed(1)})`);
     rear.setAttribute('opacity', (B.alpha*(lv === 1 ? T.opDetect : 1)*(lv >= 3 ? blink : 1)).toFixed(3));
@@ -215,19 +221,24 @@ function drawAr2(p, f, C, k){
     const cl = cand.cl, n = lv >= 2 && cand.behind && cl > 0 ? (cl < REAR2.chevronV[0] ? 1 : cl < REAR2.chevronV[1] ? 2 : 3) : 0;
     $$('#bChev path').forEach((q, i) => { q.style.display = i < n ? '' : 'none'; q.setAttribute('stroke', col); });
   } else rear.setAttribute('opacity', 0);
-  // 간격 막대: 옮길 차로 바깥 가장자리를 따라 뒤차 ~ 내 차. 가까울수록 짧고 진하게, 흰색 → 주황 → 빨강
-  let gb = '';
-  if(cand && zCar !== null && B.alpha > .001){
-    const xe = laneX + Math.sign(laneX - p.x || sgn || 1)*1.75, hw = lv >= 3 ? .16 : lv === 2 ? .12 : .08;
-    const z0 = Math.max(zCar - (cand.behind ? 0 : cand.c.halfL), p.z - 1), z1 = Math.min(zCar, p.z - 1);
-    if(z0 - z1 > .5) gb = bandX(xe - hw, xe + hw, z0, z1, proj, 1);
+  // 이전 기준 차: 지금 실제 자리(대개 내 차 옆 · 앞)에서 사라짐
+  const old = $('#bRearOld');
+  if(B.old){ B.old.alpha -= dt/REAR2.fade; const oc = G && G.cars.find(c => c.ref === B.old.ref), op = oc ? proj(oc.x, oc.z) : null;
+    if(B.old.alpha <= 0 || !op) B.old = null; else { old.setAttribute('transform', `translate(${op[0].toFixed(1)} ${op[1].toFixed(1)})`); old.setAttribute('opacity', (B.old.alpha*.8).toFixed(3)); old.querySelector('rect').setAttribute('fill', B.old.col); } }
+  if(!B.old) old.setAttribute('opacity', 0);
+  // ---- 거리 (사용자 선택 7-B, 2026-11-03): 내 차 뒤부터 뒤차까지 옮길 차로를 칠한 구간 — 가까울수록 짧고 진하게, 색은 단계(흰 → 주황 → 빨강). 대기에선 깜빡임을 같이 탐. 간격 막대 대신 ----
+  let band = '', bandOp = 0;
+  if(cand && zCar !== null && B.alpha > .001 && cand.behind){
+    const z1 = p.z + 2.4, z0 = Math.max(zCar - 1, z1 + 1);   // 뒤차 앞 ~ 내 차 뒤. 바짝 붙어도 최소 1m는 남겨 가장 위험할 때 구간이 사라지지 않게
+    if(z0 - z1 > .3){ band = bandX(laneX - 1.55, laneX + 1.55, z0, z1, proj, 1); const near = 1 - clamp(B.gapDraw/REAR2.detect); bandOp = (REAR2.bandOp[0] + (REAR2.bandOp[1] - REAR2.bandOp[0])*near)*(lv === 1 ? .7 : 1); }
   }
-  $('#bGapBar').setAttribute('d', gb); $('#bGapBar').setAttribute('fill', col);
-  $('#bGapBar').setAttribute('fill-opacity', (B.alpha*(lv === 1 ? T.opDetect : .95)*(lv >= 3 ? blink : 1)).toFixed(3));
-  // 04 대기: 위험 구간 — 뒤차 ~ 내 차 사이 옮길 차로를 빨갛게
-  let zone = '';
-  if(wait && cand && zCar !== null){ const z0 = Math.max(zCar, p.z - 2.3), z1 = Math.min(zCar - (cand.behind ? 0 : cand.c.halfL*2), p.z - 2.3); if(z0 - z1 > .5) zone = bandX(laneX - 1.6, laneX + 1.6, z0, z1, proj, 1); }
-  $('#bZone').setAttribute('d', zone); $('#bZone').setAttribute('fill-opacity', (T.opZone*blink).toFixed(3));
+  $('#bDistBand').setAttribute('d', band); $('#bDistBand').setAttribute('fill', col); $('#bDistBand').setAttribute('fill-opacity', (bandOp*B.alpha*(lv >= 3 ? blink : 1)).toFixed(3));
+  // ---- 여러 대 (사용자 선택 4-C): 차 아이콘 · 거리 · 빛 · 깜빡임은 가장 가까운 한 대만. 뒤에 더 오는 차(감지 범위 안)가 있으면 옮길 차로 아래쪽에 위로 흐르는 흐린 띠 3개 — 글자 · 숫자 없이 '계속 온다' ----
+  let flow = '';
+  if(cand && cand.behind && B.others.length && B.alpha > .001){
+    for(let i = 0; i < 3; i++){ const g = B.gapDraw + 6 + ((i*7 - now/1000*6) % 21 + 21) % 21; if(g > REAR2.detect) continue; const zf = zOfGap(g); flow += bandX(laneX - 1.1, laneX + 1.1, zf + .35, zf - .35, proj, .5); }
+  }
+  $('#bFlow').setAttribute('d', flow); $('#bFlow').setAttribute('fill-opacity', (REAR2.flowOp*B.alpha).toFixed(3));
   // 05 위험 강화: 넘으려는 차로 경계에 빨간 선 (내 차 뒤 6m ~ 앞 16m), 밝은 심
   let bnd = '', core = '';
   if(lv >= 4 && G){ const xb = m.laneX(G.my) + G.side*1.75; bnd = lineX(xb, p.z + 6, p.z - 16, .13, proj); core = lineX(xb, p.z + 6, p.z - 16, .045, proj); }

@@ -95,7 +95,7 @@ function setLight(l){
 }
 // HUD 세 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD 개선 전(1차 실험 v1.9, hud.js drawAr) · 'ar2' 우리 HUD 개선 후(2.1, hud2.js drawAr2). 'off' = 연습 주행(HUD 없음)
 // HUD_VER는 기록 식별용(엑셀 'HUD 버전' 칸). 개선 후는 마감(A · B)을 뒤에 붙인다(session.js). 1차 실험 기록은 이 칸이 비어 있음
-const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9', ar2:'우리 2.1'};
+const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9', ar2:'우리 2.1'};   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
@@ -286,7 +286,7 @@ function demoLeader(){
   let best = null;
   const see = (mesh, L) => { if(!mesh.visible) return; const r = project(path.P, mesh.position.x, mesh.position.z, -1);
     if(Math.abs(r.d) < 1.6 && r.s > S.s - 2 && r.s - S.s < 60 && (!best || r.s < best.s)) best = {s:r.s, L}; };
-  queueCars.forEach(c => see(c, c.userData.L)); see(otherCar, otherCar.userData.L); see(busMesh, 11.4);
+  if(S.jam > 0) queueCars.forEach(c => see(c, c.userData.L)); if(S.rearActive) see(otherCar, otherCar.userData.L); if(S.map.bus) see(busMesh, 11.4);   // 지금 장면의 차만 — 이전 맵의 버스 · 줄 차가 보이는 채 남아 있을 수 있음
   return best;
 }
 function update(dt){

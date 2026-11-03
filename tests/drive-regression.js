@@ -148,7 +148,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const sm = () => { const lv = +$('#arHud2').dataset.level, rr = $('#bRear'), bb = rr.getBBox(), tr = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(rr.getAttribute('transform') || '');
         return {t:+D.t.toFixed(2), lv, gate:S.G ? S.G.gate : '-', rear:+rr.getAttribute('opacity'), rw:+bb.width.toFixed(1), ry:tr ? +(+tr[2]).toFixed(1) : 0, edgeR:+$('#bEdgeR').getAttribute('opacity'), edgeL:+$('#bEdgeL').getAttribute('opacity'), edgeW:+$('#bEdgeR').getAttribute('width'),
           flow:$('#bMove').classList.contains('flow'), dash:$('#bMove').getAttribute('stroke-dasharray'), icon:+$('#bAct').getAttribute('opacity'), bar:$('#bCdBar').getAttribute('fill'), fill:+$('#bLaneFill').getAttribute('opacity'),
-          zone:($('#bZone').getAttribute('d') || '').length > 0, bound:($('#bBound').getAttribute('d') || '').length > 0, sweep:($('#bSweep').getAttribute('d') || '').length > 0, gapbar:($('#bGapBar').getAttribute('d') || '').length > 0,
+          bound:($('#bBound').getAttribute('d') || '').length > 0, sweep:($('#bSweep').getAttribute('d') || '').length > 0, band:($('#bDistBand').getAttribute('d') || '').length > 0,
           chev:[...document.querySelectorAll('#bChev path')].filter(q => q.style.display !== 'none').length, car:$('#bRearBody').getAttribute('fill'), stop:($('#moveStop') && $('#moveStop').getAttribute('d') || '').length}; };
       return runDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed:5, sigT:0}, {hud:'ar2', secs, keep:!!extra.keep, ap:{mode:'lane', lane:1}, sample:sm,
         setup:() => { D.cars.forEach(c => c.mesh.visible = false); const lead = D.cars.find(c => c.kind === 'lead'); const car = D.cars.find(c => c.kind === 'rear') || D.cars[1];
@@ -159,13 +159,13 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         beforeFrame:extra.jumpAt ? (tt => { if(tt >= extra.jumpAt && !window.__jumped){ window.__jumped = true; window.__car.s = LANE_START - (D.z - 40); window.__car.v = window.__car.v0 = D.v + 2; } }) : null}); }, [gapM, closing, secs, extra]);
     await E(() => { window.__jumped = false; });
     const a = await stage(80, 2, 2);          // 01 안전: 80m 뒤 · 거의 같은 속도 → 감지 범위(60m) 밖
-    check('개선 후 01 안전: 뒤차 80m 뒤(감지 밖)면 단계 0 · 뒤차 안 보임 · 화살표 흐름', a.samples.every(s => s.lv === 0 && s.rear < .01 && s.flow && !s.gapbar), JSON.stringify(a.samples[a.samples.length-1]));
+    check('개선 후 01 안전: 뒤차 80m 뒤(감지 밖)면 단계 0 · 뒤차 안 보임 · 화살표 흐름', a.samples.every(s => s.lv === 0 && s.rear < .01 && s.flow && !s.band), JSON.stringify(a.samples[a.samples.length-1]));
     const b = await stage(50, 1, 2);          // 02 감지: 50m 뒤 · 접근 1m/s (ttc 50초)
     const bl = b.samples[b.samples.length-1];
-    check('개선 후 02 감지: 50m 뒤면 단계 1 · 뒤차와 간격 막대가 흐리게 나타남(fade in) · 꺾쇠 없음 · 가장자리 빛 없음 · 화살표는 흐름', bl.lv === 1 && bl.rear > .3 && bl.rear < .6 && bl.gapbar && bl.chev === 0 && bl.edgeR < .01 && bl.flow && b.samples.filter(s => s.lv === 1).slice(0, 5).every((s, i, arr) => i === 0 || s.rear >= arr[i-1].rear), JSON.stringify(bl));
+    check('개선 후 02 감지: 50m 뒤면 단계 1 · 뒤차가 흐리게 나타남(fade in) · 꺾쇠 없음 · 가장자리 빛 없음 · 화살표는 흐름', bl.lv === 1 && bl.rear > .3 && bl.rear < .6 && bl.chev === 0 && bl.edgeR < .01 && bl.flow && b.samples.filter(s => s.lv === 1).slice(0, 5).every((s, i, arr) => i === 0 || s.rear >= arr[i-1].rear), JSON.stringify(bl));
     const c = await stage(20, 2.5, 2);        // 03 주의: 20m 뒤 · 접근 2.5m/s (ttc 8초, 간격 < 25m → 주의. 대기 해제 기준 4.2초 밖)
     const cl = c.samples[c.samples.length-1];
-    check('개선 후 03 주의: 단계 2 · 주황 뒤차 · 꺾쇠 1개(접근 2.5m/s) · 오른쪽 가장자리 빛 · 화살표 흐름 유지 · 위험 구간 없음', cl.lv === 2 && cl.car.toLowerCase() === '#ffb13d' && cl.chev === 1 && cl.edgeR > .3 && cl.edgeL < .01 && cl.flow && !cl.zone, JSON.stringify(cl));
+    check('개선 후 03 주의: 단계 2 · 주황 뒤차 · 꺾쇠 1개(접근 2.5m/s) · 오른쪽 가장자리 빛 · 화살표 흐름 유지 · 위험 구간 없음', cl.lv === 2 && cl.car.toLowerCase() === '#ffb13d' && cl.chev === 1 && cl.edgeR > .3 && cl.edgeL < .01 && cl.flow && cl.band, JSON.stringify(cl));
     const c2 = await stage(45, 9, 1.2);       // 45m 뒤에서 접근 9m/s → 꺾쇠 3개, 올라옴(y가 줄어듦)
     const ys = c2.samples.filter(s => s.lv >= 2).map(s => s.ry);
     check('개선 후 03 주의: 빠르게 다가오면 꺾쇠 3개, 뒤차가 내 차 쪽으로 올라옴(y 감소), 크기는 그대로', c2.samples[c2.samples.length-1].chev === 3 && ys.length > 5 && ys[ys.length-1] < ys[0] - 2 && new Set(c2.samples.filter(s => s.rear > .5).map(s => s.rw)).size === 1, `y ${ys[0]} → ${ys[ys.length-1]}, 폭 ${[...new Set(c2.samples.map(s => s.rw))].join('/')}`);
@@ -173,7 +173,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const dl = d.samples.filter(s => s.lv === 3 && s.gate === 'wait' && s.t > 1);
     const ops = [...new Set(dl.map(s => s.rear.toFixed(2)))], edges = [...new Set(dl.map(s => s.edgeR.toFixed(2)))];
     const flips = dl.reduce((n, s, i) => n + (i && s.rear !== dl[i-1].rear ? 1 : 0), 0);
-    check('개선 후 04 대기: 단계 3 · 빨간 뒤차 · 화살표 빨간 점으로 멈춤 · 위험 구간 · 갈 방향 흐리게 · 막대 회색 · 들어갈 차로는 그대로', dl.length > 20 && dl.every(s => s.car.toLowerCase() === '#ff5a4f' && !s.flow && s.dash === '.1 14' && s.zone && s.icon < .5 && s.bar === '#9aa6b2' && s.fill > .8 && !s.bound), JSON.stringify(dl[0]));
+    check('개선 후 04 대기: 단계 3 · 빨간 뒤차 · 화살표 빨간 점으로 멈춤 · 거리 구간 · 갈 방향 흐리게 · 막대 회색 · 들어갈 차로는 그대로', dl.length > 20 && dl.every(s => s.car.toLowerCase() === '#ff5a4f' && !s.flow && s.dash === '.1 14' && s.band && s.icon < .5 && s.bar === '#9aa6b2' && s.fill > .8 && !s.bound), JSON.stringify(dl[0]));
     check('개선 후 04 대기: 뒤차와 가장자리 빛이 같은 박자로 깜빡임(켜짐 1 · 꺼짐 0.3, 0.25초마다 바뀜)', ops.length === 2 && edges.length === 2 && flips >= 3 && flips <= 6 && dl.every(s => (s.rear > .9) === (s.edgeR > .5)), `opacity ${ops.join('/')} · 빛 ${edges.join('/')} · 바뀜 ${flips}번/1.2초`);
     check('개선 후: 개선 전의 멈춤 막대(#moveStop)는 개선 후 화면에 없음', dl.every(s => !s.stop || true) && (await E(() => $('#arHud2').querySelector('#moveStop') === null)), '');
     const e = await stage(7, 4, 2.2, {offset:.6});   // 05 위험 강화: 대기 + 옆 차로 쪽으로 0.6m 넘어감
@@ -247,7 +247,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         while(SES.on && guard++ < 40){
           const st = SES.steps[SES.i];
           if(!$('#sess').hidden && $('#rate')){ setRate(4); setWait(0); $('#sesBtn').click(); continue; }
-          if(!$('#sess').hidden){ $('#sesBtn').click(); continue; }
+          if(!$('#sess').hidden){ if(/연습/.test($('#sesEyebrow').textContent) && /성공|다른 출구|충돌|시간 초과/.test($('#sesTitle').textContent)) window.__practiceCard = $('#sesTitle').textContent; $('#sesBtn').click(); continue; }
           // 주행 중: 카운트다운 건너뛰고 자동 운전
           clearTimeout(SES.timer); $('#count').hidden = true; D.frozen = false;
           for(let k = 0; k < 120*30 && S.running; k++) update(1/30);
@@ -256,22 +256,23 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         sessions[pid] = {rows:SES.rows.map(r => ({hud:r.hud, scn:r.scn, seq:r.seq, order:r.order, ver:r.ver, env:r.env, ev:(r.events || []).length, practice:r.practice})), qs:SES.qs.length, prs:SES.prs.length, mode:S.mode, testing:S.testing};
       }
       const stored = loadArr(DKEY);
-      return {sessions, storedN:stored.length, oldKept:stored.some(r => r.p === 'P_OLD'), practiceN:loadArr(PKEY).length, practiceInDrives:stored.some(r => r.practice),
+      return {sessions, practiceCard:window.__practiceCard || null, storedN:stored.length, oldKept:stored.some(r => r.p === 'P_OLD'), practiceN:loadArr(PKEY).length, practiceInDrives:stored.some(r => r.practice),
         sheets:book && book.map(([n, a]) => [n, a.length, a[0].length]), head:book && book.find(([n]) => n === '기록')[1][0], oldRowCells:rowCells(old).length};
     });
     const p1 = s.sessions.P1, p2 = s.sessions.P2;
     check('세션: 참가자마다 본 주행 6판 기록', p1.rows.length === 6 && p2.rows.length === 6, `P1 ${p1.rows.length} · P2 ${p2.rows.length}`);
     check('세션: 연습 기록은 본 기록에 섞이지 않음 (따로 저장)', s.practiceN === 2 && !s.practiceInDrives && p1.prs === 1, `연습 ${s.practiceN}`);
     const first = (rows, a, b) => rows.slice(0, 3).every(r => r.hud === a) && rows.slice(3).every(r => r.hud === b);
-    check('세션: 홀수 번호(P1)는 개선 전 → 개선 후, 짝수(P2)는 개선 후 → 개선 전 (현대 HUD 없음)', first(p1.rows, 'ar', 'ar2') && first(p2.rows, 'ar2', 'ar') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'BA', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
-    check('세션: 개선 후 기록의 HUD 버전에 마감(A/B)이 붙음', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.1-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'ar').every(r => r.ver === '우리 1.9'), JSON.stringify(p1.rows.map(r => r.ver)));
+    check('세션: 홀수 번호(P1)는 현대 → 2차, 짝수(P2)는 2차 → 현대 (1차 HUD 없음)', first(p1.rows, 'nav', 'ar2') && first(p2.rows, 'ar2', 'nav') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'BA', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
+    check('세션: HUD 버전 칸 — 현대 3.3 · 우리 2.1-A/B', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.1-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.3'), JSON.stringify(p1.rows.map(r => r.ver)));
+    check('세션: 연습이 끝나면 결과 카드 없이 바로 첫 주행(연습 기록 1 · 카드에 결과 글 없음)', p1.prs === 1 && !s.practiceCard, JSON.stringify(s.practiceCard));
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
     check('세션: 같은 시나리오 ID를 두 HUD가 한 번씩 (교통 · 목적지 · 시간대 고정)', pairOk(p1.rows) && pairOk(p2.rows), JSON.stringify(p1.rows.map(r => r.scn)));
     check('세션: 새 필드(시나리오 · HUD 버전 · 환경 · 순서 · 이벤트) 기록', p1.rows.every(r => r.scn && r.ver && r.env && r.order && r.ev > 0), JSON.stringify(p1.rows[0]));
     check('세션: 예전 기록이 지워지거나 덮이지 않음', s.oldKept && s.storedN === 13, `저장 ${s.storedN}`);
     check('세션 끝: 질문 2블록 · HUD/테스트 상태 복원', p1.qs === 2 && !p2.testing, `질문 ${p1.qs}`);
     check('엑셀: 요약 · 기록 · 질문 · 이벤트 · 연습 · 설명 시트', s.sheets && ['요약','기록','질문','이벤트','연습','설명'].every(n => s.sheets.some(x => x[0] === n)), JSON.stringify(s.sheets));
-    check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에, 맨 뒤 연습 여부 · 정체 줄 합류 방식', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 2] === '연습 여부' && s.head[s.head.length - 1] === '정체 줄 합류 방식' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-2)).join(' | '));
+    check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에, 맨 뒤 연습 여부 · 정체 줄 합류 방식', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 5] === '연습 여부' && s.head[s.head.length - 4] === '정체 줄 합류 방식' && s.head[s.head.length - 1] === '그때 닿기까지 (초)' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
   }
 
   {
@@ -281,10 +282,10 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       $('#practiceBtn').click(); $('#sesBtn').click();   // 연습 시작
       clearTimeout(SES.timer); $('#count').hidden = true; D.frozen = false;
       for(let k = 0; k < 90*30 && S.running; k++) update(1/30);
-      const card = $('#sesTitle').textContent, testing = S.testing; $('#sesBtn').click();   // 처음으로
+      const card = $('#sess').hidden ? '' : $('#sesTitle').textContent, testing = S.testing;   // 2026-11-03: 연습 끝엔 결과 카드 없이 바로 처음으로
       return {card, testing, screen:$('#app').dataset.screen, drives:loadArr(DKEY).length - before, practices:loadArr(PKEY).length - pBefore, mode:S.mode, mode0};
     });
-    check('처음 화면 연습: 끝나면 잠금 해제 · 처음으로 · 본 기록 0 · 연습 기록 1 · HUD 되돌림', !r.testing && r.screen === 'home' && r.drives === 0 && r.practices === 1 && r.mode === r.mode0, JSON.stringify(r));
+    check('처음 화면 연습: 끝나면 결과 카드 없이 잠금 해제 · 처음으로 · 본 기록 0 · 연습 기록 1 · HUD 되돌림', !r.testing && r.screen === 'home' && r.card === '' && r.drives === 0 && r.practices === 1 && r.mode === r.mode0, JSON.stringify(r));
   }
 
   /* ---------- 8. 일시정지 · 재시작 · HUD 변경 뒤 상태 ---------- */
@@ -306,12 +307,12 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
   /* ---------- 8-1. 화면 구조: HUD 선택은 현대 · 우리 두 개 · 버전 선택 없음 · 우리 HUD에 설명 글자 없음 ---------- */
   {
     const r = await E(() => ({modes:$$('#modeSeg button').map(b => b.dataset.mode + ':' + b.textContent.trim()), pair:!!$('#pairSeg'),
-      verWords:/v1|v2/.test(document.body.innerText + $$('#setup button, #intro button').map(b => b.title).join(' ')),
+      verWords:/v1|v2/.test(document.body.innerText + $$('#setup button, #intro button').map(b => b.title).join(' ')), rules:/순서|홀수|짝수|비교:/.test(document.body.innerText),
       arText:$$('#arHud text').map(t => t.id + ':' + t.textContent), ar2Text:$$('#arHud2 text').map(t => t.id + ':' + t.textContent), arHud2:!!$('#arHud2'), orderUi:!!$('#orderSeg')}));
-    check('시연 HUD 선택은 현대 · 개선 전 · 개선 후 세 개, 순서 선택지 없음', JSON.stringify(r.modes) === JSON.stringify(['nav:현대 HUD', 'ar:개선 전', 'ar2:개선 후']) && !r.pair && !r.verWords && r.arHud2 && !r.orderUi, JSON.stringify(r));
+    check('시연 HUD 선택은 현대 · 2차 · 1차 세 개, 순서 선택지 · 안내 문장 없음', JSON.stringify(r.modes) === JSON.stringify(['nav:현대 HUD', 'ar2:2차 HUD', 'ar:1차 HUD']) && !r.pair && !r.verWords && r.arHud2 && !r.orderUi && !r.rules, JSON.stringify(r));
     check('우리 HUD(개선 전 · 개선 후) 안 글자는 제한속도 숫자뿐', r.arText.length === 1 && /^limA:\d+$/.test(r.arText[0]) && r.ar2Text.length === 1 && /^bLim:\d+$/.test(r.ar2Text[0]), JSON.stringify(r.arText.concat(r.ar2Text)));
-    const prep = await E(() => { $('#pid').value = 'P3'; openSession(); const o = {screen:$('#app').dataset.screen, setupVisible:!!$('#setup').offsetParent, setupBtn:!!$('#setupBtn').offsetParent, modeBtns:$$('#modeSeg button').filter(b => b.offsetParent).length, meta:$('#sesMeta').textContent}; $('#sesPid').value = 'P4'; $('#sesPid').oninput(); o.meta4 = $('#sesMeta').textContent; goHome(); return o; });
-    check('주행 테스트 준비 화면: HUD 고르기 없음, 순서는 번호로 (P3 개선 전 먼저 · P4 개선 후 먼저)', !prep.setupVisible && !prep.setupBtn && prep.modeBtns === 0 && /개선 전 → 개선 후/.test(prep.meta) && /개선 후 → 개선 전/.test(prep.meta4), JSON.stringify(prep));
+    const prep = await E(() => { $('#pid').value = 'P3'; openSession(); const o = {screen:$('#app').dataset.screen, setupVisible:!!$('#setup').offsetParent, setupBtn:!!$('#setupBtn').offsetParent, modeBtns:$$('#modeSeg button').filter(b => b.offsetParent).length, text:$('#sess').innerText, o3:orderFor('P3'), o4:orderFor('P4')}; goHome(); return o; });
+    check('주행 테스트 준비 화면: HUD · 순서 고르기 · 안내 문장 없음, 순서는 번호로(P3 현대 먼저 · P4 2차 먼저)', !prep.setupVisible && !prep.setupBtn && prep.modeBtns === 0 && !/순서|비교|연습 주행 있음/.test(prep.text) && prep.o3 === 'AB' && prep.o4 === 'BA', JSON.stringify(prep));
   }
 
   /* ---------- 8-2. HUD 표시 영역 밖으로 나오지 않음: 같은 프레임을 HUD 켬 / 끔으로 그려 상자 밖 픽셀 비교 ---------- */
@@ -328,15 +329,19 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
           D.frozen = true; }, [mapId, dest, lane, type, seed, T, light, hud]);
         await page.waitForTimeout(150);
         const box = await E(() => { const r = $('#hudWrap').getBoundingClientRect(); return {x:r.left, y:r.top, w:r.width, h:r.height}; });
-        const on = await page.screenshot(); await E(() => { $('#hudWrap').style.visibility = 'hidden'; }); await page.waitForTimeout(60);
-        const off = await page.screenshot(); await E(() => { $('#hudWrap').style.visibility = ''; });
-        const n = await E(async ([a, b, box]) => {
+        // 계기판 시계가 두 캡처 사이에 분이 바뀌면 상자 밖 픽셀이 달라져 가짜로 걸림 → 한 번은 다시 찍는다
+        let on, off, n = Infinity;
+        for(let attempt = 0; attempt < 2 && n > 0; attempt++){
+        on = await page.screenshot(); await E(() => { $('#hudWrap').style.visibility = 'hidden'; }); await page.waitForTimeout(60);
+        off = await page.screenshot(); await E(() => { $('#hudWrap').style.visibility = ''; });
+        n = await E(async ([a, b, box]) => {
           const load = s => new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = 'data:image/png;base64,' + s; });
           const [A, B] = await Promise.all([load(a), load(b)]), c = document.createElement('canvas'); c.width = A.width; c.height = A.height; const g = c.getContext('2d');
           g.drawImage(A, 0, 0); const da = g.getImageData(0, 0, c.width, c.height).data; g.drawImage(B, 0, 0); const db = g.getImageData(0, 0, c.width, c.height).data; let n = 0;
           for(let y = 0; y < c.height; y++) for(let x = 0; x < c.width; x++){ if(x >= box.x - 1 && x <= box.x + box.w + 1 && y >= box.y - 1 && y <= box.y + box.h + 1) continue;
             const i = (y*c.width + x)*4; if(Math.abs(da[i]-db[i]) + Math.abs(da[i+1]-db[i+1]) + Math.abs(da[i+2]-db[i+2]) > 24) n++; }
           return n; }, [on.toString('base64'), off.toString('base64'), box]);
+        }
         await E(() => { stopDrive(); S.testing = false; MIR.on = true; });
         check(`HUD 영역 밖 픽셀 0 — ${({ar:'개선 전', ar2:'개선 후', nav:'현대'})[hud]} · ${vw}×${vh} · ${name}`, n === 0, `${n}px`);
       }

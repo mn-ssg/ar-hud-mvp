@@ -34,8 +34,8 @@
     <p class="field">HUD</p>
     <div class="seg" id="modeSeg">
       <button data-mode="nav" aria-pressed="false">현대 HUD</button>
-      <button data-mode="ar" aria-pressed="false">개선 전</button>
-      <button data-mode="ar2" aria-pressed="true">개선 후</button>
+      <button data-mode="ar2" aria-pressed="true">2차 HUD</button>
+      <button data-mode="ar" aria-pressed="false">1차 HUD</button>
     </div>
     <p class="field">시간대</p>
     <div class="seg ico-seg" id="lightSeg">
@@ -60,14 +60,13 @@
 
   <section id="expSetup">
     <h2>실험</h2>
-    <p class="field">비교: 우리 HUD 개선 전 · 개선 후 3회씩. 순서는 참가자 번호 홀수 = 개선 전 먼저 · 짝수 = 개선 후 먼저</p>
-    <label class="check"><input type="checkbox" id="practiceChk" checked> 본 실험 전 연습 주행</label>
+    <label class="check"><input type="checkbox" id="practiceChk" checked> 연습 주행</label>
   </section>
 
   <section>
     <h2>보기</h2>
     <label class="check"><input type="checkbox" id="mirrorChk" checked> 룸미러</label>
-    <p class="field">개선 후 HUD 마감 <span class="field-note">hud.css 토큰</span></p>
+    <p class="field">개선 후 HUD 마감</p>
     <div class="seg" id="toneSeg">
       <button data-tone="A" aria-pressed="true">A 절제</button>
       <button data-tone="B" aria-pressed="false">B 선명</button>
@@ -201,7 +200,7 @@
 
         <!-- ===== 우리 HUD 2.1 (개선 후, 2026-11-03 — 10주차 발표 '상태 6개') =====
              자리 · 크기 · 길 안내(① 들어갈 차로 ② 갈 방향 ③ 막대 ④ 제한속도)는 개선 전과 같다. 바뀐 것은 뒤차 표현뿐:
-             간격 막대(bGapBar) · 움직이는 뒤차 + 꺾쇠(bRear) · 가장자리 빛(bEdgeL/R) · 깜빡임, 대기의 위험 구간(bZone) · 위험 강화의 경계 빨간 선(bBound) · 해소의 초록 훑기(bSweep).
+             움직이는 뒤차 + 꺾쇠(bRear, 가장 가까운 한 대) · 거리 구간(bDistBand) · 더 오는 차 흐름(bFlow) · 가장자리 빛(bEdgeL/R) · 깜빡임 · 위험 강화의 경계 빨간 선(bBound) · 해소의 초록 훑기(bSweep).
              상태는 data-level(0 안전 · 1 감지 · 2 주의 · 3 대기 · 4 위험 강화). 색 · 굵기 · 투명도 · 시간은 hud.css 맨 위 토큰, 그리기는 hud2.js drawAr2() -->
         <g id="arHud2" data-level="0" style="display:none">
           <g mask="url(#roadMask2)">
@@ -214,7 +213,6 @@
             <path id="bRails" class="b-rails" filter="url(#glow2)"/>
             <path id="bSweepBase" class="b-sweep"/>
             <path id="bSweep" class="b-sweep"/>
-            <path id="bZone" class="b-zone"/>
             <g id="bVeh"></g>
             <path id="bGapMark" class="b-gapmark" filter="url(#glow2)"/>
             <path id="bSlot" class="b-slot"/>
@@ -223,7 +221,15 @@
             <path id="bPed" class="b-ped"/>
             <path id="bBound" class="b-bound" filter="url(#glow2)"/>
             <path id="bBoundCore" class="b-boundcore"/>
-            <path id="bGapBar" class="b-gapbar"/>
+            <!-- 거리: 내 차 뒤부터 뒤차까지 옮길 차로를 칠한 구간 — 가까울수록 짧고 진하게, 색은 단계(2026-11-03 사용자 선택 7-B, 간격 막대 대신) -->
+            <path id="bDistBand" class="b-distband"/>
+            <!-- 뒤에 더 오는 차가 있으면 옮길 차로 아래쪽에 위로 흐르는 띠(4-C) — 차 아이콘은 가장 가까운 한 대만 -->
+            <path id="bFlow" class="b-flow"/>
+            <!-- 기준 차가 바뀔 때 이전 차가 0.3초 동안 사라짐(제자리에서) -->
+            <g id="bRearOld" class="b-rear" opacity="0">
+              <rect class="b-rear-old-body" x="-15" y="-10" width="30" height="20" rx="4"/>
+              <rect class="b-rear-glass" x="-10" y="-6" width="20" height="5" rx="1.5"/>
+            </g>
             <!-- 뒤차: 크기 고정(원근 축소 없음 — 가까울수록 작아져 반대로 읽힘). 꺾쇠 수 = 접근 속도 -->
             <g id="bRear" class="b-rear" opacity="0">
               <rect id="bRearBody" x="-15" y="-10" width="30" height="20" rx="4"/>
@@ -235,7 +241,8 @@
             <path id="bMove" class="b-move" fill="none" stroke="url(#arrowGrad2)" stroke-linecap="round"/>
             <path id="bHead" stroke="none" stroke-linejoin="round"/>
           </g>
-          <g id="bEgo" class="b-ego" transform="translate(260 221)">
+          <!-- 내 차 (2026-11-03 키움): 1차의 30 × 21px → 1.5배(45 × 32), 흰색 속 참 + 밝은 테. 자리(260, 221)는 그대로 — 미니 도로의 기준점 -->
+          <g id="bEgo" class="b-ego" transform="translate(260 221) scale(1.5)">
             <path d="M-15 4 Q-15 -3 -11 -4 L-7 -10 Q-6 -12 -3 -12 H3 Q6 -12 7 -10 L11 -4 Q15 -3 15 4 V7 Q15 9 13 9 H-13 Q-15 9 -15 7 Z" fill-opacity=".92"/>
             <rect x="-12" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/><rect x="7" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/>
             <path d="M-5 -9 H5 L8 -4 H-8 Z" fill="#0b0d10" fill-opacity=".55"/>
@@ -273,7 +280,7 @@
     <div class="card home">
       <p class="eyebrow">디지털미디어 프로타이핑 · 4팀</p>
       <h1>분기점 차로 안내 주행 실험</h1>
-      <p class="lead">HUD를 보고 목적지 출구까지 키보드로 운전합니다. 한 사람에 6회 주행하고, 3회마다 짧은 질문에 답합니다.</p>
+      <p class="lead">HUD를 보고 목적지 출구로 운전합니다.</p>
       <div class="keyrow"><span><kbd>←</kbd><kbd>→</kbd> 핸들</span><span><kbd>↑</kbd> 가속</span><span><kbd>↓</kbd> 브레이크</span></div>
       <button class="btn primary lg block" id="testBtn">주행 테스트 시작</button>
       <div class="row">
@@ -305,7 +312,6 @@
 <aside id="drawer" aria-label="주행 테스트 기록">
   <header><h2>주행 테스트 기록</h2><button class="btn" id="closeDrawer">닫기</button></header>
   <label>다음 참가자 <input type="text" id="pid" value="P1" autocomplete="off"></label>
-  <p class="drawer-note">연습 주행 기록은 여기에 섞이지 않고 엑셀 '연습' 시트에만 들어갑니다.</p>
   <div id="summary"></div>
   <div class="tablewrap"><table>
     <thead><tr><th>참가자</th><th>HUD</th><th>시간대</th><th>맵</th><th>상황</th><th>결과</th><th>마감선 앞(m)</th><th>반응(초)</th><th>위험</th><th>대기 중 이동</th></tr></thead>
