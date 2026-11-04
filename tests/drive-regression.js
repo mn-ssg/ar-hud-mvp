@@ -148,7 +148,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const sm = () => { const lv = +$('#arHud2').dataset.level, rr = $('#bRear'), bb = rr.getBBox(), tr = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(rr.getAttribute('transform') || '');
         return {t:+D.t.toFixed(2), lv, gate:S.G ? S.G.gate : '-', rear:+rr.getAttribute('opacity'), rw:+bb.width.toFixed(1), ry:tr ? +(+tr[2]).toFixed(1) : 0, edgeR:+$('#bEdgeR').getAttribute('opacity'), edgeL:+$('#bEdgeL').getAttribute('opacity'), edgeW:+$('#bEdgeR').getAttribute('width'),
           flow:$('#bMove').classList.contains('flow'), dash:$('#bMove').getAttribute('stroke-dasharray'), icon:+$('#bAct').getAttribute('opacity'), bar:$('#bCdBar').getAttribute('fill'), fill:+$('#bLaneFill').getAttribute('opacity'),
-          bound:($('#bBound').getAttribute('d') || '').length > 0, sweep:($('#bSweep').getAttribute('d') || '').length > 0, band:($('#bDistBand').getAttribute('d') || '').length > 0,
+          bound:($('#bBound').getAttribute('d') || '').length > 0, sweep:($('#bClearFill').getAttribute('d') || '').length > 0 || !!$('#bMoveGrp').getAttribute('transform'), band:($('#bDistBand').getAttribute('d') || '').length > 0,
           chev:[...document.querySelectorAll('#bChev path')].filter(q => q.style.display !== 'none').length, car:$('#bRearBody').getAttribute('fill'), stop:($('#moveStop') && $('#moveStop').getAttribute('d') || '').length}; };
       return runDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed:5, sigT:0}, {hud:'ar2', secs, keep:!!extra.keep, ap:{mode:'lane', lane:1}, sample:sm,
         setup:() => { D.cars.forEach(c => c.mesh.visible = false); const lead = D.cars.find(c => c.kind === 'lead'); const car = D.cars.find(c => c.kind === 'rear') || D.cars[1];
@@ -165,7 +165,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('개선 후 02 감지: 50m 뒤면 단계 1 · 뒤차가 흐리게 나타남(fade in) · 꺾쇠 없음 · 가장자리 빛 없음 · 화살표는 흐름', bl.lv === 1 && bl.rear > .3 && bl.rear < .6 && bl.chev === 0 && bl.edgeR < .01 && bl.flow && b.samples.filter(s => s.lv === 1).slice(0, 5).every((s, i, arr) => i === 0 || s.rear >= arr[i-1].rear), JSON.stringify(bl));
     const c = await stage(20, 2.5, 2);        // 03 주의: 20m 뒤 · 접근 2.5m/s (ttc 8초, 간격 < 25m → 주의. 대기 해제 기준 4.2초 밖)
     const cl = c.samples[c.samples.length-1];
-    check('개선 후 03 주의: 단계 2 · 주황 뒤차 · 꺾쇠 1개(접근 2.5m/s) · 오른쪽 가장자리 빛 · 화살표 흐름 유지 · 위험 구간 없음', cl.lv === 2 && cl.car.toLowerCase() === '#ffb13d' && cl.chev === 1 && cl.edgeR > .3 && cl.edgeL < .01 && cl.flow && cl.band, JSON.stringify(cl));
+    check('개선 후 03 주의: 단계 2 · 주황 뒤차 · 꺾쇠 1개(접근 2.5m/s) · 오른쪽 가장자리 빛 · 화살표 흐름 유지 · 위험 구간 없음', cl.lv === 2 && cl.car.toLowerCase() === '#ffb020' && cl.chev === 1 && cl.edgeR > .3 && cl.edgeL < .01 && cl.flow && cl.band, JSON.stringify(cl));
     const c2 = await stage(45, 9, 1.2);       // 45m 뒤에서 접근 9m/s → 꺾쇠 3개, 올라옴(y가 줄어듦)
     const ys = c2.samples.filter(s => s.lv >= 2).map(s => s.ry);
     check('개선 후 03 주의: 빠르게 다가오면 꺾쇠 3개, 뒤차가 내 차 쪽으로 올라옴(y 감소), 크기는 그대로', c2.samples[c2.samples.length-1].chev === 3 && ys.length > 5 && ys[ys.length-1] < ys[0] - 2 && new Set(c2.samples.filter(s => s.rear > .5).map(s => s.rw)).size === 1, `y ${ys[0]} → ${ys[ys.length-1]}, 폭 ${[...new Set(c2.samples.map(s => s.rw))].join('/')}`);
@@ -173,17 +173,19 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const dl = d.samples.filter(s => s.lv === 3 && s.gate === 'wait' && s.t > 1);
     const ops = [...new Set(dl.map(s => s.rear.toFixed(2)))], edges = [...new Set(dl.map(s => s.edgeR.toFixed(2)))];
     const flips = dl.reduce((n, s, i) => n + (i && s.rear !== dl[i-1].rear ? 1 : 0), 0);
-    check('개선 후 04 대기: 단계 3 · 빨간 뒤차 · 화살표 빨간 점으로 멈춤 · 거리 구간 · 갈 방향 흐리게 · 막대 회색 · 들어갈 차로는 그대로', dl.length > 20 && dl.every(s => s.car.toLowerCase() === '#ff5a4f' && !s.flow && s.dash === '.1 14' && s.band && s.icon < .5 && s.bar === '#9aa6b2' && s.fill > .8 && !s.bound), JSON.stringify(dl[0]));
-    check('개선 후 04 대기: 뒤차와 가장자리 빛이 같은 박자로 깜빡임(켜짐 1 · 꺼짐 0.3, 0.25초마다 바뀜)', ops.length === 2 && edges.length === 2 && flips >= 3 && flips <= 6 && dl.every(s => (s.rear > .9) === (s.edgeR > .5)), `opacity ${ops.join('/')} · 빛 ${edges.join('/')} · 바뀜 ${flips}번/1.2초`);
+    check('개선 후 04 대기: 단계 3 · 빨간 뒤차 · 화살표 빨간 점으로 멈춤 · 거리 구간 · 갈 방향 흐리게 · 막대 회색 · 들어갈 차로는 그대로', dl.length > 20 && dl.every(s => s.car.toLowerCase() === '#ff4d4d' && !s.flow && s.dash === '.1 14' && s.band && s.icon < .5 && s.bar === '#9aa6b2' && s.fill > .8 && !s.bound), JSON.stringify(dl[0]));
+    check('개선 후 04 대기: 뒤차와 가장자리 빛이 같은 박자로 깜빡임(켜짐 1 · 꺼짐 0, 0.2초마다 바뀜 = 2.5Hz)', ops.length === 2 && edges.length === 2 && flips >= 4 && flips <= 7 && dl.every(s => (s.rear > .9) === (s.edgeR > .5)), `opacity ${ops.join('/')} · 빛 ${edges.join('/')} · 바뀜 ${flips}번/1.2초`);
     check('개선 후: 개선 전의 멈춤 막대(#moveStop)는 개선 후 화면에 없음', dl.every(s => !s.stop || true) && (await E(() => $('#arHud2').querySelector('#moveStop') === null)), '');
     const e = await stage(7, 4, 2.2, {offset:.6});   // 05 위험 강화: 대기 + 옆 차로 쪽으로 0.6m 넘어감
     const el = e.samples.filter(s => s.t > 1);
     check('개선 후 05 위험 강화: 단계 4 · 차로 경계에 빨간 선 · 가장자리 빛 최대 · 깜빡임 속도 그대로', el.length > 10 && el.every(s => s.lv === 4 && s.bound) && Math.max(...el.map(s => s.edgeW)) > 30 && el.reduce((n, s, i) => n + (i && s.rear !== el[i-1].rear ? 1 : 0), 0) >= 3, JSON.stringify(el[el.length-1]));
     await E(() => { window.__jumped = false; });
-    const f = await stage(7, 4, 3.4, {jumpAt:1});    // 06 해소: 1초 뒤 뒤차가 40m 앞으로(지나감) → 확인 0.8초 → 이동 + 초록 훑기
+    const f = await stage(7, 4, 3.6, {jumpAt:1});    // 06 해소: 1초 뒤 뒤차가 40m 앞으로(지나감) → 확인 0.8초 → 이동 + 초록 해소 신호 한 번(REAR2.clearT초)
     const goAt = f.samples.find(s => s.gate === 'go' && s.t > 1), sw = f.samples.filter(s => s.sweep), after = f.samples.filter(s => s.t > (goAt ? goAt.t + .7 : 99));
     const clearing = f.samples.filter(s => s.gate === 'clearing');
-    check('개선 후 06 해소: 위험이 풀리면 확인(0.8초, 깜빡임 멈춤) → 이동 판단에 초록이 한 번 훑고(0.6초) → 뒤차 사라지고 화살표 다시 흐름', goAt && sw.length >= 15 && sw.length <= 22 && sw[0].t >= goAt.t && clearing.length > 15 && clearing.every(s => s.rear === clearing[0].rear || s.rear < .95) && after.length > 5 && after.every(s => s.lv === 0 && s.rear < .05 && s.flow && !s.sweep), `go ${goAt && goAt.t} · 훑기 ${sw.length}프레임 · 확인 ${clearing.length}프레임 · 뒤 ${after.length}`);
+    const clearT = await E(() => REAR2.clearT), after2 = f.samples.filter(s => s.t > (goAt ? goAt.t + clearT + .15 : 99));
+    const stride = f.samples.slice(1).map((s, i) => s.t - f.samples[i].t).sort((a, b) => a - b)[Math.floor(f.samples.length/2)] || 1/60, clearN = Math.round(clearT/stride);   // 표본 간격(초)으로 기대 표본 수
+    check(`개선 후 06 해소: 위험이 풀리면 확인(0.8초, 깜빡임 멈춤) → 이동 판단에 초록 해소 신호 한 번(${clearT.toFixed(1)}초, 반복 없음) → 뒤차 사라지고 화살표 다시 흐름`, goAt && sw.length >= clearN - 4 && sw.length <= clearN + 3 && sw[0].t >= goAt.t && clearing.length > 15 && clearing.every(s => s.rear === clearing[0].rear || s.rear < .95) && after2.length > 5 && after2.every(s => s.lv === 0 && s.rear < .05 && s.flow && !s.sweep), `go ${goAt && goAt.t} · 해소 ${sw.length}프레임(기대 ${clearN}) · 확인 ${clearing.length}프레임 · 뒤 ${after2.length}`);
     check('개선 후 06 해소: 확인 중에는 깜빡이지 않음', clearing.length > 10 && new Set(clearing.map(s => s.rear.toFixed(2))).size <= 2, [...new Set(clearing.map(s => s.rear.toFixed(2)))].join('/'));
     // 개선 전(V1)은 같은 장면에서 멈춤 막대 + 빨간 점 — 1차 그대로
     const v1 = await E(() => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');

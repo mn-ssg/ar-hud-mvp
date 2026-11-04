@@ -66,11 +66,6 @@
   <section>
     <h2>보기</h2>
     <label class="check"><input type="checkbox" id="mirrorChk" checked> 룸미러</label>
-    <p class="field">개선 후 HUD 마감</p>
-    <div class="seg" id="toneSeg">
-      <button data-tone="A" aria-pressed="true">A 절제</button>
-      <button data-tone="B" aria-pressed="false">B 선명</button>
-    </div>
     <button class="btn block" id="explainBtn" aria-pressed="false">HUD 설명 보기 (발표용)</button>
   </section>
 </aside>
@@ -82,7 +77,7 @@
 
   <div id="hudWrap">
     <!-- HUD 표시 영역 = 이 상자(viewBox 520 × 270) 하나. 두 HUD의 모든 층은 #hudClip 안에서만 그린다 (2026-10-29) -->
-    <svg viewBox="0 0 520 270" aria-hidden="true">
+    <svg id="hudSvg" viewBox="0 0 520 270" aria-hidden="true">
       <defs>
         <clipPath id="hudClip" clipPathUnits="userSpaceOnUse"><rect x="0" y="0" width="520" height="270"/></clipPath>
         <linearGradient id="fadeTop" gradientUnits="userSpaceOnUse" x1="0" y1="80" x2="0" y2="102">
@@ -124,9 +119,11 @@
         <linearGradient id="arrowGrad2" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1" y2="0">
           <stop id="ag2A" offset="0" stop-color="#4cd38a" stop-opacity=".3"/><stop id="ag2B" offset="1" stop-color="#4cd38a" stop-opacity="1"/>
         </linearGradient>
-        <linearGradient id="edgeGrad2" x1="0" y1="0" x2="0" y2="1">
-          <stop id="eg2A" offset="0" stop-color="#ff5a4f" stop-opacity="0"/><stop id="eg2B" offset=".5" stop-color="#ff5a4f" stop-opacity="1"/><stop id="eg2C" offset="1" stop-color="#ff5a4f" stop-opacity="0"/>
-        </linearGradient>
+        <!-- 가장자리 빛 (2026-11-04): 세로 번짐만 있던 네모 막대 → 가로로도 바깥 가장자리에서 안쪽으로 서서히 사라지게(가로 그라데이션 채움 + 세로 마스크). 색은 hud2.js가 넣음 -->
+        <linearGradient id="edgeGrad2R" x1="1" y1="0" x2="0" y2="0"><stop class="eg2" offset="0" stop-color="#ff5a4f" stop-opacity="1"/><stop class="eg2" offset=".45" stop-color="#ff5a4f" stop-opacity=".35"/><stop class="eg2" offset="1" stop-color="#ff5a4f" stop-opacity="0"/></linearGradient>
+        <linearGradient id="edgeGrad2L" x1="0" y1="0" x2="1" y2="0"><stop class="eg2" offset="0" stop-color="#ff5a4f" stop-opacity="1"/><stop class="eg2" offset=".45" stop-color="#ff5a4f" stop-opacity=".35"/><stop class="eg2" offset="1" stop-color="#ff5a4f" stop-opacity="0"/></linearGradient>
+        <linearGradient id="edgeMaskGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+        <mask id="edgeMaskV" maskContentUnits="objectBoundingBox"><rect width="1" height="1" fill="url(#edgeMaskGrad)"/></mask>
         <filter id="glow2" x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur stdDeviation="1.2" result="b"/>
           <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
@@ -200,7 +197,7 @@
 
         <!-- ===== 우리 HUD 2.1 (개선 후, 2026-11-03 — 10주차 발표 '상태 6개') =====
              자리 · 크기 · 길 안내(① 들어갈 차로 ② 갈 방향 ③ 막대 ④ 제한속도)는 개선 전과 같다. 바뀐 것은 뒤차 표현뿐:
-             움직이는 뒤차 + 꺾쇠(bRear, 가장 가까운 한 대) · 거리 구간(bDistBand) · 더 오는 차 흐름(bFlow) · 가장자리 빛(bEdgeL/R) · 깜빡임 · 위험 강화의 경계 빨간 선(bBound) · 해소의 초록 훑기(bSweep).
+             움직이는 뒤차 + 꺾쇠(bRear, 가장 가까운 한 대) · 거리 구간(bDistBand) · 더 오는 차 흐름(bFlow) · 가장자리 빛(bEdgeL/R) · 깜빡임 · 위험 강화의 경계 빨간 선(bBound) · 해소 신호(bClearFill · 화살표 한 번 커짐).
              상태는 data-level(0 안전 · 1 감지 · 2 주의 · 3 대기 · 4 위험 강화). 색 · 굵기 · 투명도 · 시간은 hud.css 맨 위 토큰, 그리기는 hud2.js drawAr2() -->
         <g id="arHud2" data-level="0" style="display:none">
           <g mask="url(#roadMask2)">
@@ -211,8 +208,8 @@
             <path id="bJam" fill="url(#jamHatch)" opacity="0"/>
             <path id="bPulses" class="b-pulses"/>
             <path id="bRails" class="b-rails" filter="url(#glow2)"/>
-            <path id="bSweepBase" class="b-sweep"/>
-            <path id="bSweep" class="b-sweep"/>
+            <!-- 06 해소 신호 (2026-11-04): 들어갈 차로 전체가 초록으로 찼다 천천히 빠짐 (길이 config.js REAR2.clearT). 화살표 한 번 커짐은 #bMoveGrp transform -->
+            <path id="bClearFill" class="b-clear"/>
             <g id="bVeh"></g>
             <path id="bGapMark" class="b-gapmark" filter="url(#glow2)"/>
             <path id="bSlot" class="b-slot"/>
@@ -247,10 +244,10 @@
             <rect x="-12" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/><rect x="7" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/>
             <path d="M-5 -9 H5 L8 -4 H-8 Z" fill="#0b0d10" fill-opacity=".55"/>
           </g>
-          <rect id="bEdgeL" x="0" y="96" width="0" height="140" rx="3.5" fill="url(#edgeGrad2)" opacity="0"/>
-          <rect id="bEdgeR" x="520" y="96" width="0" height="140" rx="3.5" fill="url(#edgeGrad2)" opacity="0"/>
+          <rect id="bEdgeL" x="0" y="80" width="0" height="172" fill="url(#edgeGrad2L)" mask="url(#edgeMaskV)" opacity="0"/>
+          <rect id="bEdgeR" x="520" y="80" width="0" height="172" fill="url(#edgeGrad2R)" mask="url(#edgeMaskV)" opacity="0"/>
           <g id="bAct" filter="url(#glow2)">
-            <g id="bIcon" class="b-icon" transform="scale(1.55)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <g id="bIcon" class="b-icon" transform="scale(1.75)" fill="none" stroke-linecap="round" stroke-linejoin="round"><!-- 크기는 hud.css --h2-icon-scale, 자리 · 막대와의 간격(--h2-sp3)은 hud2.js가 넣음 -->
               <g id="bIcoRight"><path d="M-6 13 V4 Q-6 -4 5 -9 M-1 -13 L8 -9 L4 -1"/></g>
               <g id="bIcoLeft"><path d="M6 13 V4 Q6 -4 -5 -9 M1 -13 L-8 -9 L-4 -1"/></g>
               <g id="bIcoUp"><path d="M0 13 V-12 M-8 -4 L0 -13 L8 -4"/></g>

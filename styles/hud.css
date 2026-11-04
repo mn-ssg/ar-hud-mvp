@@ -9,21 +9,26 @@
    · 색: 역할별 4가지(안내 route · 이동/해소 go · 주의 warn · 위험 danger) + 무채색 2(감지 · 도로 윤곽 neutral / 대기 중 막대 idle). 같은 역할은 모든 요소가 같은 값. 거리 구간 · 흐름 띠 투명도는 config.js REAR2(bandOp · flowOp)
    · 선 굵기 3단계(w1 윤곽 · w2 막대 · w3 경계/멈춤) · 모서리 2단계 · 투명도는 역할별 토큰 · 빛 번짐은 glow 하나(JS가 #glow2에 넣음)
    · 시간: fast(상태 전환) · fade(나타남 · 사라짐) — 깜빡임 · 훑기 시간은 config.js REAR2
-   · 야간은 .cab.night에서 투명도 · 번짐만 낮춤(색은 그대로). 마감 B(선명)는 #cab[data-tone="B"]에서 토큰만 바꿈 → 구조 · 코드 같음
+   · 야간은 .cab.night에서 투명도 · 번짐만 낮춤(색은 그대로). 마감은 B(선명) 하나(2026-11-04 사용자: A 절제 삭제)
    ============================================================ */
 :root{
-  --h2-route:#6edcf0;  --h2-go:#4cd38a;  --h2-warn:#ffb13d;  --h2-danger:#ff5a4f;
+  --h2-route:#00e5ff;  --h2-go:#3ddc84;  --h2-warn:#ffb020;  --h2-danger:#ff4d4d;
   --h2-neutral:#e3ecf2;  --h2-idle:#9aa6b2;  --h2-core:#ffffff;
-  --h2-w1:1px;  --h2-w2:2.6px;  --h2-w3:5px;  --h2-arrow:7px;
+  --h2-w1:1.4px;  --h2-w2:3.4px;  --h2-w3:6.5px;  --h2-arrow:8.5px;
   --h2-r1:2px;  --h2-r2:4px;
-  --h2-op-fill:.5;  --h2-op-ctx:.4;  --h2-op-detect:.45;  --h2-op-edge:.75;  --h2-op-ego:1;
-  --h2-glow:1.2;
+  --h2-op-fill:.62;  --h2-op-ctx:.5;  --h2-op-detect:.45;  --h2-op-edge:.9;  --h2-op-ego:1;
+  --h2-glow:2.2;
   --h2-t-fast:.18s;  --h2-t-fade:.3s;
+  /* 간격 단계 (HUD 상자 단위 = viewBox 520 × 270 기준, 2026-11-04): sp1 4 · sp2 8 · sp3 16. 갈 방향 화살표 ↔ 막대 사이는 sp3 */
+  --h2-sp1:4;  --h2-sp2:8;  --h2-sp3:16;
+  /* ② 갈 방향 화살표 (2026-11-04 사용자: '잘 안 보임' — 원인: 작고(1.55배 · 선 3.4) 밝은 하늘 위에 screen 합성이라 하늘보다 밝아질 수 없어 대비 1.1 ~ 1.4:1). 크기 · 선 굵기만 키움.
+     네모 바탕 → 모양 그림자(#hudPlate)를 넣었다가 사용자 요청으로 삭제(11.4 밤) — 그림자 없음. 우선순위: 들어갈 차로(미니 도로 전체) > 갈 방향 > 막대 */
+  --h2-icon-scale:1.75;  --h2-icon-w:5px;
+  /* 06 해소 신호 색 · 세기 (2026-11-04). 초록은 해소 · 이동에만 */
+  --h2-op-clear:.85;
 }
-.cab.night{ --h2-op-fill:.42; --h2-op-ctx:.26; --h2-op-detect:.4; --h2-op-edge:.6; --h2-op-ego:.85; --h2-glow:.6; }
-/* 마감 B(선명): 1차의 채도 높은 청록 · 굵은 선 · 센 번짐. 비교용 — 연구자 설정 '개선 후 HUD 마감' */
-#cab[data-tone="B"]{ --h2-route:#00e5ff; --h2-go:#3ddc84; --h2-warn:#ffb020; --h2-danger:#ff4d4d; --h2-w1:1.4px; --h2-w2:3.4px; --h2-w3:6.5px; --h2-arrow:8.5px; --h2-op-fill:.62; --h2-op-ctx:.5; --h2-op-edge:.9; --h2-glow:2.2; }
-#cab[data-tone="B"].night{ --h2-glow:1.1; --h2-op-fill:.5; --h2-op-ctx:.32; }
+.cab.night{ --h2-op-fill:.5; --h2-op-ctx:.32; --h2-op-detect:.4; --h2-op-edge:.6; --h2-op-ego:.85; --h2-glow:1.1; --h2-op-clear:.7; }
+/* 마감은 B(선명) 하나 — 2026-11-04 사용자: 'A 절제'를 없애고 선명만. 위 토큰이 예전 B 값(1차의 채도 높은 청록 · 굵은 선 · 센 번짐). 기록의 HUD 버전은 '우리 2.1-B' 그대로 */
 
 /* 개선 후 HUD 요소 — 정적인 색 · 굵기 · 투명도만 여기서. 상태에 따라 바뀌는 값은 hud2.js가 토큰을 읽어 넣는다 */
 #arHud2 .b-surf{ fill:var(--h2-neutral); fill-opacity:.04; }
@@ -31,14 +36,14 @@
 #arHud2 .b-dash{ fill:var(--h2-neutral); fill-opacity:calc(var(--h2-op-ctx)*.6); }
 #lg2A{ stop-opacity:var(--h2-op-fill); } #lg2B{ stop-opacity:calc(var(--h2-op-fill)*.5); } #lg2C{ stop-opacity:.08; }
 #arHud2 .b-ego path:first-child{ fill:var(--h2-core); fill-opacity:var(--h2-op-ego); stroke:var(--h2-core); stroke-width:.6; stroke-opacity:.9; }   /* 내 차: 흰색 속 참 + 밝은 테 (2026-11-03 키움) */
-#arHud2 .b-icon{ stroke:var(--h2-route); stroke-width:3.4; transition:opacity var(--h2-t-fast) ease; }
+#arHud2 .b-icon{ stroke:var(--h2-route); stroke-width:var(--h2-icon-w); transition:opacity var(--h2-t-fast) ease; }
 #arHud2 .b-move{ stroke-width:var(--h2-arrow); }
 #arHud2 .b-gapmark{ fill:none; stroke:var(--h2-go); stroke-width:var(--h2-w2); stroke-linecap:round; stroke-linejoin:round; }
 #arHud2 .b-slot{ fill:var(--h2-route); fill-opacity:.2; stroke:var(--h2-route); stroke-width:var(--h2-w1); stroke-linejoin:round; }
 #arHud2 .b-citystop{ fill:var(--h2-danger); }
 #arHud2 .b-ped{ fill:var(--h2-neutral); fill-opacity:.9; }
 #arHud2 .b-q{ fill:none; stroke:var(--h2-warn); stroke-width:calc(var(--h2-w1)*1.4); }
-#arHud2 .b-sweep{ fill:var(--h2-go); }
+#arHud2 .b-clear{ fill:var(--h2-go); }   /* 06 해소 신호 (초록은 여기와 이동 화살표에만) */
 #arHud2 .b-bound{ fill:var(--h2-danger); }
 #arHud2 .b-boundcore{ fill:var(--h2-core); fill-opacity:.85; }
 #arHud2 .b-rear-glass{ fill:#0b0d10; fill-opacity:.45; }
@@ -57,11 +62,11 @@
    실제 순정 HUD 허상은 수평 약 5 ~ 10°(자료마다 다름 — 10_HUD_GUI_설계 0-7절)인데 이 화면의 카메라 수평 시야가 약 90°라
    각도 그대로면 폭 6 ~ 11%로 그림 · 숫자를 읽기 어렵다 → 그 사이 값. 두 HUD가 같은 상자를 써서 비교 조건은 같다 */
 #hudWrap{ position:absolute; left:50%; bottom:32.6%; transform:translateX(-50%); transform-origin:50% 100%; width:clamp(230px, 19%, 410px); pointer-events:none; transition:transform .35s ease; }
-#hudWrap svg{ display:block; width:100%; height:auto; overflow:hidden; mix-blend-mode:screen; filter:drop-shadow(0 0 3px rgba(255,255,255,.16)); }
+#hudSvg{ display:block; width:100%; height:auto; overflow:hidden; mix-blend-mode:screen; filter:drop-shadow(0 0 3px rgba(255,255,255,.16)); }
 .tnum{ font-variant-numeric:tabular-nums; }
 /* 야간: HUD 전체 밝기 · 채도 · 빛 번짐을 낮춤 — 우리 HUD · 기존 HUD 똑같이 (실제 순정 HUD의 밤 자동 감광처럼).
    빛 번짐 반경은 main.js setLight가 #glow 흐림(2.4 → 1.1)으로 줄임 */
-.cab.night #hudWrap svg{ filter:brightness(.9) saturate(.9) drop-shadow(0 0 1.5px rgba(255,255,255,.05)); }
+.cab.night #hudSvg{ filter:brightness(.9) saturate(.9) drop-shadow(0 0 1.5px rgba(255,255,255,.05)); }
 /* 우리 HUD 야간: 맥락(도로 윤곽) · 보조(표지) · 내 차를 더 낮춤. 경로 · 위험 · 이동은 그대로 */
 .cab.night #roadEdges{ fill-opacity:.34; }
 .cab.night #roadDash{ fill-opacity:.22; }

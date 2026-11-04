@@ -5,14 +5,16 @@
      뺀 것: 작은 경고 아이콘(#carBehind) · 크기 변화(원근 도로에서 반대로 읽힘)
    · 상태 6개 (data-level): 0 안전 / 1 감지(흐린 흰색, fade in) / 2 주의(주황, 뒤차가 올라옴, 같은 쪽 가장자리 빛) /
      3 대기(빨강, 이동 화살표 빨간 점으로 멈춤, 위험 구간, 깜빡임, 갈 방향 흐리게, 막대 회색) / 4 위험 강화(차로 경계 빨간 선, 가장자리 빛 최대, 깜빡임 속도 그대로) /
-     해소(뒤차 fade out · 초록이 들어갈 차로를 한 번 훑고 · 화살표 다시 흐름)
+     해소(뒤차 fade out · 초록 해소 신호 한 번 = 들어갈 차로 전체가 초록으로 찼다 천천히 빠짐 + 빨간 점이 초록 화살표로 바뀌며 한 번 커짐 · 화살표 다시 흐름)
+   · 2026-11-04 보이는 정도만 고침(구조 그대로): 갈 방향 화살표 키움(네모 바탕 · 모양 그림자는 넣었다가 사용자 요청으로 삭제) · 깜빡임 켜짐/꺼짐 딱 끊김(REAR2.blink · blinkDuty · blinkLow) · 해소 신호 차로 전체 초록 + 화살표 한 번 커짐(REAR2.clearT, 사용자 선택 A+C)
    · 판단: 대기 · 해소는 guide.js 게이트(S.G.gate — 1차와 같은 10m · 3.5초, 해제는 1.2배 + 0.8초 유지 → 경계값에서 깜빡이지 않음).
      감지 · 주의 값은 config.js REAR2 (파일럿에서 정함). 내릴 때는 REAR2.dwell초 머문 뒤 · 올릴 때는 바로
    · 색 · 굵기 · 투명도 · 시간은 hud.css 맨 위 토큰(--h2-*)을 읽어 쓴다 — 상태에 따라 바뀌는 값만 여기서 넣고, 정적인 값은 CSS
    config.js · guide.js · hud.js 다음에 로드. S · path · EGO는 main.js (호출 시점엔 존재)
    ============================================================ */
 
-const B_BEHIND = 14;   // 미니 도로를 내 차 뒤 이만큼(m)까지 그린다 — 뒤차가 실제 쪽 차로에서 내 차 쪽으로 올라오는 자리
+const B_BEHIND = 14;
+const ICON_Y = 30;     // 갈 방향 화살표 가운데 y (HUD 상자 단위). 막대 y = ICON_Y + 13 × --h2-icon-scale + --h2-sp3 (2026-11-04)   // 미니 도로를 내 차 뒤 이만큼(m)까지 그린다 — 뒤차가 실제 쪽 차로에서 내 차 쪽으로 올라오는 자리
 // 투영: hud.js makeProj와 같은 식, 뒤(d < 0)도 B_BEHIND까지 허용 (같은 원근식을 그대로 늘린 것)
 function makeProj2(p, f){
   const rx = -f.z, rz = f.x;
@@ -23,14 +25,14 @@ function makeProj2(p, f){
     return [HX + X*PXM*s, HY_FAR + (HY_NEAR - HY_FAR)*s, s, d];
   };
 }
-const B = {level:0, since:0, gate:'none', prevGate:'none', cand:null, others:[], gapDraw:null, alpha:0, edgeW:0, edgeA:0, blinkT0:0, sweepT0:-9, lastT:null, tk:null, tkAt:-1e9, dir:0,
+const B = {level:0, since:0, gate:'none', prevGate:'none', cand:null, others:[], gapDraw:null, alpha:0, edgeW:0, edgeA:0, blinkT0:0, clearT0:-9, lastT:null, tk:null, tkAt:-1e9, dir:0,
   primRef:null, old:null};   // old: 기준 차가 바뀔 때 이전 차 {ref, alpha, pt, col} — 제자리에서 0.3초에 걸쳐 사라짐 (튀지 않게)
-const AS2 = {icon:null, since:0, doneUntil:0, wasMove:false};
+const AS2 = {icon:null, since:0, doneUntil:0, wasMove:false, op:1};   // op: 갈 방향 투명도(대기 0.45 ↔ 평상시 1)를 t-fast(0.18초)에 걸쳐 옮김 — 상태가 바뀔 때 튀지 않게 (2026-11-04)
 function resetHud2(){
-  Object.assign(B, {level:0, since:0, gate:'none', prevGate:'none', cand:null, others:[], gapDraw:null, alpha:0, edgeW:0, edgeA:0, blinkT0:0, sweepT0:-9, lastT:null, dir:0, primRef:null, old:null});
-  AS2.icon = null; AS2.doneUntil = 0; AS2.wasMove = false;
-  $('#bRear').setAttribute('opacity', 0); $('#bRearOld').setAttribute('opacity', 0); $('#bDistBand').setAttribute('d', ''); $('#bFlow').setAttribute('d', ''); $('#bSweep').setAttribute('d', ''); $('#bSweepBase').setAttribute('d', '');
-  $('#bBound').setAttribute('d', ''); $('#bBoundCore').setAttribute('d', ''); $('#bEdgeL').setAttribute('opacity', 0); $('#bEdgeR').setAttribute('opacity', 0);
+  Object.assign(B, {level:0, since:0, gate:'none', prevGate:'none', cand:null, others:[], gapDraw:null, alpha:0, edgeW:0, edgeA:0, blinkT0:0, clearT0:-9, lastT:null, dir:0, primRef:null, old:null});
+  AS2.icon = null; AS2.doneUntil = 0; AS2.wasMove = false; AS2.op = 1;
+  $('#bRear').setAttribute('opacity', 0); $('#bRearOld').setAttribute('opacity', 0); $('#bDistBand').setAttribute('d', ''); $('#bFlow').setAttribute('d', ''); $('#bClearFill').setAttribute('d', '');
+  $('#bBound').setAttribute('d', ''); $('#bBoundCore').setAttribute('d', ''); $('#bEdgeL').setAttribute('opacity', 0); $('#bEdgeR').setAttribute('opacity', 0); $('#bMoveGrp').removeAttribute('transform');
   $('#arHud2').dataset.level = 0;
 }
 // 디자인 토큰 읽기 (0.5초마다 — 시간대 · 마감 바뀌면 그때 반영). 빛 번짐은 여기서 #glow2에 넣는다
@@ -39,7 +41,8 @@ function tk2(now){
   const cs = getComputedStyle($('#cab')), g = n => cs.getPropertyValue(n).trim();
   B.tk = {route:g('--h2-route'), go:g('--h2-go'), warn:g('--h2-warn'), danger:g('--h2-danger'), neutral:g('--h2-neutral'), idle:g('--h2-idle'), core:g('--h2-core'),
     opFill:+g('--h2-op-fill'), opCtx:+g('--h2-op-ctx'), opDetect:+g('--h2-op-detect'), opEdge:+g('--h2-op-edge'),
-    glow:+g('--h2-glow'), w1:parseFloat(g('--h2-w1')), w2:parseFloat(g('--h2-w2')), w3:parseFloat(g('--h2-w3'))};
+    glow:+g('--h2-glow'), w1:parseFloat(g('--h2-w1')), w2:parseFloat(g('--h2-w2')), w3:parseFloat(g('--h2-w3')),
+    iconScale:+g('--h2-icon-scale') || 1.75, sp3:+g('--h2-sp3') || 16, opClear:+g('--h2-op-clear')};
   B.tkAt = now;
   $('#glow2 feGaussianBlur').setAttribute('stdDeviation', B.tk.glow);
   return B.tk;
@@ -74,7 +77,7 @@ function rearLevel2(G, needMove, t){
     if(want >= 3 && B.level < 3) B.blinkT0 = t;
     B.level = want; B.since = t;
   }
-  if((B.prevGate === 'wait' || B.prevGate === 'clearing') && gate === 'go') B.sweepT0 = t;   // 06 해소
+  if((B.prevGate === 'wait' || B.prevGate === 'clearing') && gate === 'go') B.clearT0 = t;   // 06 해소
   B.prevGate = gate; B.gate = gate; B.cand = cand;
   B.dir = G && G.dir && G.dir.side ? G.dir.side : (G ? G.side : 0);   // 빛 · 뒤차 쪽: 내 차 자세 기준 (없으면 옮길 쪽)
   return B.level;
@@ -97,7 +100,8 @@ function drawAr2(p, f, C, k){
 
   // ---- 뒤차 단계 (0 ~ 4) ----
   const lv = rearLevel2(G, needMove, t), wait = lv >= 3, cand = B.cand;
-  const blinkOn = lv >= 3 && B.gate === 'wait' ? ((t - B.blinkT0) % REAR2.blink) < REAR2.blink/2 : true;
+  // 깜빡임: 켜짐 · 꺼짐이 딱 끊기는 네모파 (켜짐 비율 blinkDuty, 꺼짐 밝기 blinkLow). 뒤차 · 거리 구간 · 가장자리 빛이 같은 blink 값을 곱해 같은 박자. 속도는 위험 강화에서도 그대로
+  const blinkOn = lv >= 3 && B.gate === 'wait' ? ((t - B.blinkT0) % REAR2.blink) < REAR2.blink*REAR2.blinkDuty : true;
   const blink = blinkOn ? 1 : REAR2.blinkLow;
   $('#arHud2').dataset.level = lv;
   const col = lv >= 3 ? T.danger : lv === 2 ? T.warn : T.neutral;
@@ -113,8 +117,15 @@ function drawAr2(p, f, C, k){
   const act = $('#bAct'), e = ease(clamp((now - AS2.since)/200));
   ['bIcoRight', 'bIcoLeft', 'bIcoUp'].forEach(n => $('#' + n).style.display = n === icon ? '' : 'none');
   act.style.display = icon ? '' : 'none';
-  act.setAttribute('transform', `translate(${HX} 32) scale(${(.88 + .12*e).toFixed(3)})`);
-  act.setAttribute('opacity', (e*(wait ? .45 : 1)).toFixed(3));
+  // 자리: 화살표 가운데 y = ICON_Y, 아래끝 = ICON_Y + 13 × 크기. 막대는 그 아래 --h2-sp3만큼 띄움 (2026-11-04 사용자: 화살표와 막대가 붙어 보임). HUD 상자 · 미니 도로 자리는 그대로
+  const actTr = `translate(${HX} ${ICON_Y}) scale(${(.88 + .12*e).toFixed(3)})`;
+  act.setAttribute('transform', actTr);
+  AS2.op += clamp((wait ? .45 : 1) - AS2.op, -dt/.18, dt/.18);   // 대기 ↔ 평상시 0.18초에 걸쳐 (hud.css --h2-t-fast와 같은 값)
+  const iconOp = e*AS2.op;
+  act.setAttribute('opacity', iconOp.toFixed(3));
+  $('#bIcon').setAttribute('transform', `scale(${T.iconScale})`);
+  const barY = Math.round(ICON_Y + 13*T.iconScale + T.sp3);
+  $('#bCdBg').setAttribute('y', barY); $('#bCdBar').setAttribute('y', barY);
 
   /* ③ 다음 행동까지 — 개선 전과 같음. 뒤차로 기다리면 회색으로 계속 줄어듦 */
   let bar = null, bi = C.i, bd = C.d;
@@ -158,9 +169,14 @@ function drawAr2(p, f, C, k){
 
   /* 이동 화살표 — 개선 전과 같은 자리 · 모양. 초록 흐름 = 옮겨도 됨 / 주황 점 = 틈 대기 / 빨간 점 = 대기(뒤차). 개선 전의 '멈춤 막대'는 없음 — 원인(뒤차)을 직접 보여 주므로 */
   const a0 = needMove ? proj(p.x, p.z - 7) : null, a1 = needMove ? proj(p.x, p.z - 19) : null, a2 = needMove ? proj(tx, p.z - 31) : null;
-  const ma = $('#bMove'), mh = $('#bHead');
+  const ma = $('#bMove'), mh = $('#bHead'), mg = $('#bMoveGrp');
+  // 06 해소 진행도 0 ~ 1 (한 번만, REAR2.clearT초)
+  const cu = (t - B.clearT0)/REAR2.clearT, clearing = cu >= 0 && cu < 1 && onMain && !wait;
   if(a0 && a1 && a2){
-    const ac = wait ? T.danger : besideQueue ? (S.q.mergeNear ? T.go : T.warn) : arrowColor2(frac);
+    const ac = wait ? T.danger : clearing ? T.go : besideQueue ? (S.q.mergeNear ? T.go : T.warn) : arrowColor2(frac);
+    // 해소: 빨간 점 → 초록 화살표로 바뀌며 한 번 커졌다(1.35배, 화살표 가운데 기준) 제자리로 (2026-11-04 사용자 선택 C)
+    if(clearing){ const k = 1 + .35*Math.sin(Math.PI*cu), cx = (a0[0] + a2[0])/2, cy = (a0[1] + a2[1])/2; mg.setAttribute('transform', `translate(${cx.toFixed(1)} ${cy.toFixed(1)}) scale(${k.toFixed(3)}) translate(${(-cx).toFixed(1)} ${(-cy).toFixed(1)})`); }
+    else mg.removeAttribute('transform');
     ma.setAttribute('d', `M${fmt(a0)}Q${fmt(a1)} ${fmt(a2)}`);
     const ag = $('#arrowGrad2'); ag.setAttribute('x1', a0[0]); ag.setAttribute('y1', a0[1]); ag.setAttribute('x2', a2[0]); ag.setAttribute('y2', a2[1]);
     $('#ag2A').setAttribute('stop-color', ac); $('#ag2B').setAttribute('stop-color', ac);
@@ -170,7 +186,7 @@ function drawAr2(p, f, C, k){
     const nx = -dy, ny = dx;
     mh.setAttribute('d', `M${(a2[0]+dx*9).toFixed(1)} ${(a2[1]+dy*9).toFixed(1)}L${(a2[0]-dx*8+nx*10).toFixed(1)} ${(a2[1]-dy*8+ny*10).toFixed(1)}L${(a2[0]-dx*8-nx*10).toFixed(1)} ${(a2[1]-dy*8-ny*10).toFixed(1)}Z`);
     mh.setAttribute('fill', ac); mh.setAttribute('opacity', wait ? .8 : 1);   // 대기: 머리는 조금만 낮춤(주간 대비 2.2:1 → 측정 뒤 .55에서 올림)
-  } else { ma.setAttribute('d', ''); mh.setAttribute('d', ''); ma.classList.remove('flow'); }
+  } else { ma.setAttribute('d', ''); mh.setAttribute('d', ''); ma.classList.remove('flow'); mg.removeAttribute('transform'); }
 
   /* 정체 — 개선 전과 같음(빗금 · 설 칸 · 틈 · 줄 차 주황 테). 정체 줄 차는 뒤차 표현에 넣지 않음 */
   const jb = $('#bJam');
@@ -247,18 +263,14 @@ function drawAr2(p, f, C, k){
   const wTo = lv >= 4 ? 34 : lv === 3 ? 22 : lv === 2 ? 12 : 0, aTo = lv >= 4 ? 1 : lv === 3 ? .85 : lv === 2 ? .55 : 0;
   B.edgeW += (wTo - B.edgeW)*Math.min(1, dt*8); B.edgeA += clamp(aTo - B.edgeA, -dt/REAR2.fade, dt/REAR2.fade);
   const ec = lv >= 3 ? T.danger : T.warn;
-  ['#eg2A', '#eg2B', '#eg2C'].forEach(s => $(s).setAttribute('stop-color', ec));
+  $$('.eg2').forEach(s => s.setAttribute('stop-color', ec));
   const side = B.dir || sgn, eL = $('#bEdgeL'), eR = $('#bEdgeR');
   const ea = (B.edgeA*T.opEdge*(lv >= 3 ? blink : 1)).toFixed(3);
   eL.setAttribute('width', side < 0 ? B.edgeW.toFixed(1) : 0); eL.setAttribute('opacity', side < 0 ? ea : 0);
   eR.setAttribute('width', side > 0 ? B.edgeW.toFixed(1) : 0); eR.setAttribute('x', (520 - B.edgeW).toFixed(1)); eR.setAttribute('opacity', side > 0 ? ea : 0);
-  // 06 해소: 초록이 들어갈 차로를 한 번 훑음(내 차 앞에서 멀어지는 띠 + 차로 전체가 잠깐 초록) → 그 뒤 화살표가 다시 흐름
-  const su = (t - B.sweepT0)/REAR2.sweep;
-  if(su >= 0 && su < 1 && onMain){
-    const zc = p.z - 2 - 58*su;
-    $('#bSweep').setAttribute('d', bandX(tx - 1.6, tx + 1.6, zc + 7, zc - 7, proj, 2)); $('#bSweep').setAttribute('fill-opacity', (.75*(1 - su)).toFixed(3));
-    $('#bSweepBase').setAttribute('d', bandX(tx - 1.6, tx + 1.6, p.z - 2, p.z - 60, proj, 2)); $('#bSweepBase').setAttribute('fill-opacity', (.32*Math.sin(Math.PI*su)).toFixed(3));
-  } else { $('#bSweep').setAttribute('d', ''); $('#bSweepBase').setAttribute('d', ''); }
+  // 06 해소 채움 (2026-11-04 사용자 선택 A): 들어갈 차로 전체(내 차 뒤부터 갈림까지)가 0.1초 안에 초록으로 차고 나머지 동안 천천히 빠짐. 끝나면 지워져 화살표 흐름(평상시)만 남는다
+  const onFast = u => u < .12 ? u/.12 : Math.cos(Math.PI/2*(u - .12)/.88);
+  $('#bClearFill').setAttribute('d', clearing ? bandX(tx - 1.75, tx + 1.75, zNear, -230, proj) : ''); $('#bClearFill').setAttribute('fill-opacity', (clearing ? T.opClear*onFast(cu) : 0).toFixed(3));
 
   /* 일반도로 (D69) — 개선 전과 같음: 멈출 곳 빨간 막대 · 보행자 점 */
   let cs = '', pd = '';

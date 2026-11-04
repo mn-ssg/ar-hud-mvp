@@ -59,7 +59,7 @@ function navCtx(s){
 
 /* ---------- 상태 ---------- */
 // testing = 주행 테스트 진행 중(결과 카드 · 쉬는 화면 포함, 설정 잠금) · drive = 내 차를 키보드로 모는 중 (drive.js D)
-const S = {mode:'ar2', tone:'A', map:null, route:null, target:0, startLane:1, running:false, paused:false, s:40, testing:false, drive:false,
+const S = {mode:'ar2', tone:'B', map:null, route:null, target:0, startLane:1, running:false, paused:false, s:40, testing:false, drive:false,
   fill:0, danger:0, car:null, jam:0, speedFactor:1, q:null, jamHoldT:0,
   rearGap:56, rearActive:false, rearBlock:false, threatCar:null, bswL:false, bswR:false, demoMap:'ICR', demoTarget:1, demoJam:0, light:'day',
   cityT:0, sigT:0, pedPlan:null, cityLim:Infinity};   // 일반도로(D69): 판 시작부터 시간 · 좌회전 화살표 켜지는 시각 · 보행자 계획 · 시연에서 설 곳(s)
@@ -130,7 +130,11 @@ function stopDemo(){
 function prepDemo(){
   const m = mapById(S.demoMap);
   loadMap(m); renderScenario();
-  S.jam = m.city ? (m.queue ? 1 : 0) : S.demoJam; setTarget(S.demoTarget);
+  S.jam = m.city ? (m.queue ? 1 : 0) : S.demoJam;
+  // 고속도로 시연의 출발 차로 (2026-11-04): 고른 목적지로 가려면 차로를 옮겨야 하는 차로를 고른다 — ② JC 4차로 '왼쪽'은 2차로(→ 1차로로 옮김, 왼쪽 뒤차), '오른쪽'은 1차로(→ 2차로, 오른쪽 뒤차).
+  // 예전엔 늘 첫 출발 차로(1차로)라 '왼쪽'은 옮길 필요가 없어 뒤차 장면이 아예 안 나왔음. 일반도로는 맵에 딸린 장면이라 그대로
+  const lane = m.city ? undefined : (m.start.find(l => makeRoute(m, S.demoTarget, l).side !== 0) ?? m.start[0]);
+  setTarget(S.demoTarget, lane);
   // 일반도로 시연: 좌회전 화살표는 17초에 켜짐(줄 뒤에서 몇 초 기다림), ⑤ 보행자 3명이 내 차가 닿을 무렵 건넘
   S.cityT = 0; S.sigT = 17;
   S.pedPlan = m.cw ? [{x:17.2, dir:1, v:1.35, t0:11.5}, {x:18.8, dir:1, v:1.5, t0:13}, {x:18, dir:-1, v:1.5, t0:1}] : null;
@@ -448,14 +452,8 @@ $$('#mapSeg button').forEach(b => b.onclick = () => {
 $$('#jamSeg button').forEach(b => b.onclick = () => { if(stopDemo()){ S.demoJam = +b.dataset.j; prepDemo(); update(1); } });
 $('#mirrorChk').onchange = e => { MIR.on = e.target.checked; };
 $('#mirrorChk').checked = MIR.on;
-// 개선 후 HUD 마감(디자인 토큰 세트): A 절제(기본) · B 선명 — hud.css #cab[data-tone]. 기록의 'HUD 버전'에 붙는다
-const TONE_KEY = 'hud-tone';
-function setTone(t){
-  S.tone = t === 'B' ? 'B' : 'A'; $('#cab').dataset.tone = S.tone;
-  $$('#toneSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tone === S.tone)));
-  try{ localStorage.setItem(TONE_KEY, S.tone); }catch(e){}
-}
-$$('#toneSeg button').forEach(b => b.onclick = () => { setTone(b.dataset.tone); update(1); });
+// 개선 후 HUD 마감: B 선명 하나 (2026-11-04 사용자: A 절제 삭제 — hud.css 토큰이 곧 B 값). 기록의 'HUD 버전'에 '-B'로 붙는다(session.js). 고르는 UI 없음
+function setTone(t){ S.tone = 'B'; $('#cab').dataset.tone = 'B'; void t; }
 function togglePause(){
   if(!S.running || S.testing) return;
   S.paused = !S.paused; $('#pauseBtn').textContent = S.paused ? '계속' : '일시정지';
@@ -469,7 +467,7 @@ addEventListener('keydown', e => {
 /* ---------- 시작 ---------- */
 $$('[data-ico]').forEach(el => el.insertAdjacentHTML('afterbegin', ico(el.dataset.ico)));   // 버튼 아이콘 채우기
 $('#hudWrap').style.bottom = (cowlBottomPct() + 2.5).toFixed(1) + '%';   // HUD 아래끝 = 대시보드 윗선보다 화면 높이 2.5%만큼 위 (2026-10-29 사용자: 살짝 올림, 예전 +0.2%)
-setTone((() => { try{ return localStorage.getItem(TONE_KEY) || 'A'; }catch(e){ return 'A'; } })());
+setTone('B');
 setMode('ar2'); setLight('day'); prepDemo(); update(1); setScreen('home');
 requestAnimationFrame(frame);
 prebuildMaps(() => !S.running);   // 멈춰 있을 때 나머지 맵을 미리 지어 둔다

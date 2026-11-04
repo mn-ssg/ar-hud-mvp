@@ -76,23 +76,27 @@ cadd(new THREE.BoxGeometry(1.5, .003, .03), CM.piano, .37, -.2122, -.985);   // 
 // 앞유리 아래끝 검은 세라믹 띠 (위로 갈수록 옅어짐)
 cadd(new THREE.PlaneGeometry(2.6, .035), CM.frit, .37, COWL.y + .016, COWL.z - .005, -.25);
 
-/* ---------- 파노라마 디스플레이: 계기판(운전자 정면) + 센터 화면(오른쪽)을 한 유리로 ---------- */
-const PANEL = {x:.22, y:-.205, z:-.74, tilt:-.12};
+/* ---------- 파노라마 디스플레이: 계기판(운전자 정면) + 센터 화면(오른쪽)을 한 유리로 ----------
+   2026-11-04 (사용자: 계기판이 아래에서 잘리고 오른쪽으로 쏠림 — 원인은 창 크기가 아니라 값):
+   · 세로 자리는 카메라 세로 시야각(58°)이 정해 창 크기 · 비율과 무관(계기판은 늘 화면 높이의 70 ~ 81%). '잘림'은 핸들 테 윗부분이 계기판 아래 테두리(화면 19.8°)를 덮은 것 → 핸들을 4.5cm 내려 틈을 둠
+   · 가로: 계기판 유리는 눈 정면(x = 0)이었지만 속도계를 유리 왼쪽 1/3에 그렸고, 센터 화면이 오른쪽 0.61m까지 뻗어 전체가 오른쪽으로 쏠려 보였다(좁은 창 + 설정 열림(비율 1.35)에선 오른쪽 끝이 잘림).
+     → 속도계를 유리 가운데(= 눈 정면 = 핸들 가운데)에, 센터 화면을 0.42 → 0.34m로 줄이고 유리 전체를 왼쪽으로 옮겨 오른쪽 끝 0.52m(비율 1.3까지 다 보임). 가로 폭은 창 비율을 따라 늘고 줄 뿐 가운데는 늘 화면 가운데 */
+const PANEL = {x:.17, y:-.205, z:-.74, tilt:-.12};
 const panel = new THREE.Group(); panel.position.set(PANEL.x, PANEL.y, PANEL.z); panel.rotation.x = PANEL.tilt; cabin.add(panel);
-cadd(rrBox(.79, .112, .022, .018), CM.piano, 0, 0, -.004, 0, 0, 0, panel);
-cadd(new THREE.BoxGeometry(.8, .008, .06), CM.dash, 0, .059, -.022, 0, 0, 0, panel);   // 위 차양(빛 가림 턱)
+cadd(rrBox(.70, .112, .022, .018), CM.piano, 0, 0, -.004, 0, 0, 0, panel);
+cadd(new THREE.BoxGeometry(.71, .008, .06), CM.dash, 0, .059, -.022, 0, 0, 0, panel);   // 위 차양(빛 가림 턱)
 cadd(new THREE.BoxGeometry(.04, .03, .12), CM.dash, -.05, -.06, -.05, 0, 0, 0, panel);  // 받침
 const clusterCv = document.createElement('canvas'); clusterCv.width = 768; clusterCv.height = 252;
-const infoCv = document.createElement('canvas'); infoCv.width = 1100; infoCv.height = 252;
+const infoCv = document.createElement('canvas'); infoCv.width = 900; infoCv.height = 252;
 const screenMat = cv => { const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.anisotropy = MAX_ANISO; return new THREE.MeshBasicMaterial({map:t, toneMapped:false}); };
 const clusterMat = screenMat(clusterCv), infoMat = screenMat(infoCv);
-cadd(new THREE.PlaneGeometry(.292, .092), clusterMat, -.22, -.002, .0145, 0, 0, 0, panel);   // 계기판: 눈 정면(x≈0)
-cadd(new THREE.PlaneGeometry(.418, .092), infoMat, .143, -.002, .0145, 0, 0, 0, panel);
+cadd(new THREE.PlaneGeometry(.292, .092), clusterMat, -PANEL.x, -.002, .0145, 0, 0, 0, panel);   // 계기판: 눈 정면(x = 0) — 유리 안 어디에 두든 이 값이 가운데
+cadd(new THREE.PlaneGeometry(.34, .092), infoMat, .17, -.002, .0145, 0, 0, 0, panel);               // 센터 화면: 계기판 오른쪽 (눈에서 0.15 ~ 0.49m)
 
 /* ---------- 핸들: 림 지름 37cm, 기둥 기울기 22° (윗부분이 앞으로 누움). 돌리는 건 wheelSpin ----------
    v1.7.1: 눈 앞 0.52 m · 아래 0.385 m(실제 자세에 가깝게). 테 윗부분이 계기판 아래끝 바로 밑(화면 위에서 ≈ 85%)에 와서
    계기판과 겹치지 않고, 화면 아래엔 테 윗부분만 크게 보인다. 가운데 패드 · 살은 화면 밖 */
-const wheel = new THREE.Group(); wheel.position.set(0, -.385, -.52); wheel.rotation.x = -.384; cabin.add(wheel);
+const wheel = new THREE.Group(); wheel.position.set(0, -.43, -.52); wheel.rotation.x = -.384; cabin.add(wheel);   // 2026-11-04: -0.385 → -0.43 (테 윗부분이 계기판 테두리를 덮지 않게, 화면 높이 ≈ 3%의 틈)
 const wheelSpin = new THREE.Group(); wheel.add(wheelSpin);
 (() => {
   /* 2026-10-29: 실제 비례로 다시 — 림 지름 37cm · 굵기 3.9cm(엄지 자리 4.4cm) · 3스포크(3 · 9 · 6시) · 에어백 허브 15 × 11.5cm.
@@ -115,7 +119,7 @@ const wheelSpin = new THREE.Group(); wheel.add(wheelSpin);
   cadd(rrBox(.15, .115, .05, .03), CM.leather, 0, -.012, .03, 0, 0, 0, wheelSpin);                                     // 에어백 허브
   cadd(rrBox(.07, .03, .006, .01), CM.piano, 0, -.006, .057, 0, 0, 0, wheelSpin);                                        // 허브 가운데 (로고 없음)
 })();
-cadd(new THREE.CylinderGeometry(.045, .06, .26, 16), CM.trim, 0, -.45, -.63, 1.01);   // 핸들 기둥 덮개
+cadd(new THREE.CylinderGeometry(.045, .06, .26, 16), CM.trim, 0, -.495, -.63, 1.01);   // 핸들 기둥 덮개 (핸들과 같이 4.5cm 내림)
 
 /* ---------- 앞유리 틀 · 룸미러 · 도어는 그리지 않음 (v1.7.1, D51) ----------
    모니터 시야(가로 ≈ 70°)에 실제 비율로 넣으면 왼쪽 A필러만 화면 안에 들어와 앞유리가 한쪽으로 쏠려 보이고,
@@ -137,15 +141,15 @@ const two = n => String(n).padStart(2, '0');
 function drawCluster(kmh){
   const g = clusterCv.getContext('2d'), W = clusterCv.width, H = clusterCv.height, d = new Date();
   g.fillStyle = '#080b0f'; g.fillRect(0, 0, W, H);
-  // 속도: 가는 호 + 큰 숫자
-  const cx = 250, cy = 150, r = 98, a0 = Math.PI*.78, a1 = Math.PI*2.22;
+  // 속도: 가는 호 + 큰 숫자 — 유리 가운데(= 눈 정면 = 핸들 가운데, 2026-11-04). 기어는 왼쪽, 시각은 오른쪽
+  const cx = W/2, cy = 150, r = 98, a0 = Math.PI*.78, a1 = Math.PI*2.22;
   g.lineCap = 'round'; g.lineWidth = 6; g.strokeStyle = '#1b232d'; g.beginPath(); g.arc(cx, cy, r, a0, a1); g.stroke();
   g.strokeStyle = '#a9c7ec'; g.beginPath(); g.arc(cx, cy, r, a0, a0 + (a1-a0)*clamp(kmh/200)); g.stroke();
   g.textAlign = 'center'; g.fillStyle = '#f2f5f8'; g.font = `600 84px ${CF}`; g.fillText(kmh, cx, cy + 26);
   g.font = `500 20px ${CF}`; g.fillStyle = '#8b96a3'; g.fillText('km/h', cx, cy + 58);
   // 기어 · 시각
-  g.font = `700 46px ${CF}`; g.fillStyle = '#f2f5f8'; g.fillText('D', 540, 150);
-  g.font = `500 20px ${CF}`; g.fillStyle = '#8b96a3'; g.fillText(`${two(d.getHours())}:${two(d.getMinutes())}`, 540, 190);
+  g.font = `700 46px ${CF}`; g.fillStyle = '#f2f5f8'; g.fillText('D', 150, 165);
+  g.font = `500 22px ${CF}`; g.fillStyle = '#8b96a3'; g.fillText(`${two(d.getHours())}:${two(d.getMinutes())}`, W - 150, 160);
   clusterMat.map.needsUpdate = true;
 }
 function drawInfo(){

@@ -33,12 +33,14 @@ const STATES = [
       resetGuide(); resetHud2(); resetHud(); update(0);   // 첫 프레임(원래 교통)으로 올라간 판단 · 단계를 지움
       let jumped = false;
       for(let k = 0; k < st.secs*60; k++){ if(st.jumpAt && !jumped && D.t >= st.jumpAt){ jumped = true; car.s = LANE_START - (D.z - 40); car.v = car.v0 = D.v + 2; } update(1/60); }
+      // 대기 · 위험 강화는 깜빡임 '켜짐' 순간에 멈춤 (2026-11-04: 꺼짐 밝기 0이라 꺼진 순간을 찍으면 뒤차 · 빛이 안 보임)
+      for(let k = 0; k < 30 && hud === 'ar2' && +$('#arHud2').dataset.level >= 3 && +$('#bRear').getAttribute('opacity') < .5; k++) update(1/60);
       D.frozen = true; update(0);
       const r = $('#hudWrap').getBoundingClientRect(), c = $('#cab').getBoundingClientRect();
       return {x:r.left - 60, y:r.top - 40, w:r.width + 120, h:r.height + 70, lv:$('#arHud2').dataset.level, gate:S.G && S.G.gate, cab:[c.left, c.top, c.width, c.height]}; };
   });
   const shots = {};
-  for(const light of ['day', 'night']) for(const [hud, tone, label] of [['ar', 'A', '개선 전 (1차 v1.9)'], ['ar2', 'A', '개선 후 · 마감 A 절제'], ['ar2', 'B', '개선 후 · 마감 B 선명']]){
+  for(const light of ['day', 'night']) for(const [hud, tone, label] of [['ar', 'B', '개선 전 (1차 v1.9)'], ['ar2', 'B', '개선 후 (마감 B 선명)']]){
     for(const st of STATES){
       const box = await page.evaluate(([hud, light, tone, st]) => setupScene(hud, light, tone, st), [hud, light, tone, st]);
       await page.waitForTimeout(120);
@@ -68,7 +70,7 @@ const STATES = [
   }
   // 한 장으로: 행 = HUD(3) · 열 = 상태(6)
   for(const light of ['day', 'night']){
-    const rows = [['ar', 'A'], ['ar2', 'A'], ['ar2', 'B']].map(([hud, tone]) => ({label:shots[`${light}_${hud}${hud === 'ar2' ? tone : ''}_01`].label, cells:STATES.map(st => shots[`${light}_${hud}${hud === 'ar2' ? tone : ''}_${st.id}`])}));
+    const rows = [['ar', 'B'], ['ar2', 'B']].map(([hud, tone]) => ({label:shots[`${light}_${hud}${hud === 'ar2' ? tone : ''}_01`].label, cells:STATES.map(st => shots[`${light}_${hud}${hud === 'ar2' ? tone : ''}_${st.id}`])}));
     const html = `<html><body style="margin:0;background:#101418;color:#e7ecf1;font-family:-apple-system,'Pretendard','Apple SD Gothic Neo',sans-serif"><div style="padding:18px 22px 6px;font-size:20px;font-weight:700">우리 HUD 개선 전 · 후 — 상태 6개 · ${light === 'day' ? '주간' : '야간'} (2026-11-03, 같은 장면: ① IC 오른쪽 진출, 2차로 뒤차 한 대)</div>
       <table style="border-collapse:collapse;margin:8px 16px 18px"><tr><td></td>${STATES.map(s => `<td style="padding:6px 8px;font-size:14px;font-weight:600;color:#9fb3c8">${s.id} ${s.name}</td>`).join('')}</tr>
       ${rows.map(r => `<tr><td style="padding:6px 10px;font-size:13px;font-weight:700;white-space:nowrap;color:#e7ecf1">${r.label}</td>${r.cells.map(c => `<td style="padding:4px"><img src="data:image/png;base64,${c.buf.toString('base64')}" style="width:300px;display:block;border-radius:6px"></td>`).join('')}</tr>`).join('')}</table></body></html>`;
