@@ -54,6 +54,8 @@
 /* ---------- 운전석 영역 ---------- */
 .cab{ position:relative; flex:1; min-width:0; min-height:0; border-radius:12px; overflow:hidden; background:#0b0d10; }
 #view, #view canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+#glLost{ position:absolute; inset:0; z-index:5; display:grid; place-items:center; background:#0b0d10; color:#e6e9ee; font-size:15px; font-weight:600; }
+#glLost[hidden]{ display:none; }
 #view::after{ content:""; position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 95% at 50% 42%, transparent 58%, rgba(0,0,0,.28)); }
 
 /* HUD: 유리에 비친 빛처럼 screen 합성. v1.7: 실내(대시보드)가 생겨 지난 크기의 75%로 줄이고,

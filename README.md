@@ -35,7 +35,7 @@ assets/
   tex/                노면 · 벽 · 나무 재질 (코드가 읽음). 참고 시안은 ../04_리서치/assets/2026-10-29_Higgsfield시안/
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
-  drive-regression.js 브라우저 자동 운전 회귀 77항목   node drive-regression.js (Chrome 필요)
+  drive-regression.js 브라우저 자동 운전 회귀 78항목   node drive-regression.js (Chrome 필요)
   capture-states.js   HUD 상태 6개 캡처 + 대비 측정
   autodrive-batch.js  자동 운전 묶음(기록 값 점검)
   demo-audit.js       시연 · 주행 교통 겹침 · 이상 움직임 점검
@@ -48,5 +48,7 @@ tests/
 
 - 열기: `index.html`을 정적 서버로 연다 (파일로 직접 열면 재질 이미지가 막힐 수 있음). 예: `python3 -m http.server` 뒤 `http://localhost:8000/`
 - 테스트: `cd tests && npm i && npm test`
+- 느린 기기: 화소 배율이 최대 1.5이고, 프레임이 자주 25ms를 넘으면 1.25 → 1로 내려가며 룸미러는 두 프레임에 한 번 갱신된다(`scene.js PERF`). 캡처처럼 선명하게 고정하려면 `?dpr=2`
+- WebGL 컨텍스트가 끊기면(사파리가 오래 둔 탭에서 거둬 감) 안내를 띄우고 복구, 4초 안에 안 되면 새로고침한다(`scene.js`)
 
 외부 라이브러리: three.js r128 · SheetJS 0.18.5 (cdnjs). 에셋 출처 · 라이선스는 `assets/README.md`와 `04_리서치/`.

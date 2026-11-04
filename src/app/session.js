@@ -1,7 +1,7 @@
 /* ============================================================
    session.js — 주행 테스트 진행 · 기록 · 내보내기 (2026-10-29 개편, 예전 D60 · D64 · D65 · D68 · D70 위에)
    흐름: 참가자 정보 → (연습 주행) → HUD A 3회 → 질문 2개 → HUD B 3회 → 질문 2개 → 요약 + 엑셀 자동 저장
-   · 비교 (2026-11-03 두 번째 개정, 2차 실험): 현대 HUD(nav, 1차 그대로) 3회 · 우리 HUD 2차(ar2, 2.1) 3회. 순서는 참가자 번호 홀수 = 현대 먼저 · 짝수 = 2차 먼저.
+   · 비교 (2026-11-03 두 번째 개정, 2차 실험): 현대 HUD(nav, 1차 그대로) 3회 · 우리 HUD 2차(ar2, 2.1) 3회. 순서는 늘 현대 → 2차로 고정 (2026-11-04 사용자: 참가자 번호 홀수 · 짝수 교대를 없앰).
      1차 HUD(ar, v1.9)는 실험 조건에서 빠지고 시연에서만 열어 볼 수 있음. 'HUD 버전' 칸: 현대 3.3 · 우리 2.1-A/B (1차 기록의 '우리 HUD'는 빈칸 = v1.7~1.9)
    · 시나리오(맵 · 상황 · 시간대 · 교통 번호 · 시작 차로 · 목적지 · 신호 시각)는 짝마다 한 번 정해 두 HUD 블록이 그대로 다시 씀
      → HUD만 다르고 교통은 같다 (예전엔 블록마다 교통 번호 · 목적지를 새로 뽑았음)
@@ -42,8 +42,8 @@ function renderExp(){
   $('#practiceChk').checked = EXP.practice;
 }
 $('#practiceChk').onchange = e => { EXP.practice = e.target.checked; saveExp(); };
-// 제시 순서: 참가자 번호 홀수 = 현대 먼저('AB') · 짝수 = 2차 먼저('BA'). 번호가 없으면 'AB'. 화면엔 안 보임 — 코드가 정함 (2026-11-03)
-const orderFor = pid => { const n = (String(pid || '').match(/(\d+)\s*$/) || [])[1]; return n !== undefined && +n % 2 === 0 ? 'BA' : 'AB'; };
+// 제시 순서: 늘 현대 먼저('AB'). 2026-11-03엔 참가자 번호 홀수 AB · 짝수 BA로 교대했으나 2026-11-04 사용자가 고정을 택함 (짝수 참가자에게 2차가 먼저 나와 혼란). 순서 효과는 상쇄되지 않으므로 분석 때 참고
+const orderFor = pid => { void pid; return 'AB'; };
 
 /* ---------- 진행 순서 ---------- */
 const SES = {on:false, pid:'', steps:[], i:-1, rows:[], qs:[], prs:[], order:'AB', cur:null, timer:0, seq:0};
@@ -256,7 +256,6 @@ function summarize(rows, hud, qs = [], kind = null){
     ped:l.reduce((a, r) => a + (r.ped || 0), 0), off:l.reduce((a, r) => a + (r.offroad || 0), 0),
     waitMoves:nw.length ? nw.reduce((a, r) => a + r.waitMoves, 0) : null, waitOk:q.filter(x => x.wait).length ? q.filter(x => x.wait === 1).length + '/' + q.filter(x => x.wait).length : ''};
 }
-const fx1 = v => v === null ? '-' : v.toFixed(1);
 function summaryHtml(rows){
   return '<div class="ses-sum">' + HUDS_IN(rows).map(h => { const s = summarize(rows, h);
     return `<div><strong>${modeName(h)}</strong>성공 <em>${s.rate === null ? '-' : s.rate + '%'}</em> · 다른 출구 <em>${s.wrong}</em><br>충돌 <em>${s.crash}</em> · 위험 끼어들기 <em>${s.risky}</em><br>대기 중 이동 <em>${s.waitMoves ?? '-'}</em></div>`; }).join('') + '</div>';
@@ -283,7 +282,7 @@ const evDetail = e => e.type === 'gate' ? `${GATE_NAME[e.from]} → ${GATE_NAME[
 const evRows = rows => rows.flatMap(r => (r.events || []).map(e => [r.p, modeName(r.hud), r.scn ?? '', r.seq ?? '', e.t, EV_NAME[e.type] || e.type, evDetail(e)]));
 const EXPLAIN = [['칸','뜻','어떻게 읽나'],
   ['HUD','현대 HUD = 지금 차에 있는 HUD(1차와 같은 대조군) · 우리 HUD (2차) = 뒤차 표현을 고친 HUD(2026-11-03) · 우리 HUD (1차) = 1차 실험 때 HUD(시연 전용). \'HUD 버전\' 칸이 빈칸이면 1차 실험 기록','2차: 같은 사람이 현대 3회 · 2차 3회. 같은 시나리오 ID끼리 짝'],
-  ['제시 순서','현대 → 2차 (참가자 번호 홀수) / 2차 → 현대 (짝수)','순서 효과를 둘로 나눠 상쇄. 순서별로 나눠서도 볼 것'],
+  ['제시 순서','현대 → 2차 (모든 참가자 같음, 2026-11-04 고정)','순서 효과가 상쇄되지 않음 — 2차 HUD 결과엔 익숙해진 효과가 섞일 수 있음. 2026-11-03 이전 기록은 짝수 번호가 2차 → 현대'],
   ['연습 여부','본 실험 / 연습. 연습 주행은 \'연습\' 시트에만 있고 요약 · 기록에 들어가지 않음',''],
   ['정체 줄 합류 방식','정체 판 성공이 \'줄 합류\'(목표 차로 줄 뒤에 붙어 3초)였는지 \'줄 건너뜀\'(줄 옆을 지나 갈림 뒤에 출구로 들어감)이었는지. 건너뜀이면 차로 옮긴 곳 · 반응 시간이 빈칸으로 남음','정체 판 성공률을 읽을 때 둘을 나눠 볼 것. 1차 엑셀엔 이 칸이 없음'],
   ['앞으로 끼어들기 (번) · 그때 뒤차 간격 · 닿기까지','옮길 차로에서 내 뒤 60m 안에 차가 있는데 그 앞에 들어간 횟수, 그때 가장 가까운 뒤차와의 범퍼 간격(m)과 닿기까지 시간(초, 뒤차가 더 빠를 때만). 위험 여부와 상관없이 셈','2차 가설의 \'위험한 차로 변경\' 지표. 간격 · 시간이 작을수록 무리한 끼어들기'],

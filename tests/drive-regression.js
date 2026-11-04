@@ -265,7 +265,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('세션: 참가자마다 본 주행 6판 기록', p1.rows.length === 6 && p2.rows.length === 6, `P1 ${p1.rows.length} · P2 ${p2.rows.length}`);
     check('세션: 연습 기록은 본 기록에 섞이지 않음 (따로 저장)', s.practiceN === 2 && !s.practiceInDrives && p1.prs === 1, `연습 ${s.practiceN}`);
     const first = (rows, a, b) => rows.slice(0, 3).every(r => r.hud === a) && rows.slice(3).every(r => r.hud === b);
-    check('세션: 홀수 번호(P1)는 현대 → 2차, 짝수(P2)는 2차 → 현대 (1차 HUD 없음)', first(p1.rows, 'nav', 'ar2') && first(p2.rows, 'ar2', 'nav') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'BA', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
+    check('세션: 번호와 상관없이 늘 현대 → 2차 (2026-11-04 고정, 1차 HUD 없음)', first(p1.rows, 'nav', 'ar2') && first(p2.rows, 'nav', 'ar2') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'AB', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
     check('세션: HUD 버전 칸 — 현대 3.3 · 우리 2.1-A/B', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.1-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.3'), JSON.stringify(p1.rows.map(r => r.ver)));
     check('세션: 연습이 끝나면 결과 카드 없이 바로 첫 주행(연습 기록 1 · 카드에 결과 글 없음)', p1.prs === 1 && !s.practiceCard, JSON.stringify(s.practiceCard));
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
@@ -314,7 +314,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('시연 HUD 선택은 현대 · 2차 · 1차 세 개, 순서 선택지 · 안내 문장 없음', JSON.stringify(r.modes) === JSON.stringify(['nav:현대 HUD', 'ar2:2차 HUD', 'ar:1차 HUD']) && !r.pair && !r.verWords && r.arHud2 && !r.orderUi && !r.rules, JSON.stringify(r));
     check('우리 HUD(개선 전 · 개선 후) 안 글자는 제한속도 숫자뿐', r.arText.length === 1 && /^limA:\d+$/.test(r.arText[0]) && r.ar2Text.length === 1 && /^bLim:\d+$/.test(r.ar2Text[0]), JSON.stringify(r.arText.concat(r.ar2Text)));
     const prep = await E(() => { $('#pid').value = 'P3'; openSession(); const o = {screen:$('#app').dataset.screen, setupVisible:!!$('#setup').offsetParent, setupBtn:!!$('#setupBtn').offsetParent, modeBtns:$$('#modeSeg button').filter(b => b.offsetParent).length, text:$('#sess').innerText, o3:orderFor('P3'), o4:orderFor('P4')}; goHome(); return o; });
-    check('주행 테스트 준비 화면: HUD · 순서 고르기 · 안내 문장 없음, 순서는 번호로(P3 현대 먼저 · P4 2차 먼저)', !prep.setupVisible && !prep.setupBtn && prep.modeBtns === 0 && !/순서|비교|연습 주행 있음/.test(prep.text) && prep.o3 === 'AB' && prep.o4 === 'BA', JSON.stringify(prep));
+    check('주행 테스트 준비 화면: HUD · 순서 고르기 · 안내 문장 없음, 순서는 늘 현대 먼저(P3 · P4 모두 AB)', !prep.setupVisible && !prep.setupBtn && prep.modeBtns === 0 && !/순서|비교|연습 주행 있음/.test(prep.text) && prep.o3 === 'AB' && prep.o4 === 'AB', JSON.stringify(prep));
   }
 
   /* ---------- 8-2. HUD 표시 영역 밖으로 나오지 않음: 같은 프레임을 HUD 켬 / 끔으로 그려 상자 밖 픽셀 비교 ---------- */

@@ -5,7 +5,7 @@
    · HUD(SVG) · 실내(cabinScene) · 안내 카드는 이 장면에 없어서 거울에 비치지 않고, 거울은 장면 밖이라 자기 자신을 비추지 않는다
    · 카메라는 운전자 눈 카메라(main.js가 매 프레임 놓음)에서 차 중심 · 방향을 구해 따라감 — 시연 · 주행 테스트, 현대 HUD · 우리 HUD 모두 같음
    · ?mirrors=0 이면 끔. 위치 · 화각은 추정값 [가정]: 수평 화각 ≈ 42°
-   scene.js renderScene()이 매 프레임 MIR.render()를 부른다. cabin.js 다음에 로드
+   scene.js renderScene()이 매 프레임 MIR.render(half)를 부른다 — half면(느린 기기, scene.js PERF) 거울 그림은 두 프레임에 한 번만 새로 그림. cabin.js 다음에 로드
    ============================================================ */
 
 const MIR = {on:!/[?&]mirrors=0/.test(location.search), hfov:42, w:.2, asp:3.7, cx:.555, top:.022, pos:[0, 1.3, .15], pitch:-.025};
@@ -61,15 +61,18 @@ const MIR = {on:!/[?&]mirrors=0/.test(location.search), hfov:42, w:.2, asp:3.7, 
     cam.position.set(px, oy, pz); _t.set(px - fx*10, oy + Math.tan(MIR.pitch)*10, pz - fz*10); cam.lookAt(_t);
   };
   MIR.cam = cam; MIR.rt = rt;
-  MIR.render = () => {
+  let frameN = 0;
+  MIR.render = (half) => {
     quad.visible = stem.visible = cover.visible = MIR.on;
     if(!MIR.on) return;
     const sm = renderer.shadowMap.autoUpdate, k = NIGHT ? .25 : 1;
     darkMat.color.setRGB(.063*k, .07*k, .082*k); mat.uniforms.dim.value = NIGHT ? .35 : 1;
-    MIR.aim();
-    renderer.shadowMap.autoUpdate = false;   // 그림자 맵은 앞 화면 것을 다시 씀
-    renderer.setRenderTarget(rt); renderer.render(scene, cam); renderer.setRenderTarget(null);
-    renderer.shadowMap.autoUpdate = sm;
+    if(!half || (++frameN & 1)){   // 느리면 거울 그림은 한 프레임 걸러 갱신, 테 · 지난 그림은 매 프레임
+      MIR.aim();
+      renderer.shadowMap.autoUpdate = false;   // 그림자 맵은 앞 화면 것을 다시 씀
+      renderer.setRenderTarget(rt); renderer.render(scene, cam); renderer.setRenderTarget(null);
+      renderer.shadowMap.autoUpdate = sm;
+    }
     renderer.autoClear = false; renderer.clearDepth(); renderer.render(over, ortho); renderer.autoClear = true;
   };
 })();

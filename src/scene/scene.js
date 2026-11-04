@@ -7,13 +7,25 @@
 
 const cab = $('#cab');
 const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+/* 그리기 비용 (2026-11-04 최적화): 화면 화소 배율을 최대 1.5로(예전 2 — 레티나에서 화소 수 44% 줄, 3D만 살짝 부드러워지고 HUD(SVG) · 글은 그대로).
+   그래도 느리면(90프레임 중 절반이 25ms 넘음) 1.25 → 1로 한 단계씩 내리고 룸미러는 두 프레임에 한 번 갱신. 올리지는 않음(오락가락하지 않게). 캡처용 고정: ?dpr=2 */
+const PERF = {tiers:[1.5, 1.25, 1], tier:0, n:0, slow:0, fixed:+(location.search.match(/[?&]dpr=([\d.]+)/) || [])[1] || 0};
+const applyDpr = () => renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PERF.fixed || PERF.tiers[PERF.tier]));
+applyDpr();
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.92;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 $('#view').appendChild(renderer.domElement);
+/* WebGL 컨텍스트 소실 복구 (2026-11-04): 사파리는 탭을 오래 두거나 GPU 메모리가 모자라면 컨텍스트를 거둬 가고, 그러면 3D만 검게 남고 HUD(SVG)만 움직인다.
+   three.js가 restored 이벤트에서 스스로 다시 초기화하므로 안내만 띄우고, 4초 안에 안 돌아오면 페이지를 다시 불러온다 (끝난 판 기록은 localStorage에 있어 남음) */
+(() => {
+  const note = document.createElement('div'); note.id = 'glLost'; note.hidden = true; note.textContent = '화면을 다시 불러오는 중…'; $('#view').appendChild(note);
+  let timer = 0;
+  renderer.domElement.addEventListener('webglcontextlost', () => { note.hidden = false; clearTimeout(timer); timer = setTimeout(() => location.reload(), 4000); });
+  renderer.domElement.addEventListener('webglcontextrestored', () => { clearTimeout(timer); note.hidden = true; });
+})();
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(58, 1, 0.5, 2600);
@@ -701,7 +713,11 @@ function renderScene(){
   if(typeof cabinScene !== 'undefined'){ renderer.autoClear = false; renderer.clearDepth(); renderer.render(cabinScene, camera); renderer.autoClear = true; }
   // 룸미러 · 사이드미러 (mirrors.js): 같은 장면을 뒤 보기 카메라로 따로 그려 맨 위에 얹음. 프레임 시간을 넘겨 느리면 번갈아 갱신
   const now = performance.now(); renderScene.ms = now - (renderScene.last || now); renderScene.last = now;
-  if(typeof MIR !== 'undefined') MIR.render(renderScene.ms || 16);
+  if(!PERF.fixed && PERF.tier < PERF.tiers.length - 1 && document.visibilityState === 'visible'){
+    if(renderScene.ms > 25) PERF.slow++;
+    if(++PERF.n >= 90){ if(PERF.slow*2 > PERF.n){ PERF.tier++; applyDpr(); } PERF.n = PERF.slow = 0; }
+  }
+  if(typeof MIR !== 'undefined') MIR.render(PERF.tier > 0);
 }
 
 /* ---------- 캔버스 크기 ---------- */

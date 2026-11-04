@@ -9,7 +9,6 @@
 
 const cabinScene = new THREE.Scene();
 const cabin = new THREE.Group(); cabinScene.add(cabin);
-const CCX = DRIVER_X;   // 차 중심선 x
 
 /* ---------- 재질 ---------- */
 const grainTex = (base, amp, n) => canvasTex(256, 256, (g, w, h) => {

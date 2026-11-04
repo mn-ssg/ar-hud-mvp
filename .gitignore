@@ -1,7 +1,10 @@
 tests/node_modules/
-
 tests/autodrive-batch.json
 tests/package-lock.json
 tests/shots/
 tests/demo-audit.json
 tests/cutin-batch.json
+.idea/
+.codex/
+.mcp.json
+.DS_Store
