@@ -717,7 +717,7 @@ function makeCar(type, hex, braking){
   const parts = carParts(type), g = new THREE.Group();
   const mats = {paint:paintOf(hex), glass:carMats.glass, trim:carMats.trim, box:carMats.box, lamp:braking ? carMats.brake : carMats.tail,
     head:carMats.head, grille:carMats.grille, plate:carMats.plate, tire:carMats.tire, rim:carMats.rim, shadow:carMats.shadow, indL:carMats.indOff, indR:carMats.indOff};
-  g.userData.ind = {};
+  g.userData.ind = {}; g.userData.brake = braking;
   for(const k in parts){
     const m = new THREE.Mesh(parts[k], mats[k]); m.userData.part = k;
     m.castShadow = !['lamp','head','plate','rim','shadow','indL','indR'].includes(k); m.receiveShadow = k !== 'shadow';
@@ -733,6 +733,7 @@ function makeCar(type, hex, braking){
 }
 // 방향 지시등 켜기 (D103): side −1 왼쪽 · 1 오른쪽 · 2 비상등(양쪽) · 0 끔. on = 깜빡임 켜짐 순간. 버스(city.js)도 userData.ind가 있어 같이 쓴다
 function applyBlink(mesh, side, on){
+  if(mesh.userData.lights) mesh.userData.lights.blink = on ? side : 0;   // 모델 차: 셰이더 (D110)
   const I = mesh.userData.ind; if(!I || !I.L) return;
   I.L.material = on && (side < 0 || side === 2) ? carMats.indOn : carMats.indOff;
   I.R.material = on && (side > 0) ? carMats.indOn : carMats.indOff;
@@ -761,13 +762,68 @@ function modelLamps(type){
   for(const sx of [-1, 1]){ lamp.push([box(.34, .06, .04), at(sx*(T.W/2 - .33), T.tail + .02, T.tz + .005)]); head.push([box(.3, .07, .04), at(sx*(T.W/2 - .33), T.hy + .01, T.hz - .005)]); }
   return modelLampCache[type] = {lamp:merge(lamp), head:merge(head)};
 }
+/* ---------- 등화 (2026-11-07, D110): 모델 차체 표면 자체가 빛난다 ----------
+   코드 메시로 붙이던 등 상자(몸체 밖에 뜬 납작한 네모)를 버리고, 차체 재질 셰이더에 등 영역을 심는다.
+   등 영역 = 차 좌표(앞 = −z)에서 뒷면 · 앞면 가까이 × 등 높이 × 바깥쪽 폭 — 모델의 실제 곡면 위에서만 빛나므로 떠 보이지 않고 겹침(z-fighting)도 없다.
+   텍스처에 그려진 빨강(뒤 등) · 주황(깜빡이) · 밝은 면(앞등)은 색으로 골라 그 자리를 더 세게 — 텍스처가 흐린 모델도 영역만으로 보인다.
+   상태(uniform): tail(미등, 밤) · brake · head(전조등, 밤) · dayHead(주간등) · blink L/R. 꺼진 뒤 등엔 빨간 렌즈 색을 살짝 곱한다 */
+const LAMP_SHADER = {
+  vert:['#include <begin_vertex>', '#include <begin_vertex>\n  vLp = position;'],
+  frag:['#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  { float L = uDim.x, W = uDim.y; vec3 p = vLp, base = diffuseColor.rgb;
+    float rear = smoothstep(L*0.5 - 0.5, L*0.5 - 0.15, p.z), front = smoothstep(L*0.5 - 0.5, L*0.5 - 0.15, -p.z);
+    float side = smoothstep(W*0.5 - 0.5, W*0.5 - 0.34, abs(p.x)), outer = smoothstep(W*0.5 - 0.26, W*0.5 - 0.14, abs(p.x));
+    float ty = 1.0 - smoothstep(0.07, 0.17, abs(p.y - uDim.z)), hy = 1.0 - smoothstep(0.07, 0.16, abs(p.y - uDim.w));
+    float red = clamp((base.r - max(base.g, base.b))*2.5, 0.0, 1.0), amber = clamp((base.r - base.b)*2.0, 0.0, 1.0)*step(0.25, base.g)*step(base.g, 0.8);
+    float lum = dot(base, vec3(0.333));
+    float tailM = rear*side*ty*(0.35 + 1.0*red), headM = front*side*hy*(0.45 + 0.6*smoothstep(0.45, 0.8, lum)), blinkM = (rear*ty + front*hy)*outer*(0.45 + 0.8*amber);
+    float bl = p.x < 0.0 ? uBlink.x : uBlink.y;
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb*vec3(0.95, 0.3, 0.25), tailM*0.45);   // 꺼진 뒤 등: 빨간 렌즈
+    totalEmissiveRadiance += vec3(1.0, 0.07, 0.05)*tailM*(uLamp.x*0.7 + uLamp.y*uLamp.y*2.4);
+    totalEmissiveRadiance += vec3(1.0, 0.96, 0.86)*headM*(uLamp.z*2.6 + uLamp.w*0.4);
+    totalEmissiveRadiance += vec3(1.0, 0.62, 0.12)*blinkM*bl*(1.8 + uLamp.z*1.2); }`]
+};
+function lampMaterial(mat, T){
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uLamp = {value:new THREE.Vector4(0, 0, 0, 1)}; sh.uniforms.uBlink = {value:new THREE.Vector2(0, 0)}; sh.uniforms.uDim = {value:new THREE.Vector4(T.L, T.W, T.tail, T.hy)};
+    sh.vertexShader = 'varying vec3 vLp;\n' + sh.vertexShader.replace(LAMP_SHADER.vert[0], LAMP_SHADER.vert[1]);
+    sh.fragmentShader = 'varying vec3 vLp; uniform vec4 uLamp; uniform vec2 uBlink; uniform vec4 uDim;\n' + sh.fragmentShader.replace(LAMP_SHADER.frag[0], LAMP_SHADER.frag[1]);
+    mat.userData.u = sh.uniforms;
+  };
+  mat.customProgramCacheKey = () => 'lamp';
+  return mat;
+}
+// 밤 바닥 빛: 전조등 부채꼴(앞) · 브레이크 붉은 반사(뒤) — 더하기 합성 그림, 실제 조명 아님
+const fanTex = canvasTex(128, 128, (g, w, h) => { const gr = g.createRadialGradient(w/2, h, 0, w/2, h, h); gr.addColorStop(0, 'rgba(255,240,210,.55)'); gr.addColorStop(.5, 'rgba(255,240,210,.22)'); gr.addColorStop(1, 'rgba(255,240,210,0)');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(w/2, h); g.lineTo(0, 0); g.lineTo(w, 0); g.closePath(); g.fill(); });
+const fanMat = new THREE.MeshBasicMaterial({map:fanTex, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, polygonOffset:true, polygonOffsetFactor:-5, polygonOffsetUnits:-5});
+const brakePoolMat = new THREE.MeshBasicMaterial({map:radialTex('255,40,30', .35), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, polygonOffset:true, polygonOffsetFactor:-5, polygonOffsetUnits:-5});
+const fanGeo = new THREE.PlaneGeometry(9, 14).rotateX(-Math.PI/2), brakePoolGeo = new THREE.PlaneGeometry(3, 2.4).rotateX(-Math.PI/2);
+const _cv = new THREE.Vector3(), _cf = new THREE.Vector3();
 function applyCarModel(car){
   const M = CAR_MODELS[car.type]; if(!M || car.group.userData.model) return;
-  car.group.children.forEach(ch => { if(ch.userData.part && MODEL_HIDE.has(ch.userData.part)) ch.visible = false; });
-  const ML = modelLamps(car.type);
-  if(ML) car.group.children.filter(ch => ch.userData.part === 'lamp' || ch.userData.part === 'head').forEach(ch => { ch.geometry = ML[ch.userData.part]; });
-  const mat = M.mat.clone(); mat.color = lin(car.hex); mat.envMapIntensity = .6; mat.metalness = Math.min(mat.metalness, .45); mat.roughness = Math.max(mat.roughness, .4); mat.side = THREE.FrontSide;
-  const m = new THREE.Mesh(M.geo, mat); m.castShadow = m.receiveShadow = true; m.userData.part = 'model'; car.group.add(m); car.group.userData.model = m;
+  const g = car.group;
+  // 코드 부품은 모두 숨김(등 · 깜빡이 상자 포함) — 등은 셰이더가 몸체 위에 그린다. 그림자 · 행선지 표시 · 밤 창 빛은 남김
+  g.children.forEach(ch => { if(ch.userData.part && (MODEL_HIDE.has(ch.userData.part) || ['lamp', 'head', 'indL', 'indR', 'ind'].includes(ch.userData.part))) ch.visible = false; });
+  const T = car.type === 'bus' ? {L:11.4, W:2.5, tail:1.05, hy:.72} : CAR_TYPES[car.type];
+  const mat = lampMaterial(M.mat.clone(), T); mat.color = lin(car.hex); mat.envMapIntensity = .6; mat.metalness = Math.min(mat.metalness, .45); mat.roughness = Math.max(mat.roughness, .4); mat.side = THREE.FrontSide;
+  const m = new THREE.Mesh(M.geo, mat); m.castShadow = m.receiveShadow = true; m.userData.part = 'model'; g.add(m); g.userData.model = m;
+  // 밤 빛 그림: 전조등 번짐 스프라이트는 차마다 재질을 따로(앞에서 볼 때만 보이게 밝기를 바꿈), 바닥 부채꼴 · 브레이크 반사
+  g.children.filter(ch => ch.isSprite).forEach(ch => { ch.material = headGlowMat.clone(); ch.scale.set(.9, .9, 1); ch.userData.glow = true; });
+  const fan = new THREE.Mesh(fanGeo, fanMat.clone()); fan.position.set(0, .03, -T.L/2 - 7); fan.visible = false; fan.userData.fan = true; g.add(fan);
+  const bp = new THREE.Mesh(brakePoolGeo, brakePoolMat.clone()); bp.position.set(0, .03, T.L/2 + 1.1); bp.visible = false; bp.userData.brakePool = true; g.add(bp);
+  g.userData.lights = {brake:!!g.userData.brake, blink:0};
+}
+// 매 프레임(renderScene): 상태 → 셰이더 uniform · 빛 그림. 전조등 번짐은 차가 향한 방향과 카메라 방향의 각도로 밝기(뒤에서 보면 0), 거리에 따라 번짐 크기 제한
+function updateCarLights(){
+  carRegistry.forEach(car => { const g = car.group, m = g.userData.model; if(!m || !g.visible) return; const u = m.material.userData.u; const st = g.userData.lights;
+    const night = NIGHT, brake = st.brake ? 1 : 0, bl = st.blink;
+    if(u){ u.uLamp.value.set(night ? 1 : 0, brake, night ? 1 : 0, night ? 0 : 1); u.uBlink.value.set(bl === -1 || bl === 2 ? 1 : 0, bl === 1 || bl === 2 ? 1 : 0); }
+    _cf.set(-Math.sin(g.rotation.y), 0, -Math.cos(g.rotation.y));   // 차 앞 방향(three rotation.y)
+    _cv.copy(camera.position).sub(g.position); const dist = _cv.length(); _cv.normalize();
+    const face = Math.max(0, _cf.dot(_cv)), k = night ? Math.pow(face, 1.5)*Math.min(1, 12/Math.max(dist, 6) + .35) : 0;   // 앞에서 볼 때만, 멀면 작게
+    g.children.forEach(ch => { if(ch.userData.glow){ ch.visible = night && k > .02; ch.material.opacity = k; } else if(ch.userData.fan){ ch.visible = night; } else if(ch.userData.brakePool){ ch.visible = night && !!brake; } });
+  });
 }
 function loadCarModels(){
   if(!THREE.GLTFLoader){ console.warn('GLTFLoader 없음 → 코드 차량 메시'); return; }
@@ -842,6 +898,7 @@ function renderScene(){
   // 전조등: 범퍼 높이에서 앞 30m 노면을 겨눔
   headlight.position.set(camera.position.x + _fwd.x*1.5, .7, camera.position.z + _fwd.z*1.5);
   headlight.target.position.set(camera.position.x + _fwd.x*30, 0, camera.position.z + _fwd.z*30);
+  updateCarLights();
   renderer.render(scene, camera);
   // 실내(cabin.js)는 따로 한 번 더: 깊이만 지우고 위에 그림 — 차 안엔 바깥 물체가 들어오지 않으므로 늘 앞
   if(typeof cabinScene !== 'undefined'){ renderer.autoClear = false; renderer.clearDepth(); renderer.render(cabinScene, camera); renderer.autoClear = true; }

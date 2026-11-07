@@ -69,7 +69,7 @@ const FTYPES = ['sedan','suv','hatch','sedan','suv','truck','sedan','hatch','suv
 const FCOLORS = ['#f4f5f4','#2a3442','#a4a9af','#7d2222','#f4f5f4','#1c1e22','#c9ccd0','#233b5c','#5b6169','#f4f5f4','#2e3440','#a4a9af'];
 const flowCars = FTYPES.map((t, i) => makeCar(t, FCOLORS[i], false));
 // 브레이크등: 미등 재질 ↔ 브레이크 재질 바꿔 끼우기 (앞차 급정거)
-const setBrake = (mesh, on) => mesh.traverse(o => { if(o.material === carMats.tail || o.material === carMats.brake) o.material = on ? carMats.brake : carMats.tail; });
+const setBrake = (mesh, on) => { mesh.userData.brake = on; if(mesh.userData.lights) mesh.userData.lights.brake = on; mesh.traverse(o => { if(o.material === carMats.tail || o.material === carMats.brake) o.material = on ? carMats.brake : carMats.tail; }); };   // 모델 차는 셰이더 uniform(D110)
 // 교통 번호(seed)로 같은 난수 → 두 HUD 블록이 같은 교통
 const mulberry32 = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; };
 
