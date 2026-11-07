@@ -144,6 +144,8 @@ const grassTex = canvasTex(256, 256, (g,w,h) => {
   for(let i=0;i<6000;i++){ const v = 110 + Math.random()*110 | 0; g.fillStyle = `rgba(${v*.78|0},${v},${v*.55|0},.35)`; g.fillRect(Math.random()*w, Math.random()*h, 1.4, 1.5 + Math.random()*3.5); }
 }, true);
 const terrainMat = (() => { const tex = grassTex.clone(); tex.needsUpdate = true; tex.repeat.set(280, 280); return new THREE.MeshStandardMaterial({map:tex, vertexColors:true, roughness:.96}); })();
+// 2026-11-07 (D105): 위에서 본 잔디 사진 텍스처(assets/tex/grass.jpg, 한 장 7m, 반 칸 밀어 겹치기로 이음새 제거) — 넓은 면의 반복은 vertexColors 색 변화(fbm)와 곱해져 가려짐. 못 불러오면 위 코드 잔디
+loadTex('assets/tex/grass.jpg', t => { t.repeat.set(2200/7, 2200/7); terrainMat.map = t; terrainMat.needsUpdate = true; });
 function ribbonGeo(n){
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*6),3));
@@ -171,27 +173,39 @@ const asphaltTex = canvasTex(512, 512, (g,w,h) => {
 const asphalt = worldUV(new THREE.MeshStandardMaterial({map:asphaltTex, roughness:.95, envMapIntensity:.35, side:THREE.DoubleSide}), .1);
 const verge = worldUV(new THREE.MeshStandardMaterial({map:grassTex, color:lin('#53683a'), roughness:.97, side:THREE.DoubleSide,
   polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}), .15);
+// 길가 띠(콘크리트 띠 바깥 3.3 ~ 3.6m): 흙 · 자갈 사진 텍스처(assets/tex/verge.jpg, 한 장 ≈ 5m) — 잔디 언덕과 포장 사이의 갓길 흙 (D105)
+loadTex('assets/tex/verge.jpg', t => { verge.map = t; verge.color = lin('#cfc8b8'); verge.needsUpdate = true; });
 const paint = new THREE.MeshStandardMaterial({color:lin('#e9e9e3'), emissive:lin('#d8dbd4'), emissiveIntensity:0, roughness:.55, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});   // 밤엔 재귀반사처럼 살짝 빛남(setSceneLight)
 const trackMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.06, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
 // 가는 물체(가로등·표지판 기둥·가드레일)는 그림자를 드리우지 않는다: 도로 위에 선·띠 그림자가 생기면 부자연스럽고 차선으로 오인될 수 있음
-const steel = new THREE.MeshStandardMaterial({color:lin('#c3c8ce'), metalness:.8, roughness:.35, side:THREE.DoubleSide});
+const steel = worldUV(new THREE.MeshStandardMaterial({color:lin('#c3c8ce'), metalness:.8, roughness:.35, side:THREE.DoubleSide}), .5);   // 가드레일 W빔: 세계 좌표 2m 한 장
 const galv = new THREE.MeshStandardMaterial({color:lin('#8e949b'), metalness:.6, roughness:.5});
+// 2026-11-07 (D105): 아연도금 강판 사진 텍스처(assets/tex/galv.jpg) — 가드레일 빔(세계 좌표) · 가로등 기둥 · 지주 · 문형 표지 기둥(UV). 밤 반사체(reflMat)는 그대로
+loadTex('assets/tex/galv.jpg', t => { steel.map = t; steel.color = lin('#d8dde2'); steel.metalness = .55; steel.roughness = .42; steel.needsUpdate = true;
+  const t2 = t.clone(); t2.needsUpdate = true; t2.repeat.set(1, 4); galv.map = t2; galv.color = lin('#b9bec4'); galv.metalness = .5; galv.needsUpdate = true; });
 const reflMat = new THREE.MeshStandardMaterial({color:lin('#ffb347'), emissive:lin('#ff9a1f'), emissiveIntensity:.35});
 const lampMat = new THREE.MeshStandardMaterial({color:lin('#e8eef2'), emissive:lin('#fff6e0'), emissiveIntensity:.15, roughness:.3});
 const footMat = new THREE.MeshStandardMaterial({color:lin('#9a9a95'), roughness:.9});
 // 밤 전용: 가로등 바닥 불빛 · 등 머리 빛 (더하기 합성), 표지판 재질 목록
 const nightOnly = [], signMats = [];
 const poolGeo = new THREE.PlaneGeometry(17, 17).rotateX(-Math.PI/2);
-const poolMat = new THREE.MeshBasicMaterial({map:radialTex('255,206,150', .5), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+// 밤 가로등 색 (D105): 국내 고속도로 LED 가로등 ≈ 4000K 따뜻한 흰색(예전 '255,206,150'은 나트륨등 주황에 가까웠음)
+const poolMat = new THREE.MeshBasicMaterial({map:radialTex('255,228,196', .42), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
   polygonOffset:true, polygonOffsetFactor:-6, polygonOffsetUnits:-6});
-const glowMat = new THREE.SpriteMaterial({map:radialTex('255,228,190', .85), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
+const glowMat = new THREE.SpriteMaterial({map:radialTex('255,240,214', .8), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
 let NIGHT = false;
 // 가드레일: W자 단면 + 지주 + 반사체
 const railBeam = (() => {
   const sh = new THREE.Shape([[0,0],[.07,.05],[.07,.12],[.03,.155],[.07,.19],[.07,.26],[0,.31],[-.006,.31],[.064,.262],[.064,.192],[.024,.155],[.064,.118],[.064,.052],[-.006,0]].map(p => new THREE.Vector2(p[0],p[1])));
   return new THREE.ExtrudeGeometry(sh, {depth:268, bevelEnabled:false});
 })();
-const lampGeo = {pole:new THREE.CylinderGeometry(.08,.13,10,10), arm:new THREE.CylinderGeometry(.045,.045,2.4,6), head:new THREE.BoxGeometry(.75,.14,.3)};
+// 가로등 (D105): 받침(바닥 플랜지)이 있는 가늘어지는 기둥 · 살짝 꺾인 팔 · 납작한 등 머리 + 아래 렌즈 면(밤에 빛남, lampMat). 그림자는 드리우지 않음(가는 물체 원칙)
+const lampGeo = (() => {
+  const pole = merge([[new THREE.CylinderGeometry(.075,.12,10,12), M4()], [new THREE.CylinderGeometry(.2,.24,.08,16), M4().makeTranslation(0,-4.96,0)], [new THREE.CylinderGeometry(.13,.16,.5,12), M4().makeTranslation(0,-4.7,0)]]);
+  const arm = merge([[new THREE.CylinderGeometry(.045,.055,1.6,8), M4().makeRotationZ(Math.PI/2).premultiply(M4().makeTranslation(-.75,0,0))], [new THREE.CylinderGeometry(.04,.045,1.0,8), M4().makeRotationZ(Math.PI/2 - .18).premultiply(M4().makeTranslation(-2.0,.09,0))]]);
+  const head = merge([[new THREE.BoxGeometry(.95,.1,.34), M4()], [new THREE.BoxGeometry(.7,.04,.24), M4().makeTranslation(0,-.06,0)]]);
+  return {pole, arm, head, lens:new THREE.PlaneGeometry(.62,.2).rotateX(Math.PI/2).translate(0,-.085,0)};
+})();
 // 갈림목 충격흡수대: 노랑 + 검은 사선
 const goreMats = (() => {
   const stripes = canvasTex(128, 128, g => {
@@ -199,6 +213,8 @@ const goreMats = (() => {
     for(let k=-128;k<256;k+=40){ g.beginPath(); g.moveTo(k,128); g.lineTo(k+20,128); g.lineTo(k+84,0); g.lineTo(k+64,0); g.fill(); }
   });
   const yellow = new THREE.MeshStandardMaterial({color:lin('#f2c230'), roughness:.6}), face = new THREE.MeshStandardMaterial({map:stripes, roughness:.6});
+  // 2026-11-07 (D105): 칸이 나뉜 실제 제품처럼 — 오염된 노랑 · 검정 사선 사진 텍스처(assets/tex/gore.jpg). 앞면 + 옆면(세로로 늘려)
+  loadTex('assets/tex/gore.jpg', t => { face.map = t; face.color = lin('#ffffff'); face.roughness = .7; face.needsUpdate = true; const ts = t.clone(); ts.needsUpdate = true; ts.repeat.set(2.5, 1); yellow.map = ts; yellow.color = lin('#ffffff'); yellow.roughness = .7; yellow.needsUpdate = true; });
   return [yellow,yellow,yellow,yellow,face,yellow];
 })();
 // 나무: 그린 나무 그림을 세 방향으로 교차시킨 판(앞뒤 따로) — 멀리서 보면 입체로 보이고 그림자도 잎 모양으로 진다
@@ -237,8 +253,10 @@ const treeKinds = (() => {
     return g;
   };
   // 2026-10-29: 판에 그리는 그림을 Higgsfield 소나무 · 느티나무 사진(배경 제거, assets/tex/tree_*.png)으로 — 판 비율도 그림 비율로. 못 불러오면 위 코드 그림
-  return [[pineTex, cross(.67,1), 10, 7, 'assets/tex/tree_pine.png'], [leafTex, cross(.75,1), 8, 4, 'assets/tex/tree_zelkova.png']].map(([map, geo, hMin, hVar, url]) => {
-    const mat = new THREE.MeshStandardMaterial({map, alphaTest:.5, roughness:.95, envMapIntensity:.25});
+  // 2026-11-07 (D105): 그림을 그림자가 구워지지 않은 평평한 빛의 사진(1k, 배경 제거 · 흰 테 제거)으로 바꿈 — 장면 빛이 음영을 준다. 판 비율 = 그림 비율(소나무 688 × 1012 · 느티나무 838 × 1024).
+  // 가장자리: alphaTest를 낮추고 alphaToCoverage(MSAA)로 부드럽게 — 예전 320px 그림은 가장자리 반투명 픽셀이 42 ~ 82%라 alphaTest .5에서 잎이 뜯겨 보였음
+  return [[pineTex, cross(.68,1), 10, 7, 'assets/tex/tree_pine.png'], [leafTex, cross(.82,1), 8, 4, 'assets/tex/tree_zelkova.png']].map(([map, geo, hMin, hVar, url]) => {
+    const mat = new THREE.MeshStandardMaterial({map, alphaTest:.3, alphaToCoverage:true, roughness:.95, envMapIntensity:.25});
     const depth = new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, map, alphaTest:.5});
     loadTex(url, t => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; mat.map = t; depth.map = t; mat.needsUpdate = depth.needsUpdate = true; });
     return {geo, mat, depth, hMin, hVar};
@@ -289,6 +307,20 @@ const BUILD = {
 loadTex('assets/tex/facade_apt.jpg', t => { const em = facadeNight(t.image, 110); BUILD.apt.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
 loadTex('assets/tex/facade_glass.jpg', t => { const em = facadeNight(t.image, 175); BUILD.glass.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
 loadTex('assets/tex/shopfront.jpg', t => { BUILD.shop.map = t; BUILD.shop.emissiveMap = t; BUILD.shop.needsUpdate = true; });
+
+/* ---------- 잔디 덩어리 (D105): 길가 흙 띠 바깥 1 ~ 6m에 낮은 풀 판(엇갈린 2장)을 인스턴스로 — 멀리는 지형 텍스처만 ---------- */
+const tuftTex = canvasTex(128, 64, (g, w, h) => {
+  for(let i = 0; i < 70; i++){ const x = 6 + Math.random()*(w - 12), k = .55 + Math.random()*.5, hh = 18 + Math.random()*40, lean = (Math.random() - .5)*14;
+    g.strokeStyle = `rgba(${80*k|0},${118*k|0},${48*k|0},.9)`; g.lineWidth = 1.2 + Math.random()*1.4; g.beginPath(); g.moveTo(x, h); g.quadraticCurveTo(x + lean*.4, h - hh*.6, x + lean, h - hh); g.stroke(); }
+});
+const tuftMat = new THREE.MeshStandardMaterial({map:tuftTex, alphaTest:.4, side:THREE.DoubleSide, roughness:.95, color:lin('#b8c4a2')});
+const tuftGeo = merge([[new THREE.PlaneGeometry(1.2, .6), M4().makeTranslation(0, .3, 0)], [new THREE.PlaneGeometry(1.2, .6), M4().makeRotationY(Math.PI/2).premultiply(M4().makeTranslation(0, .3, 0))]]);
+function plantTufts(spots){   // spots = [[x, y, z]] → 인스턴스 하나. 그림자 없음(가는 물체)
+  if(!spots.length) return;
+  const im = new THREE.InstancedMesh(tuftGeo, tuftMat, spots.length), d = new THREE.Object3D();
+  spots.forEach(([x, y, z], i) => { d.position.set(x, y, z); d.rotation.set(0, rnd()*6.3, 0); const s = .7 + rnd()*.7; d.scale.set(s, .6 + rnd()*.7, s); d.updateMatrix(); im.setMatrixAt(i, d.matrix); });
+  im.receiveShadow = true; MG.add(im);
+}
 
 /* ---------- 먼 풍경: 겹겹이 산 (맵과 무관) ---------- */
 const farMats = [];   // 기본 재질(빛 무시) → 밤엔 setSceneLight가 색을 낮춘다
@@ -440,8 +472,9 @@ function buildMapScene(m){
   for(const [x, z0] of [[H+1.5, 25], [-(H+1.5), 1]]) for(let z=z0; z>-225; z-=48){
     const s = Math.sign(x);
     const p = addMesh(lampGeo.pole, galv); p.position.set(x, 5, z);
-    const a = addMesh(lampGeo.arm, galv, ''); a.rotation.z = Math.PI/2; a.position.set(x - s*1.2, 9.95, z);
-    const h = addMesh(lampGeo.head, lampMat, ''); h.position.set(x - s*2.35, 9.9, z);
+    const a = addMesh(lampGeo.arm, galv, ''); a.position.set(x, 9.95, z); a.scale.x = -s;   // 팔은 도로 쪽(-s)으로
+    const h = addMesh(lampGeo.head, galv, ''); h.position.set(x - s*2.5, 10.05, z);
+    const lens = addMesh(lampGeo.lens, lampMat, ''); lens.position.copy(h.position);
     // 밤에만: 바닥 불빛 웅덩이 · 등 머리 빛 (실제 조명 대신 가벼운 그림 — 가로등 10여 개에 빛을 다 켜면 무거움)
     const pool = new THREE.Mesh(poolGeo, poolMat); pool.position.set(x - s*3.2, .03, z); pool.renderOrder = 1;
     const glow = new THREE.Sprite(glowMat); glow.scale.set(2.6, 2.6, 1); glow.position.set(x - s*2.35, 9.78, z);
@@ -476,6 +509,14 @@ function buildMapScene(m){
   };
   goreAt(m, FORK_Z);
   m.segs.filter(e => e.node).forEach(e => goreAt(e.node, e.node.pt[1]));
+
+  /* 잔디 덩어리: 본선 양옆 흙 띠 바깥(H + 3.6 ~ 9m)과 갈림 뒤 출구 처음 160m */
+  (() => {
+    const spots = [];
+    for(let z = 40; z > -230; z -= 1.3) for(const s of [-1, 1]){ const x = s*(H + 3.8 + rnd()*5); spots.push([x, terrainH(x, z) + .02, z + (rnd() - .5)]); }
+    m.segs.forEach(e => { const L = e.vis.getLength(); for(let d = 4; d < Math.min(L, 160); d += 1.6) for(const s of [-1, 1]){ const p = e.vis.getPointAt(d/L), t = e.vis.getTangentAt(d/L), off = s*(e.half + 3.5 + rnd()*4); const x = p.x - t.z*off, z = p.z + t.x*off; if(roadDist(x, z) < e.half + 3.4) continue; spots.push([x, terrainH(x, z) + .02, z]); } });
+    plantTufts(spots);
+  })();
 
   /* 나무 */
   (() => {
@@ -585,11 +626,16 @@ const carMats = (() => {
     tail: std('#4a0606', {emissive:lin('#ff1c1c'), emissiveIntensity:.7, roughness:.25}),
     head: std('#cfd5da', {emissive:lin('#fff4e0'), emissiveIntensity:.18, metalness:.3, roughness:.15}),   // 전조등 (밤에 밝아짐 — setSceneLight)
     grille: std('#0d0f12', {roughness:.5, metalness:.4}),
-    brake: std('#4a0606', {emissive:lin('#ff1c1c'), emissiveIntensity:3, roughness:.25}),
+    brake: std('#4a0606', {emissive:lin('#ff0a0a'), emissiveIntensity:1.5, roughness:.25}),   // 세기는 setSceneLight(LIGHT.brake): 낮 1.5 · 밤 2.6 (예전 #ff1c1c · 3 고정 — 톤 매핑에서 주황으로 떴음)
     // 방향 지시등 (2026-11-07, D103): 주황 렌즈. 켜짐은 applyBlink()이 재질을 바꿔 끼움 — 밤엔 더 밝게(setSceneLight)
     indOff: std('#b8742c', {emissive:lin('#ff9a1f'), emissiveIntensity:0, roughness:.3}),
     indOn: std('#ffb340', {emissive:lin('#ff9a1f'), emissiveIntensity:1.6, roughness:.3}),
-    shadow: new THREE.MeshBasicMaterial({map:radialTex('0,0,0',.65), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4})
+    // 차 밑 그림자 (D105): 순수 검정 방사형(불투명도 .65)이 '검은 판'처럼 보였음 → 하늘 · 땅 색이 섞인 어두운 색, 차 바로 밑만 진하고 바깥으로 빠르게 옅어짐, 바퀴 닿는 네 곳이 가장 진함. 밤엔 setSceneLight가 더 옅게
+    shadow: new THREE.MeshBasicMaterial({map:canvasTex(128, 256, (g, w, h) => {
+      const gr = g.createRadialGradient(w/2, h/2, 0, w/2, h/2, w*.62); gr.addColorStop(0, 'rgba(22,26,34,.62)'); gr.addColorStop(.55, 'rgba(22,26,34,.38)'); gr.addColorStop(.85, 'rgba(22,26,34,.1)'); gr.addColorStop(1, 'rgba(22,26,34,0)');
+      g.save(); g.translate(w/2, h/2); g.scale(1, h/w); g.translate(-w/2, -h/2); g.fillStyle = gr; g.fillRect(-w, -h, 3*w, 3*h); g.restore();   // 세로로 늘린 타원 그라데이션
+      for(const [fx, fy] of [[.2,.28],[.8,.28],[.2,.72],[.8,.72]]){ const r2 = g.createRadialGradient(w*fx, h*fy, 0, w*fx, h*fy, w*.17); r2.addColorStop(0, 'rgba(10,12,16,.55)'); r2.addColorStop(1, 'rgba(10,12,16,0)'); g.fillStyle = r2; g.fillRect(0, 0, w, h); }
+    }), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4})
   };
 })();
 const headGlowMat = new THREE.SpriteMaterial({map:radialTex('255,244,225', .9), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
@@ -636,7 +682,7 @@ function carParts(type){
   for(const sx of [-1,1]){ const k = sx < 0 ? 'indL' : 'indR'; P[k] = P[k] || []; P[k].push([box(.14, .09, .1), at(sx*(T.W/2-.07), T.hy + .01, T.hz + .03)], [box(.14, .1, .07), at(sx*(T.W/2-.08), T.tail + .02, T.tz - .01)]); }
   const out = {};
   for(const k in P) if(P[k].length) out[k] = merge(P[k]);
-  out.shadow = new THREE.PlaneGeometry(T.W + .7, T.L + .9).rotateX(-Math.PI/2).translate(0, .02, 0);
+  out.shadow = new THREE.PlaneGeometry(T.W + .5, T.L + .7).rotateX(-Math.PI/2).translate(0, .02, 0);
   return carPartsCache[type] = out;
 }
 function makeCar(type, hex, braking){
@@ -645,11 +691,12 @@ function makeCar(type, hex, braking){
     head:carMats.head, grille:carMats.grille, plate:carMats.plate, tire:carMats.tire, rim:carMats.rim, shadow:carMats.shadow, indL:carMats.indOff, indR:carMats.indOff};
   g.userData.ind = {};
   for(const k in parts){
-    const m = new THREE.Mesh(parts[k], mats[k]);
+    const m = new THREE.Mesh(parts[k], mats[k]); m.userData.part = k;
     m.castShadow = !['lamp','head','plate','rim','shadow','indL','indR'].includes(k); m.receiveShadow = k !== 'shadow';
     if(k === 'indL') g.userData.ind.L = m; if(k === 'indR') g.userData.ind.R = m;
     g.add(m);
   }
+  carRegistry.push({group:g, type, hex}); applyCarModel(carRegistry[carRegistry.length - 1]);   // 3D 모델이 이미 왔으면 바로, 아니면 올 때 바꿔 끼움 (D106)
   // 밤: 전조등 빛 번짐 (미러 · 앞 화면에서 다가오는 차가 보이게). 실제 빛(조명)은 무거워 그림으로만
   const T = CAR_TYPES[type];
   for(const sx of [-1,1]){ const sp = new THREE.Sprite(headGlowMat); sp.scale.set(1.1, 1.1, 1); sp.position.set(sx*(T.W/2-.32), T.hy, T.hz - .12); sp.visible = NIGHT; nightOnly.push(sp); g.add(sp); }
@@ -664,12 +711,54 @@ function applyBlink(mesh, side, on){
 }
 // 깜빡임 켜짐 순간인가: 시계 t(초) · 차마다 박자를 어긋나게(i) — 실제 교통처럼 서로 맞지 않음
 const blinkOn = (t, i = 0) => ((t*BLINK.hz + i*.37) % 1) < .5;
+/* ---------- 차량 3D 모델 (2026-11-07, D106): Higgsfield Tripo H3.1 image-to-3D GLB (assets/models, 텍스처 1024) ----------
+   차체 · 유리 · 바퀴 · 그릴을 GLB 한 메시로 바꾸고, 등화(미등 · 브레이크 · 전조등 · 깜빡이) · 밤 빛 번짐 · 바닥 그림자는 코드 메시를 그대로 둔다 → setBrake · applyBlink · 밤 전조등이 전과 같이 동작.
+   GLB의 길이 축은 PCA로 찾아 z에 맞추고(앞 = -z, 다섯 모델 모두 뒤집기 없이 맞음 — 2026-11-07 눈으로 확인), 판정 크기(CAR_TYPES L · W)에 정확히 맞춰 늘린다(길이 · 폭 따로, 높이는 그 기하평균).
+   도장 색은 흰 바탕 텍스처에 색을 곱해(mat.color) 차마다 다르게. 못 불러오면 지금 코드 메시 그대로(loadTex와 같은 방식) */
+const CAR_MODELS = {}, carRegistry = [];
+const MODEL_HIDE = new Set(['paint', 'glass', 'trim', 'box', 'grille', 'plate', 'tire', 'rim', 'body', 'door']);   // 숨길 코드 부품 (등화 · 지시등 · 그림자 · 행선지 표시는 남김)
+function alignModelGeo(geo, L, W){
+  const p = geo.attributes.position; let mx = 0, mz = 0; for(let i = 0; i < p.count; i++){ mx += p.getX(i); mz += p.getZ(i); } mx /= p.count; mz /= p.count;
+  let cxx = 0, cxz = 0, czz = 0; for(let i = 0; i < p.count; i++){ const x = p.getX(i) - mx, z = p.getZ(i) - mz; cxx += x*x; cxz += x*z; czz += z*z; }
+  geo.rotateY(.5*Math.atan2(2*cxz, cxx - czz) + Math.PI/2);   // 주축(길이) → z
+  geo.computeBoundingBox(); let b = geo.boundingBox, s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
+  geo.translate(-c.x, -b.min.y, -c.z); const sx = W/s.x, sz = L/s.z; geo.scale(sx, Math.sqrt(sx*sz), sz); geo.computeBoundingBox(); geo.computeBoundingSphere();
+  return geo;
+}
+// 모델 차의 등화: 코드 차의 큰 등 상자(.46 × .12)는 GLB에 구워진 등 위에 떠 보여 → 얇은 띠(.34 × .06)로 바꿔 표면에 살짝 붙임 (미등 ↔ 브레이크 재질 바꿔 끼우기는 그대로)
+const modelLampCache = {};
+function modelLamps(type){
+  if(modelLampCache[type]) return modelLampCache[type]; const T = CAR_TYPES[type]; if(!T) return null;
+  const at = (x, y, z) => M4().makeTranslation(x, y, z), box = (w, h, d) => new THREE.BoxGeometry(w, h, d), lamp = [], head = [];
+  for(const sx of [-1, 1]){ lamp.push([box(.34, .06, .04), at(sx*(T.W/2 - .33), T.tail + .02, T.tz + .005)]); head.push([box(.3, .07, .04), at(sx*(T.W/2 - .33), T.hy + .01, T.hz - .005)]); }
+  return modelLampCache[type] = {lamp:merge(lamp), head:merge(head)};
+}
+function applyCarModel(car){
+  const M = CAR_MODELS[car.type]; if(!M || car.group.userData.model) return;
+  car.group.children.forEach(ch => { if(ch.userData.part && MODEL_HIDE.has(ch.userData.part)) ch.visible = false; });
+  const ML = modelLamps(car.type);
+  if(ML) car.group.children.filter(ch => ch.userData.part === 'lamp' || ch.userData.part === 'head').forEach(ch => { ch.geometry = ML[ch.userData.part]; });
+  const mat = M.mat.clone(); mat.color = lin(car.hex); mat.envMapIntensity = .6; mat.metalness = Math.min(mat.metalness, .45); mat.roughness = Math.max(mat.roughness, .4); mat.side = THREE.FrontSide;
+  const m = new THREE.Mesh(M.geo, mat); m.castShadow = m.receiveShadow = true; m.userData.part = 'model'; car.group.add(m); car.group.userData.model = m;
+}
+function loadCarModels(){
+  if(!THREE.GLTFLoader){ console.warn('GLTFLoader 없음 → 코드 차량 메시'); return; }
+  const loader = new THREE.GLTFLoader();
+  const sizes = {sedan:CAR_TYPES.sedan, suv:CAR_TYPES.suv, hatch:CAR_TYPES.hatch, truck:CAR_TYPES.truck, bus:{L:11.4, W:2.5}};
+  Object.entries(sizes).forEach(([type, T]) => loader.load(`assets/models/${type}.glb`, g => {
+    let mesh = null; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if(o.isMesh && !mesh) mesh = o; }); if(!mesh) return;
+    const geo = alignModelGeo(mesh.geometry.clone().applyMatrix4(mesh.matrixWorld), T.L, T.W);
+    CAR_MODELS[type] = {geo, mat:mesh.material};
+    carRegistry.filter(c => c.type === type).forEach(applyCarModel);
+  }, undefined, () => console.warn('차량 모델을 못 불러와 코드 메시로 둠:', type)));
+}
 // 옆 차로에서 다가오는 차 (위험 상황 시연용)
 const otherCar = makeCar('sedan', '#e8eaec', false);
 // 정체 대기열: 목표 차로에 늘어선 차들. 서 있는 차라 브레이크등을 켠다
 const QTYPES = ['sedan','suv','hatch','sedan','truck','suv','sedan','hatch','suv','sedan','truck'];
 const QCOLORS = ['#f4f5f4','#1c1e22','#a4a9af','#f4f5f4','#f4f5f4','#5b6169','#233b5c','#f4f5f4','#7d2222','#c9ccd0','#f4f5f4','#2e3440','#f4f5f4'];
 const queueCars = Array.from({length:22}, (_,i) => makeCar(QTYPES[i%QTYPES.length], QCOLORS[i%QCOLORS.length], true));
+loadCarModels();
 
 
 /* ---------- 주간 · 야간 ----------
@@ -677,9 +766,9 @@ const queueCars = Array.from({length:22}, (_,i) => makeCar(QTYPES[i%QTYPES.lengt
    밤: 달빛 + 내 차 전조등 + 가로등 불빛 웅덩이 · 표지판과 차선은 살짝 발광(실제 재귀반사처럼) · 앞차 미등 */
 const LIGHT = {
   day:  {top:'#3f78cc', horizon:'#d4dee7', ground:'#a3aeb4', dir:SUN_DIR, sunCol:'#fff0d4', haloK:.18, discPow:900, discK:20, stars:0, cloudK:1, cloudLo:[.70,.74,.80], cloudHi:[1.05,1.05,1.05],
-         hemi:['#d6e4f5','#55643f',.6], sun:['#fff1dc',2.0], exposure:.92, fog:[110,950], far:'#ffffff', head:0, lamp:.15, refl:.35, paint:0, sign:0, win:0, tail:.7, headlamp:.18, ind:1.6},
+         hemi:['#cfe0fa','#5a6a42',.82], sun:['#fff1dc',1.8], exposure:.92, fog:[110,950], far:'#ffffff', head:0, lamp:.15, refl:.35, paint:0, sign:0, win:0, tail:.7, brake:1.5, headlamp:.18, ind:1.6, carShadow:1},   // D105: 간접광 .6 → .82 · 하늘색 더 푸르게(그림자 속이 파르스름), 해 2.0 → 1.8
   night:{top:'#02040a', horizon:'#141c2b', ground:'#06080b', dir:MOON_DIR, sunCol:'#3c4658', haloK:.025, discPow:12000, discK:60, stars:1, cloudK:.75, cloudLo:[.010,.012,.017], cloudHi:[.03,.034,.045],
-         hemi:['#4a5a7a','#10140e',.32], sun:['#a9bce8',.28], exposure:.95, fog:[55,620], far:'#0c1018', head:1.8, lamp:5, refl:2.2, paint:.07, sign:.5, win:1.3, tail:2.2, headlamp:3, ind:3}
+         hemi:['#4a5a7a','#10140e',.32], sun:['#a9bce8',.2], exposure:.95, fog:[55,620], far:'#0c1018', head:1.8, lamp:5, refl:2.2, paint:.07, sign:.5, win:1.3, tail:2.2, brake:2.6, headlamp:3, ind:3, carShadow:.45}   // D105: 달빛 그림자 .28 → .2(아주 옅게) · 차 밑 그림자 45%
 };
 function applySky(L){
   const u = skyMat.uniforms;
@@ -706,8 +795,10 @@ function setSceneLight(night){
   headlight.intensity = L.head;
   lampMat.emissiveIntensity = L.lamp; reflMat.emissiveIntensity = L.refl; paint.emissiveIntensity = L.paint;
   signMats.forEach(mt => mt.emissiveIntensity = L.sign); facadeMat.emissiveIntensity = L.win;
-  carMats.tail.emissiveIntensity = L.tail; carMats.head.emissiveIntensity = L.headlamp; carMats.indOn.emissiveIntensity = L.ind;
+  carMats.tail.emissiveIntensity = L.tail; carMats.brake.emissiveIntensity = L.brake; carMats.head.emissiveIntensity = L.headlamp; carMats.indOn.emissiveIntensity = L.ind; carMats.shadow.opacity = L.carShadow;
   nightOnly.forEach(o => o.visible = night);
+  // 나무 · 잎 색 (D105): 평평한 빛의 사진이라 낮엔 살짝 눌러 잔디와 맞추고, 밤엔 달빛 색으로 어둡게 (예전엔 밤에 잎이 낮처럼 밝았음)
+  const treeTint = lin(night ? '#55627a' : '#d9ddd0'); treeKinds.forEach(k => k.mat.color.copy(treeTint)); if(typeof PROPS !== 'undefined') PROPS.leafMat.color.copy(treeTint);
   if(typeof cityLight === 'function') cityLight(night);   // 일반도로 건물 창 · 노란 칠 · 길바닥 화살표 (city.js)
 }
 setSceneLight(false);

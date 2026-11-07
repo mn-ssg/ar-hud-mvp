@@ -72,7 +72,8 @@ function updateSignalHead(m, t){
    건너기 3초 전부터 보도 끝에 서 있음(= '건너려 하는' 사람 — 1.5초였을 땐 차가 코앞에서야 보여 설 수 없었음). 횡단보도 x 폭은 맵 cw */
 /* 사람 모양 (2026-10-29, 참고 시안 assets/ref/7_peds.jpg): 키 1.7m 안팎 · 엉덩이 · 어깨 관절에서 다리 · 팔이 흔들림 · 머리 + 머리카락 · 신발.
    앞 = -z. 옷 색은 차분한 실제 옷 색 (예전: 원색 상자 몸통). 충돌 · 양보 판정은 아래 pedsAt 위치 하나로 — 보이는 자리 = 판정 자리 */
-const PED_STYLE = [['#2f3a4d','#3a4a63','#1d1f24'], ['#c9bda6','#2a2c31','#eae6dd'], ['#59604a','#1f2329','#d8d4cc'], ['#7a2f35','#3b4554','#202226'], ['#9aa3ad','#24272c','#f0eee8'], ['#4b3b2f','#c2b59b','#2a2a2a']];
+// 2026-11-07 (D105): 옷 색을 Higgsfield 참고 시트(04_리서치 2026-10-29_AI생성에셋 #24, 한국 거리 평상복 6인)에 맞춤 — [코트, 바지, 신발]
+const PED_STYLE = [['#2b3347','#2c2f36','#1d1f24'], ['#9a9ca0','#2a2c31','#d9d6cf'], ['#c8b08c','#3a3d44','#e6e2d8'], ['#1e2024','#303338','#202226'], ['#44503a','#4a6a8c','#e8e6e0'], ['#a9c3e2','#6b6e75','#2a2a2a']];
 const pedMeshes = PED_STYLE.map(([coat, pants, shoe], i) => {
   const g = new THREE.Group(), std = hex => new THREE.MeshStandardMaterial({color:lin(hex), roughness:.88});
   const mCoat = std(coat), mPants = std(pants), mShoe = std(shoe), mSkin = std(['#d9b393','#c99f7f','#e2c2a2'][i % 3]), mHair = std(['#1b1714','#2b2119','#121212'][i % 3]);
@@ -127,32 +128,40 @@ function pedFrame(t){
    저상 시내버스: 큰 앞유리 · 행선지 표시 · 전조등 · 옆 창 띠 · 앞/뒤 문 · 바퀴 덮개 · 뒤 등 · 지붕 냉방기 · 거울 팔. 판정 크기(11.4 × 2.5)는 그대로 */
 const busMesh = (() => {
   const g = new THREE.Group(), body = paintOf('#2f8f4e'), white = paintOf('#e9ecea'), dark = cityMats.dark;
-  const add = (geo, mat, x, y, z, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = true; g.add(m); return m; };
+  const add = (geo, mat, x, y, z, cast = true, part = 'body') => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = true; m.userData.part = part; g.add(m); return m; };
   const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
   add(B(2.5, 1.05, 11.4), body, 0, .88, 0);                                      // 아래 몸통
   add(B(2.48, 1.5, 11.2), white, 0, 2.15, .05);                                  // 창 띠 높이의 흰 몸통
   add(B(2.5, .22, 11.3), body, 0, 3.0, .02);                                     // 지붕 테
   add(B(1.5, .32, 2.6), white, 0, 3.27, .8);                                     // 냉방기
   for(const sx of [-1, 1]) add(B(.03, 1.05, 9.2), carMats.glass, sx*1.255, 2.2, .55, false);   // 옆 창 띠
-  const doorF = add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, -4.55, false);   // 앞문 (오른쪽) — 열리면 뒤로 미끄러짐(busFrame)
-  const doorR = add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, .6, false);      // 뒷문
-  g.userData.doors = [doorF, doorR];
+  const doorF = add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, -4.55, false, 'door');   // 앞문 (오른쪽) — 열리면 뒤로 미끄러짐(busFrame)
+  const doorR = add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, .6, false, 'door');      // 뒷문
+  // 3D 모델(D106)에선 문이 텍스처에 구워져 있어 움직이지 않음 → 문 자리에 어두운 '열린 문' 면을 겹쳐 열림을 보인다(코드 버스에선 안 보임)
+  const openMat = new THREE.MeshBasicMaterial({color:0x0a0c10, transparent:true, opacity:0, depthWrite:false});
+  const openF = add(new THREE.PlaneGeometry(.95, 1.9).rotateY(Math.PI/2), openMat, 1.3, 1.5, -4.55, false, 'open'), openR = add(new THREE.PlaneGeometry(.95, 1.9).rotateY(Math.PI/2), openMat, 1.3, 1.5, .6, false, 'open');
+  g.userData.doors = [doorF, doorR]; g.userData.doorOpen = openMat; void openF; void openR;
+  // 밤 실내등 (D106): 옆 창 띠 자리에 따뜻한 빛 면(밤에만) — 3D 모델 버스에도 창이 켜져 보이게
+  const winGlow = new THREE.MeshBasicMaterial({color:lin('#ffe2b0'), transparent:true, opacity:.55, depthWrite:false});
+  for(const sx of [-1, 1]){ const w = add(new THREE.PlaneGeometry(9.0, .95).rotateY(sx > 0 ? Math.PI/2 : -Math.PI/2), winGlow, sx*1.28, 2.2, .55, false, 'glow'); w.visible = NIGHT; nightOnly.push(w); }
   add(B(2.3, 1.55, .04), carMats.glass, 0, 1.95, -5.715, false);                  // 앞유리
-  add(B(1.9, .26, .05), new THREE.MeshStandardMaterial({color:lin('#141414'), emissive:lin('#ffb347'), emissiveIntensity:.9}), 0, 2.9, -5.72, false);   // 행선지 표시
-  for(const sx of [-1, 1]) add(B(.36, .16, .05), carMats.head, sx*.92, .72, -5.72, false);   // 전조등
+  add(B(1.9, .26, .05), new THREE.MeshStandardMaterial({color:lin('#141414'), emissive:lin('#ffb347'), emissiveIntensity:.9}), 0, 2.9, -5.74, false, 'sign');   // 행선지 표시 (밤 발광, 모델에서도 유지)
+  for(const sx of [-1, 1]) add(B(.36, .16, .05), carMats.head, sx*.92, .72, -5.74, false, 'lamp');   // 전조등
   add(B(2.3, .32, .06), dark, 0, .48, -5.72);                                     // 앞 범퍼
   add(B(1.9, .85, .04), carMats.glass, 0, 2.3, 5.715, false);                      // 뒷유리
-  for(const sx of [-1, 1]) add(B(.18, .55, .05), carMats.tail, sx*1.08, 1.05, 5.72, false);   // 뒤 등
+  for(const sx of [-1, 1]) add(B(.18, .55, .05), carMats.tail, sx*1.08, 1.05, 5.74, false, 'lamp');   // 뒤 등
   add(B(.52, .12, .02), carMats.plate, 0, .62, 5.72, false);
   g.userData.ind = {};   // 방향 지시등 · 비상등 (D103): 앞 · 뒤 모서리, 왼쪽 · 오른쪽 한 덩이씩
-  for(const sx of [-1, 1]){ const geo = merge([[B(.22, .14, .08), M4().makeTranslation(sx*1.12, .95, -5.72)], [B(.2, .22, .08), M4().makeTranslation(sx*1.12, 1.55, 5.72)]]); const m = add(geo, carMats.indOff, 0, 0, 0, false); g.userData.ind[sx < 0 ? 'L' : 'R'] = m; }
+  for(const sx of [-1, 1]){ const geo = merge([[B(.22, .14, .08), M4().makeTranslation(sx*1.12, .95, -5.74)], [B(.2, .22, .08), M4().makeTranslation(sx*1.12, 1.55, 5.74)]]); const m = add(geo, carMats.indOff, 0, 0, 0, false, 'ind'); g.userData.ind[sx < 0 ? 'L' : 'R'] = m; }
   for(const sx of [-1, 1]){ add(B(.06, .06, .5), dark, sx*1.4, 2.35, -5.9); add(B(.08, .42, .22), dark, sx*1.42, 2.1, -6.1); }   // 거울 팔 · 거울
   const tire = new THREE.CylinderGeometry(.5, .5, .3, 18); tire.rotateZ(Math.PI/2);
   for(const z of [-3.6, 3.4]) for(const sx of [-1, 1]){ add(tire, carMats.tire, sx*1.1, .5, z); add(B(.04, .6, 1.35), dark, sx*1.26, .78, z, false); }
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 12.2).rotateX(-Math.PI/2).translate(0, .02, 0), carMats.shadow); g.add(shadow);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 12.2).rotateX(-Math.PI/2).translate(0, .02, 0), carMats.shadow); shadow.userData.part = 'shadow'; g.add(shadow);
   for(const sx of [-1, 1]){ const sp = new THREE.Sprite(headGlowMat); sp.scale.set(1.2, 1.2, 1); sp.position.set(sx*.92, .72, -5.85); sp.visible = NIGHT; nightOnly.push(sp); g.add(sp); }
   g.userData.L = 11.4; g.userData.W = 2.5;
-  g.visible = false; scene.add(g); return g;
+  g.visible = false; scene.add(g);
+  carRegistry.push({group:g, type:'bus', hex:'#ffffff'}); applyCarModel(carRegistry[carRegistry.length - 1]);   // 3D 모델(D106): 차체 · 문 · 바퀴를 숨기고 GLB로
+  return g;
 })();
 
 /* ---------- 버스 흐름 (D104, 값 config.js BUS) ----------
@@ -192,7 +201,7 @@ function busPedsAt(P, t, m){
 // 메시에 반영: 자리 · 문 · 깜빡이 · 승하차 사람 (주행 테스트는 drive.js stepCars, 시연은 cityFrame)
 function busFrame(P, st, t, m, idx = 9){
   busMesh.visible = true; busMesh.position.set(m.laneX(m.bus.lane), 0, st.z); busMesh.rotation.y = 0;
-  const [dF, dR] = busMesh.userData.doors; dF.position.z = -4.55 + st.door*.95; dR.position.z = .6 + st.door*.95;
+  const [dF, dR] = busMesh.userData.doors; dF.position.z = -4.55 + st.door*.95; dR.position.z = .6 + st.door*.95; busMesh.userData.doorOpen.opacity = busMesh.userData.model ? st.door*.9 : 0;
   applyBlink(busMesh, st.side, st.side === 2 ? blinkOn(t) : blinkOn(t, idx));
   busMesh.userData.peds = busPedsAt(P, t, m);
 }
