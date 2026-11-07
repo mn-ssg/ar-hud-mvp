@@ -354,6 +354,37 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     await E(() => { setMode('ar2'); goHome(); });
   }
 
+  /* ---------- 8-3. 깜빡이 · 양보 · 버스 흐름 (2026-11-07, D103 · D104) ---------- */
+  {
+    // 깜빡이: 2초에 E, 차로 유지. 같은 seed → 현대 HUD · 2차 HUD · 야간에서 같은 뒤차가 같은 반응
+    const blinkRun = (seed, hud, light, lane2At) => E(([seed, hud, light, lane2At]) => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
+      const r = runDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed, sigT:0}, {hud, light, secs:18, ap:{mode:'lane', lane:1}, dt:1/60,
+        beforeFrame:t => { if(Math.abs(t - 2) < 1/120) setBlink(1); if(lane2At && Math.abs(t - lane2At) < 1/120) window.AP.lane = 2; },
+        sample:() => { const c = D.responder; return {t:+D.t.toFixed(2), y:!!(c && c.yielding), p:!!(c && c.passing), gap:c ? +(c.z - D.z - halfL(c) - DRV.carL/2).toFixed(1) : null, rv:c ? +c.v.toFixed(2) : null, v:+D.v.toFixed(2), blink:D.blink}; }});
+      return {events:r.events.filter(e => /blink|lcDone/.test(e.type)), samples:r.samples, resp:D.blinkResp, used:D.blinkUsed, lead:D.blinkLead, cars:D.cars.map(c => [c.kind, c.lane, +c.yieldR.toFixed(3)])}; }, [seed, hud, light, lane2At]);
+    let sy = null, sn = null;
+    for(let sd = 1; sd < 40 && (!sy || !sn); sd++){ const r = await blinkRun(sd, 'ar2', 'day', 0); if(r.resp === '양보' && !sy) sy = sd; if(r.resp === '양보 안 함' && !sn) sn = sd; }
+    const a = await blinkRun(sy, 'ar2', 'day', 0), b = await blinkRun(sy, 'nav', 'night', 0), ys = a.samples.filter(s => s.y), last = ys[ys.length - 1];
+    check('깜빡이 · 양보: 알아챈 뒤차가 속도를 줄여 내 뒤에 틈(≥ 12m)을 만들고 내 속도 이하로', ys.length > 10 && last && last.gap >= 12 && last.rv <= last.v + .5, `seed ${sy} · 양보 ${ys.length}표본 · 끝 간격 ${last && last.gap}m`);
+    const key = r => r.events.filter(e => e.type === 'blinkResp').map(e => `${e.t}:${e.with}:${e.yield}:${e.notice}`).join('|');
+    check('깜빡이: 같은 seed면 현대 HUD · 야간에서도 같은 뒤차가 같은 반응 (조건 간 공정성)', key(a) === key(b) && JSON.stringify(a.cars) === JSON.stringify(b.cars), key(a));
+    const n = await blinkRun(sn, 'ar2', 'day', 0), dec = n.events.find(e => e.type === 'blinkResp'), ps = n.samples.filter(s => s.p && dec && s.t >= dec.t && s.t < dec.t + 2.5);   // 결정한 뒤 2.5초(그 차가 지나가기 전)
+    check('깜빡이 · 양보 안 함: 결정한 뒤차는 양보하지 않고 지나감(passing, 그동안 양보 없음)', n.resp === '양보 안 함' && dec && !dec.yield && ps.length > 3, `seed ${sn} · ${ps.length}표본 · 간격 ${ps[0] && ps[0].gap} → ${ps[ps.length - 1] && ps[ps.length - 1].gap}`);
+    const d = await blinkRun(sy, 'ar2', 'day', 10), auto = d.events.find(e => e.type === 'blink' && e.auto), done = d.events.find(e => e.type === 'lcDone');
+    check('깜빡이: 차로 변경이 끝나면 자동으로 꺼지고 기록(켬 · 켠 뒤 초)이 남음', auto && done && Math.abs(auto.t - done.t) < .02 && d.used === true && d.lead > 0 && d.samples[d.samples.length - 1].blink === 0, `자동 끔 ${auto && auto.t}s · 완료 ${done && done.t}s · 켠 뒤 ${d.lead}초`);
+    const none = await E(() => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥'); const r = runDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed:3, sigT:0}, {hud:'ar2', secs:8, ap:{mode:'lane', lane:1}, sample:() => !!(D.responder)}); return {ev:r.events.filter(e => /blink/.test(e.type)).length, any:r.samples.some(Boolean)}; });
+    check('깜빡이를 안 켜면 뒤차 반응 없음 (지금 동작 그대로)', none.ev === 0 && !none.any, '');
+    // ⑤ 버스: 와서 서고(문 열림 · 승하차) 떠남, 다른 차 · 보행자와 겹치지 않음
+    const bus = await E(() => { const st = makeScenario('CRT', 'city', 'day', 1003), cfg = runCfg(st); let minGap = Infinity, phases = new Set(), doorMax = 0, peds = 0, departed = false;
+      // 자동 운전은 보행자 앞에 서지 않으므로 보행자는 뺌(버스 흐름만 봄)
+      runDrive(cfg, {hud:'ar2', secs:45, ap:{}, noPeds:true, sample:() => { const c = D.cars.find(o => o.kind === 'bus'); if(!c) return; const s = busStateAt(c.plan, D.t); phases.add(s.phase); doorMax = Math.max(doorMax, s.door); if(c.plan.departT !== null) departed = true; peds = Math.max(peds, (busMesh.userData.peds || []).length);
+        D.cars.forEach(o => { if(o === c || o.kind === 'onc') return; const dz = Math.abs(o.z - c.z) - halfL(o) - halfL(c), dx = Math.abs(o.x - c.x) - halfW(o) - halfW(c); if(dz < 0 && dx < 0) minGap = Math.min(minGap, Math.max(dz, dx)); }); }});
+      return {phases:[...phases], doorMax, peds, departed, overlap:minGap < 0, result:D.result, crash:D.crashWith}; });   // runDrive가 끝나면 D.cars가 비므로 안에서 기록
+    check('⑤ 버스: 들어옴 → 정차(문 열림 · 승하차) → 출발, 다른 차와 겹침 없음', ['approach', 'stop', 'depart'].every(p => bus.phases.includes(p)) && bus.doorMax > .99 && bus.peds >= 1 && bus.departed && !bus.overlap && bus.result !== 'crash', JSON.stringify(bus));
+    const models = await E(() => ({n:Object.keys(CAR_MODELS).length, applied:carRegistry.filter(c => c.group.userData.model).length, total:carRegistry.length, tris:Object.values(CAR_MODELS).map(M => M.geo.index ? M.geo.index.count/3 : M.geo.attributes.position.count/3)}));
+    check('차량 3D 모델 5종이 불러와져 모든 차에 적용됨 (삼각형 승용차 ≤ 1.5만 · 버스 ≤ 2.5만)', models.n === 5 && models.applied === models.total && models.tris.every(t => t <= 25000), JSON.stringify(models));
+  }
+
   /* ---------- 9. 화면 · 에셋 · 콘솔 ---------- */
   {
     const tex = await E(() => ({asphalt:!!(asphalt.map && asphalt.map.image && asphalt.map.image.src && /asphalt\.jpg/.test(asphalt.map.image.src)), facade:/facade\.jpg/.test((facadeMat.map.image || {}).src || '')}));
