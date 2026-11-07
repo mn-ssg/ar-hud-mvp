@@ -900,8 +900,7 @@ function renderScene(){
   headlight.target.position.set(camera.position.x + _fwd.x*30, 0, camera.position.z + _fwd.z*30);
   updateCarLights();
   renderer.render(scene, camera);
-  // 실내(cabin.js)는 따로 한 번 더: 깊이만 지우고 위에 그림 — 차 안엔 바깥 물체가 들어오지 않으므로 늘 앞
-  if(typeof cabinScene !== 'undefined'){ renderer.autoClear = false; renderer.clearDepth(); renderer.render(cabinScene, camera); renderer.autoClear = true; }
+  // 실내는 2026-11-07(D111)부터 WebGL 밖 이미지 층(cabin.js, #cabin) — 여기서 그리지 않음
   // 룸미러 · 사이드미러 (mirrors.js): 같은 장면을 뒤 보기 카메라로 따로 그려 맨 위에 얹음. 프레임 시간을 넘겨 느리면 번갈아 갱신
   const now = performance.now(); renderScene.ms = now - (renderScene.last || now); renderScene.last = now;
   if(!PERF.fixed && PERF.tier < PERF.tiers.length - 1 && document.visibilityState === 'visible'){

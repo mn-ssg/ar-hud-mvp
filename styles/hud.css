@@ -60,6 +60,24 @@
 #glLost{ position:absolute; inset:0; z-index:5; display:grid; place-items:center; background:#0b0d10; color:#e6e9ee; font-size:15px; font-weight:600; }
 #glLost[hidden]{ display:none; }
 #view::after{ content:""; position:absolute; inset:0; pointer-events:none; background:radial-gradient(120% 95% at 50% 42%, transparent 58%, rgba(0,0,0,.28)); }
+/* ---------- 실내 이미지 층 (2026-11-07 D111) — 자리(px)는 cabin.js layoutCabin()이 창 크기마다 넣는다 ---------- */
+#cabin{ position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:2; }
+#cabin > *{ position:absolute; display:block; }
+#cabinBase{ max-width:none; }
+#clusterCv, #infoCv{ z-index:1; }
+#cabinWheel{ z-index:3; transform-origin:50% 50%; filter:drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+#cabinNight{ inset:0; z-index:2; opacity:0; transition:opacity .4s; background:
+  radial-gradient(22% 16% at var(--cl-x) var(--cl-y), rgba(140,170,230,.22), transparent 70%),
+  radial-gradient(24% 18% at var(--in-x) var(--in-y), rgba(200,215,240,.18), transparent 70%),
+  rgba(2,3,6,.62); mix-blend-mode:normal; }
+#cabin.night #cabinNight{ opacity:1; }
+#cabin.night #clusterCv, #cabin.night #infoCv{ filter:brightness(.6); }
+#cabin.night #cabinWheel{ filter:brightness(.45) drop-shadow(0 6px 10px rgba(0,0,0,.6)); }
+/* 이미지를 못 불러왔을 때: 단순한 어두운 대시보드 */
+#cabin.fallback #cabinBase{ display:none; }
+#cabin.fallback::before{ content:""; position:absolute; left:0; right:0; bottom:0; height:38%; background:linear-gradient(#2b2d31, #141518); }
+#hudWrap{ z-index:3; }
+#count, #keyHint, .abort, .overlay, #explain{ z-index:4; }
 
 /* HUD: 유리에 비친 빛처럼 screen 합성. v1.7: 실내(대시보드)가 생겨 지난 크기의 75%로 줄이고,
    아래끝을 대시보드 윗선(카울) 바로 위에 둔다 — bottom은 main.js가 cabin.js cowlBottomPct()로 맞춤 */

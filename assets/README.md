@@ -24,5 +24,8 @@
 | `tex/tree_pine.png` · `tree_zelkova.png` · `leaves.png` | **교체** (2026-11-07) | 위와 같은 자리 — 그림자 없는 평평한 빛의 1k 사진으로 다시 만듦(장면 빛이 음영을 줌), `alphaToCoverage` | 배경 제거 + 흰 테 제거(코드), PNG |
 | `models/sedan.glb` · `suv.glb` · `hatch.glb` · `truck.glb` · `bus.glb` | **실제 적용** (2026-11-07) | `scene.js loadCarModels` — 차체 · 유리 · 바퀴를 GLB로, 등화 · 깜빡이 · 그림자는 코드 메시. `city.js` 버스도 같음 | Tripo H3.1 image-to-3D, 텍스처 2048 → 1024(0.8 ~ 1.3MB), 삼각형 1.3 ~ 2.1만. 못 불러오면 코드 메시 |
 
+| `cabin/base.webp` · `cabin/wheel.webp` · `cabin/map.jpg` | **실제 적용** (2026-11-07) | `cabin.js` 실내 바탕(앞유리 크로마키로 투명, 4K 업스케일) · 핸들(정면, CSS 3D 회전) · 센터 화면 지도(글자 없음) | WebP 583 · 202KB, JPEG 900 × 506 |
+| `models/sedan.glb` | **교체** (2026-11-07 오후) | 첫 세단 모델은 텍스처가 단색 회색이라 버리고 은색 참고로 다시 생성 | 1.2MB |
+
 - 차선 · 정지선 · 횡단보도 · 차량 · 보행자 위치는 모두 맵 좌표로 코드가 그린다. 생성 이미지는 노면 · 벽 · 보도의 **재질**로만 쓴다(주행 가능 영역과 무관).
 - 텍스처를 못 불러오면 예전처럼 코드로 그린 텍스처가 그대로 쓰인다(`loadTex`). 3D 모델도 같다(`loadCarModels` — 코드 차량 메시가 그대로).

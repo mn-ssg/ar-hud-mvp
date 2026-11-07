@@ -18,7 +18,7 @@ src/
     maps.js           맵 5종 데이터 · 경로 계산
   scene/
     scene.js          three.js 장면 · 하늘 · 도로 · 차량 메시 · 3D 차량 모델(GLB) 읽기 · 주야 조명
-    cabin.js          3D 운전석 실내 · 핸들 · 계기판
+    cabin.js          운전석 실내 — Higgsfield 이미지 층(바탕 · 핸들 CSS 3D) + 계기판 · 센터 화면 캔버스 (2026-11-07 D111)
     mirrors.js        룸미러
     props.js          가로수 · 건물 · 정류장 소품
     city.js           일반도로 교차로 장면 · 신호 · 보행자 · 버스(정류장 흐름)
@@ -34,6 +34,7 @@ src/
 assets/
   tex/                노면 · 벽 · 잔디 · 금속 · 나무 재질 (코드가 읽음). 참고 시안은 ../04_리서치/assets/
   models/             차량 · 버스 GLB 5개 (Higgsfield Tripo, 2026-11-07). 못 불러오면 코드 메시
+  cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
   drive-regression.js 브라우저 자동 운전 회귀 78항목   node drive-regression.js (Chrome 필요)

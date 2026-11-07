@@ -67,7 +67,14 @@
 <!-- 운전석 영역 -->
 <main class="cab" id="cab">
   <div id="view"></div>
-  <!-- 앞유리 틀 · 대시보드 · 핸들은 3D 실내(cabin.js)로, 룸미러는 mirrors.js로 그린다 (사이드미러 없음) -->
+  <!-- 실내 (2026-11-07 D111): Higgsfield 이미지 층 — 바탕(앞유리 뚫림) · 계기판 · 센터 화면 캔버스 · 핸들(CSS 3D 회전) · 야간 덮개. 자리 · 갱신은 cabin.js. 룸미러는 mirrors.js(WebGL)가 그려 앞유리 영역에 보인다 -->
+  <div id="cabin" aria-hidden="true">
+    <img id="cabinBase" src="assets/cabin/base.webp" alt="" draggable="false">
+    <canvas id="clusterCv"></canvas>
+    <canvas id="infoCv"></canvas>
+    <img id="cabinWheel" src="assets/cabin/wheel.webp" alt="" draggable="false">
+    <div id="cabinNight"></div>
+  </div>
 
   <div id="hudWrap">
     <!-- HUD 표시 영역 = 이 상자(viewBox 520 × 270) 하나. 두 HUD의 모든 층은 #hudClip 안에서만 그린다 (2026-10-29) -->

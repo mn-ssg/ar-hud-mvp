@@ -219,7 +219,7 @@ function updateQueue(p, dt){
 
 /* ---------- 핸들 ----------
    곡률을 바로 쓰면 경로 제어점마다 각도가 튀어서, 1초 앞 지점을 겨누는 방식(pure pursuit)으로 부드럽게.
-   시연용. 주행 테스트는 참가자가 돌린 앞바퀴 각을 그대로(updateDrive). 3D 핸들은 cabin.js */
+   시연용. 주행 테스트는 참가자가 돌린 앞바퀴 각을 그대로(updateDrive). 핸들 그림(이미지, CSS 회전)은 cabin.js */
 let steer = 0;
 function updateWheel(p, f, dt){
   const qq = pathAt(path.P, S.s + STEER_LOOK), q = {x:qq[0], z:qq[1]};
