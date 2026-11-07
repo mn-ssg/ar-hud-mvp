@@ -28,6 +28,21 @@
   --h2-op-clear:.85;
 }
 .cab.night{ --h2-op-fill:.5; --h2-op-ctx:.32; --h2-op-detect:.4; --h2-op-edge:.6; --h2-op-ego:.85; --h2-glow:1.1; --h2-op-clear:.7; }
+/* ---------- 2차 HUD 그래픽 시안 (2026-11-07, 작업 7 — 사용자 선택 대기): #cab[data-skin] ----------
+   공통: 내 차 · 뒤차 아이콘을 위에서 본 실루엣으로(.b-ego-sil · .b-rear-sil), 2.1 모양(.b-*-v21)은 숨김. 정보 구조 · 색 뜻 · 자리는 그대로.
+   A 얇은 선 · 절제된 번짐: 양산 AR-HUD 참고 이미지처럼 가는 선(w1 1 · w2 2.6 · 화살표 6.5) · 번짐 1.2(밤 .6) · 채움 .5
+   B 면 중심 · 먼 곳 소실: 들어갈 차로 채움을 진하게(.7 → 먼 곳 .04) · 윤곽 더 흐리게 · 먼 곳 마스크 더 길게(roadMask2b)
+   C 2.1 그대로 + 실루엣만 교체 */
+#cab[data-skin] .b-ego-v21, #cab[data-skin] .b-rear-v21{ display:none; }
+#cab:not([data-skin]) .b-ego-sil, #cab:not([data-skin]) .b-rear-sil{ display:none; }
+#arHud2 .b-rear-sil .b-rear-glass{ fill:#0b0d10; fill-opacity:.5; }
+#cab[data-skin]{ --h2-ego-scale:1.05; --h2-chev-y:-6; }
+#cab[data-skin="A"]{ --h2-w1:1px; --h2-w2:2.6px; --h2-w3:5px; --h2-arrow:6.5px; --h2-icon-w:4px; --h2-op-fill:.5; --h2-op-ctx:.4; --h2-glow:1.2; --h2-op-edge:.8; }
+#cab[data-skin="A"].night{ --h2-op-fill:.42; --h2-op-ctx:.28; --h2-glow:.6; --h2-op-edge:.55; }
+#cab[data-skin="B"]{ --h2-w1:1.2px; --h2-op-fill:.7; --h2-op-ctx:.34; --h2-glow:1.6; }
+#cab[data-skin="B"].night{ --h2-op-fill:.55; --h2-op-ctx:.24; --h2-glow:.8; }
+#cab[data-skin="B"] #lg2C{ stop-opacity:.04; }
+#cab[data-skin="A"] #bLim, #cab[data-skin="B"] #bLim{ font-weight:600; }
 /* 마감은 B(선명) 하나 — 2026-11-04 사용자: 'A 절제'를 없애고 선명만. 위 토큰이 예전 B 값(1차의 채도 높은 청록 · 굵은 선 · 센 번짐). 기록의 HUD 버전은 '우리 2.1-B' 그대로 */
 
 /* 개선 후 HUD 요소 — 정적인 색 · 굵기 · 투명도만 여기서. 상태에 따라 바뀌는 값은 hud2.js가 토큰을 읽어 넣는다 */

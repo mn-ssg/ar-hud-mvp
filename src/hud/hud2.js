@@ -64,7 +64,7 @@ function resetHud2(){
   $('#bRear').setAttribute('opacity', 0); $('#bRearOld').setAttribute('opacity', 0); $('#bDistBand').setAttribute('d', ''); $('#bFlow').setAttribute('d', ''); $('#bClearFill').setAttribute('d', '');
   $('#bBound').setAttribute('d', ''); $('#bBoundCore').setAttribute('d', ''); $('#bEdgeL').setAttribute('opacity', 0); $('#bEdgeR').setAttribute('opacity', 0); $('#bMoveGrp').removeAttribute('transform');
   $('#arHud2').dataset.level = 0;
-  RF.init = false; RF.hints = null; $('#bEgo').setAttribute('transform', `translate(${HX} 221) scale(1.5)`);
+  RF.init = false; RF.hints = null; $('#bEgo').setAttribute('transform', `translate(${HX} 221) scale(${B.tk ? B.tk.egoScale : 1.5})`);
 }
 // 디자인 토큰 읽기 (0.5초마다 — 시간대 · 마감 바뀌면 그때 반영). 빛 번짐은 여기서 #glow2에 넣는다
 function tk2(now){
@@ -73,9 +73,10 @@ function tk2(now){
   B.tk = {route:g('--h2-route'), go:g('--h2-go'), warn:g('--h2-warn'), danger:g('--h2-danger'), neutral:g('--h2-neutral'), idle:g('--h2-idle'), core:g('--h2-core'),
     opFill:+g('--h2-op-fill'), opCtx:+g('--h2-op-ctx'), opDetect:+g('--h2-op-detect'), opEdge:+g('--h2-op-edge'),
     glow:+g('--h2-glow'), w1:parseFloat(g('--h2-w1')), w2:parseFloat(g('--h2-w2')), w3:parseFloat(g('--h2-w3')),
-    iconScale:+g('--h2-icon-scale') || 1.75, sp3:+g('--h2-sp3') || 16, opClear:+g('--h2-op-clear')};
+    iconScale:+g('--h2-icon-scale') || 1.75, sp3:+g('--h2-sp3') || 16, opClear:+g('--h2-op-clear'), egoScale:+g('--h2-ego-scale') || 1.5, chevY:+g('--h2-chev-y') || 0, skin:$('#cab').dataset.skin || ''};   // 시안(작업 7): 실루엣 크기 · 꺾쇠 자리 · 먼 곳 마스크
   B.tkAt = now;
   $('#glow2 feGaussianBlur').setAttribute('stdDeviation', B.tk.glow);
+  $('#bRoadGrp').setAttribute('mask', B.tk.skin === 'B' ? 'url(#roadMask2b)' : 'url(#roadMask2)'); $('#bChev').setAttribute('transform', `translate(0 ${B.tk.chevY})`);
   return B.tk;
 }
 const bVehEls = Array.from({length:24}, () => { const r = document.createElementNS(SVGNS, 'rect'); r.setAttribute('rx', 2.5); r.setAttribute('class', 'b-q'); $('#bVeh').appendChild(r); return r; });
@@ -123,7 +124,7 @@ function drawAr2(p, f, C, k){
   const F = roadFrame(p, m, dt), proj = makeProjRoad(p, F), tx = R.tx, sgn = R.side;   // 도로 기준 투영 (D102). f(내 차 방향)는 쓰지 않는다 — 핸들을 틀어도 미니 도로가 돌지 않게
   void f;
   // 내 차 아이콘: 옆 자리 = 실제 옆 위치를 같은 원근식으로(d = 0 → s = 1), 기울기 = 내 차 방향 − 도로 방향
-  $('#bEgo').setAttribute('transform', `translate(${(HX + F.off*PXM).toFixed(1)} 221) rotate(${F.tilt.toFixed(1)}) scale(1.5)`);
+  $('#bEgo').setAttribute('transform', `translate(${(HX + F.off*PXM).toFixed(1)} 221) rotate(${F.tilt.toFixed(1)}) scale(${T.egoScale})`);
   const inLane = !onMain || Math.abs(p.x - tx) < 1.2;
   const tail = onMain && S.jam > 0 && S.q && S.q.backZ !== null ? S.q.backZ : null;
   const needMove = onMain && !inLane && st <= 3;
@@ -266,7 +267,7 @@ function drawAr2(p, f, C, k){
   if(carPt && B.alpha > .001){
     rear.setAttribute('transform', `translate(${carPt[0].toFixed(1)} ${carPt[1].toFixed(1)})`);
     rear.setAttribute('opacity', (B.alpha*(lv === 1 ? T.opDetect : 1)*(lv >= 3 ? blink : 1)).toFixed(3));
-    $('#bRearBody').setAttribute('fill', col); $('#bRearBody').setAttribute('stroke', lv >= 3 ? T.core : 'none'); $('#bRearBody').setAttribute('stroke-width', T.w1);
+    for(const el of ['#bRearBody', '#bRearSil']){ $(el).setAttribute('fill', col); $(el).setAttribute('stroke', lv >= 3 ? T.core : 'none'); $(el).setAttribute('stroke-width', T.w1); }
     // 꺾쇠 = 접근 속도 (주의부터). 내 차 쪽(위)을 가리킴
     const cl = cand.cl, n = lv >= 2 && cand.behind && cl > 0 ? (cl < REAR2.chevronV[0] ? 1 : cl < REAR2.chevronV[1] ? 2 : 3) : 0;
     $$('#bChev path').forEach((q, i) => { q.style.display = i < n ? '' : 'none'; q.setAttribute('stroke', col); });

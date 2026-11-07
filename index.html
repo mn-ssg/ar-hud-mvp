@@ -107,6 +107,13 @@
         <mask id="roadMask2" maskUnits="userSpaceOnUse" x="0" y="0" width="520" height="270">
           <rect x="0" y="80" width="520" height="190" fill="url(#fadeTop)"/>
         </mask>
+        <!-- 시안 B (2026-11-07, 작업 7): 먼 곳이 더 길게 자연스럽게 사라지는 마스크 (y 80 → 128). hud2.js가 skin에 따라 골라 씀 -->
+        <linearGradient id="fadeTop2" gradientUnits="userSpaceOnUse" x1="0" y1="82" x2="0" y2="128">
+          <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".6" stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity="1"/>
+        </linearGradient>
+        <mask id="roadMask2b" maskUnits="userSpaceOnUse" x="0" y="0" width="520" height="270">
+          <rect x="0" y="80" width="520" height="190" fill="url(#fadeTop2)"/>
+        </mask>
         <linearGradient id="laneGrad2" gradientUnits="userSpaceOnUse" x1="0" y1="228" x2="0" y2="88">
           <stop id="lg2A" offset="0" stop-color="#5fd4ea"/><stop id="lg2B" offset=".55" stop-color="#5fd4ea"/><stop id="lg2C" offset="1" stop-color="#5fd4ea"/>
         </linearGradient>
@@ -194,7 +201,7 @@
              움직이는 뒤차 + 꺾쇠(bRear, 가장 가까운 한 대) · 거리 구간(bDistBand) · 더 오는 차 흐름(bFlow) · 가장자리 빛(bEdgeL/R) · 깜빡임 · 위험 강화의 경계 빨간 선(bBound) · 해소 신호(bClearFill · 화살표 한 번 커짐).
              상태는 data-level(0 안전 · 1 감지 · 2 주의 · 3 대기 · 4 위험 강화). 색 · 굵기 · 투명도 · 시간은 hud.css 맨 위 토큰, 그리기는 hud2.js drawAr2() -->
         <g id="arHud2" data-level="0" style="display:none">
-          <g mask="url(#roadMask2)">
+          <g id="bRoadGrp" mask="url(#roadMask2)">
             <path id="bSurf" class="b-surf"/>
             <path id="bLaneFill" fill="url(#laneGrad2)"/>
             <path id="bEdges" class="b-edges"/>
@@ -223,8 +230,14 @@
             </g>
             <!-- 뒤차: 크기 고정(원근 축소 없음 — 가까울수록 작아져 반대로 읽힘). 꺾쇠 수 = 접근 속도 -->
             <g id="bRear" class="b-rear" opacity="0">
-              <rect id="bRearBody" x="-15" y="-10" width="30" height="20" rx="4"/>
-              <rect class="b-rear-glass" x="-10" y="-6" width="20" height="5" rx="1.5"/>
+              <g class="b-rear-v21"><!-- 2.1: 둥근 네모 -->
+                <rect id="bRearBody" x="-15" y="-10" width="30" height="20" rx="4"/>
+                <rect class="b-rear-glass" x="-10" y="-6" width="20" height="5" rx="1.5"/>
+              </g>
+              <g class="b-rear-sil"><!-- 시안 A · B · C (2026-11-07): 위에서 본 차 실루엣 — 앞유리 · 뒤창 구분. 색은 hud2.js가 #bRearBody와 같이 넣음 -->
+                <path id="bRearSil" d="M-10 -15 Q-10 -18 -7 -18 H7 Q10 -18 10 -15 L11 -4 V10 Q11 18 6 18 H-6 Q-11 18 -11 10 V-4 Z"/>
+                <path class="b-rear-glass" d="M-8 -9 H8 L9 -3 H-9 Z"/><path class="b-rear-glass" d="M-8.5 9 H8.5 L7 14 H-7 Z"/>
+              </g>
               <g id="bChev" class="b-chev"><path d="M-7 -15 L0 -21 L7 -15"/><path d="M-7 -22 L0 -28 L7 -22"/><path d="M-7 -29 L0 -35 L7 -29"/></g>
             </g>
           </g>
@@ -234,9 +247,16 @@
           </g>
           <!-- 내 차 (2026-11-03 키움): 1차의 30 × 21px → 1.5배(45 × 32), 흰색 속 참 + 밝은 테. 자리(260, 221)는 그대로 — 미니 도로의 기준점 -->
           <g id="bEgo" class="b-ego" transform="translate(260 221) scale(1.5)">
-            <path d="M-15 4 Q-15 -3 -11 -4 L-7 -10 Q-6 -12 -3 -12 H3 Q6 -12 7 -10 L11 -4 Q15 -3 15 4 V7 Q15 9 13 9 H-13 Q-15 9 -15 7 Z" fill-opacity=".92"/>
-            <rect x="-12" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/><rect x="7" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/>
-            <path d="M-5 -9 H5 L8 -4 H-8 Z" fill="#0b0d10" fill-opacity=".55"/>
+            <g class="b-ego-v21"><!-- 2.1: 뒷모습 -->
+              <path d="M-15 4 Q-15 -3 -11 -4 L-7 -10 Q-6 -12 -3 -12 H3 Q6 -12 7 -10 L11 -4 Q15 -3 15 4 V7 Q15 9 13 9 H-13 Q-15 9 -15 7 Z" fill-opacity=".92"/>
+              <rect x="-12" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/><rect x="7" y="0" width="5" height="2.6" rx="1.3" fill="#ff6a6a"/>
+              <path d="M-5 -9 H5 L8 -4 H-8 Z" fill="#0b0d10" fill-opacity=".55"/>
+            </g>
+            <g class="b-ego-sil"><!-- 시안 A · B · C (2026-11-07): 위에서 본 차 실루엣(26 × 44), 앞 = 위. 미등 두 점 -->
+              <path d="M-11 -17 Q-11 -22 -6 -22 H6 Q11 -22 11 -17 L12.5 -4 V14 Q12.5 22 6 22 H-6 Q-12.5 22 -12.5 14 V-4 Z" fill-opacity=".94"/>
+              <path d="M-9 -12 H9 L10.5 -4 H-10.5 Z" fill="#0b0d10" fill-opacity=".6"/><path d="M-10 10 H10 L8 17 H-8 Z" fill="#0b0d10" fill-opacity=".55"/>
+              <rect x="-10.5" y="19" width="5" height="1.8" rx=".9" fill="#ff6a6a"/><rect x="5.5" y="19" width="5" height="1.8" rx=".9" fill="#ff6a6a"/>
+            </g>
           </g>
           <rect id="bEdgeL" x="0" y="80" width="0" height="172" fill="url(#edgeGrad2L)" mask="url(#edgeMaskV)" opacity="0"/>
           <rect id="bEdgeR" x="520" y="80" width="0" height="172" fill="url(#edgeGrad2R)" mask="url(#edgeMaskV)" opacity="0"/>
