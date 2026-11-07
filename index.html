@@ -27,7 +27,7 @@
 </header>
 
 <div class="stage">
-<!-- 연구자 설정: 시연 조건 · 실험 조건 · 보기. 참가자 화면이 아님 — 주행 테스트 중에는 닫히고 잠김 -->
+<!-- 연구자 설정: 시연 조건 · 보기. 참가자 화면이 아님 — 주행 테스트 중에는 닫히고 잠김. (2026-11-07: 연습 주행 · 룸미러 체크박스 삭제 — 연습은 늘 하고 룸미러는 늘 켬) -->
 <aside class="setup" id="setup" hidden>
   <section id="scenario">
     <h2>시연</h2>
@@ -58,14 +58,8 @@
     <button class="btn primary block" id="demoSide">시연 시작</button>
   </section>
 
-  <section id="expSetup">
-    <h2>실험</h2>
-    <label class="check"><input type="checkbox" id="practiceChk" checked> 연습 주행</label>
-  </section>
-
   <section>
     <h2>보기</h2>
-    <label class="check"><input type="checkbox" id="mirrorChk" checked> 룸미러</label>
     <button class="btn block" id="explainBtn" aria-pressed="false">HUD 설명 보기 (발표용)</button>
   </section>
 </aside>

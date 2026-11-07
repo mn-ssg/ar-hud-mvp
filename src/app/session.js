@@ -5,12 +5,12 @@
      1차 HUD(ar, v1.9)는 실험 조건에서 빠지고 시연에서만 열어 볼 수 있음. 'HUD 버전' 칸: 현대 3.3 · 우리 2.1-A/B (1차 기록의 '우리 HUD'는 빈칸 = v1.7~1.9)
    · 시나리오(맵 · 상황 · 시간대 · 교통 번호 · 시작 차로 · 목적지 · 신호 시각)는 짝마다 한 번 정해 두 HUD 블록이 그대로 다시 씀
      → HUD만 다르고 교통은 같다 (예전엔 블록마다 교통 번호 · 목적지를 새로 뽑았음)
-   · 연습 주행은 HUD 없이, 본 기록(hud-drive-v1)과 따로(hud-drive-practice-v1) 저장 → 결과에 섞이지 않음
+   · 연습 주행은 늘 하고(2026-11-07: 끄는 설정 삭제) HUD 없이, 본 기록(hud-drive-v1)과 따로(hud-drive-practice-v1) 저장 → 결과에 섞이지 않음
    · 예전 기록 · 엑셀 칸은 그대로 두고 새 칸을 뒤에 붙임. 예전 기록의 새 칸은 빈칸
    방향키 · 기록 서랍도 여기. main.js 다음에 로드.
    ============================================================ */
 
-const DKEY = 'hud-drive-v1', OLD_KEY = 'hud-mvp-trials-v2', BAG_KEY = 'hud-drive-mapbag', PID_KEY = 'hud-drive-nextpid', QKEY = 'hud-drive-survey-v1', PKEY = 'hud-drive-practice-v1', CFG_KEY = 'hud-drive-expcfg';
+const DKEY = 'hud-drive-v1', OLD_KEY = 'hud-mvp-trials-v2', BAG_KEY = 'hud-drive-mapbag', PID_KEY = 'hud-drive-nextpid', QKEY = 'hud-drive-survey-v1', PKEY = 'hud-drive-practice-v1';
 const loadArr = k => { try{ const v = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } };
 const saveArr = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
 let drives = loadArr(DKEY), surveys = loadArr(QKEY), practices = loadArr(PKEY);
@@ -35,13 +35,9 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const envName = () => `환경 ${ENV_VER} · 미러 ${MIR.on ? '켬' : '끔'}`;
 
-/* ---------- 실험 설정 (연구자 설정 패널) ---------- */
-const EXP = Object.assign({practice:true}, (() => { try{ const o = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); return {practice:o.practice !== false}; }catch(e){ return {}; } })(), {pair:['nav', 'ar2']});   // A = 현대 · B = 2차
-const saveExp = () => { try{ localStorage.setItem(CFG_KEY, JSON.stringify(EXP)); }catch(e){} renderExp(); };
-function renderExp(){
-  $('#practiceChk').checked = EXP.practice;
-}
-$('#practiceChk').onchange = e => { EXP.practice = e.target.checked; saveExp(); };
+/* ---------- 실험 설정 ---------- */
+// 비교 쌍 A = 현대 · B = 2차. 연습 주행은 늘 한다(2026-11-07: 연구자 설정의 '연습 주행' 체크박스 · localStorage 저장 삭제 — 순서는 늘 연습 → 블록 1 → 블록 2)
+const EXP = {pair:['nav', 'ar2']};
 // 제시 순서: 늘 현대 먼저('AB'). 2026-11-03엔 참가자 번호 홀수 AB · 짝수 BA로 교대했으나 2026-11-04 사용자가 고정을 택함 (짝수 참가자에게 2차가 먼저 나와 혼란). 순서 효과는 상쇄되지 않으므로 분석 때 참고
 const orderFor = pid => { void pid; return 'AB'; };
 
@@ -73,7 +69,7 @@ function buildSteps(order){
   const scns = [makeScenario(A, 'rear', lights[0], seed()), makeScenario(B, 'jam', lights[1], seed()), makeScenario(C, 'city', lights[2], seed())];
   const [h1, h2] = order === 'AB' ? EXP.pair : EXP.pair.slice().reverse();
   const block = (hud, no) => shuffle(scns.slice()).map((p, i) => ({kind:'run', hud, block:no, no:i + 1, ...p}));
-  return [...(EXP.practice ? [{kind:'practice'}] : []), ...block(h1, 1), {kind:'survey', hud:h1, block:1}, ...block(h2, 2), {kind:'survey', hud:h2, block:2}, {kind:'done'}];
+  return [{kind:'practice'}, ...block(h1, 1), {kind:'survey', hud:h1, block:1}, ...block(h2, 2), {kind:'survey', hud:h2, block:2}, {kind:'done'}];
 }
 function runCfg(st){ return {map:mapById(st.map), leaf:st.leaf, lane:st.lane, type:st.type, jam:st.jam, seed:st.seed, sigT:st.sigT}; }
 
@@ -91,7 +87,7 @@ const hideCard = () => { $('#sess').hidden = true; };
 const KEY_HINT = '<div class="keyrow"><span><kbd>←</kbd><kbd>→</kbd> 핸들</span><span><kbd>↑</kbd> 가속</span><span><kbd>↓</kbd> 브레이크</span></div>';
 function lockUi(on){
   $('#setup').classList.toggle('locked', on);
-  $$('#scenario button, #modeSeg button, #lightSeg button, #expSetup button, #expSetup input, #mirrorChk').forEach(b => b.disabled = on);
+  $$('#scenario button, #modeSeg button, #lightSeg button').forEach(b => b.disabled = on);
   if(!on && S.map && S.map.city) $$('#jamSeg button').forEach(b => b.disabled = true);
 }
 
@@ -133,7 +129,7 @@ function runStep(st){
   const cfg = runCfg(st); SES.cur = {st, cfg};
   setMode(st.hud); setLight(st.light);
   startDrive(cfg);
-  countdown(SES.seq === 0 && !EXP.practice);   // 연습이 없으면 첫 판은 키 안내를 끝까지
+  countdown(false);   // 키 안내는 연습 주행에서 끝까지 보여 줬으므로 본 주행에선 3 · 2 · 1 동안만
 }
 
 /* 연습 주행: HUD 없이 ① IC 오른쪽 진출, 앞차와 옆 차로 차만 (급정거 · 뒤차 무리 · 정체 없음). 기록은 따로 */
@@ -362,4 +358,4 @@ addEventListener('keyup', e => { if(ARROW[e.key]) KEYS[ARROW[e.key]] = false; })
 addEventListener('blur', () => Object.keys(KEYS).forEach(k => KEYS[k] = false));
 
 try{ const np = localStorage.getItem(PID_KEY); if(np) $('#pid').value = np; }catch(e){}
-renderExp(); renderLog();
+renderLog();

@@ -4,11 +4,11 @@
    · 거울처럼 가로로 뒤집는다: 뒤를 보는 카메라의 왼쪽 = 차의 오른쪽 → 뒤집으면 오른쪽 뒤 차가 거울 오른쪽에 (실제 거울과 같음)
    · HUD(SVG) · 실내(cabinScene) · 안내 카드는 이 장면에 없어서 거울에 비치지 않고, 거울은 장면 밖이라 자기 자신을 비추지 않는다
    · 카메라는 운전자 눈 카메라(main.js가 매 프레임 놓음)에서 차 중심 · 방향을 구해 따라감 — 시연 · 주행 테스트, 현대 HUD · 우리 HUD 모두 같음
-   · ?mirrors=0 이면 끔. 위치 · 화각은 추정값 [가정]: 수평 화각 ≈ 42°
+   · 늘 켬 (2026-11-07: ?mirrors=0 · 연구자 설정 체크박스 삭제 — 실험 조건 고정). 위치 · 화각은 추정값 [가정]: 수평 화각 ≈ 42°
    scene.js renderScene()이 매 프레임 MIR.render(half)를 부른다 — half면(느린 기기, scene.js PERF) 거울 그림은 두 프레임에 한 번만 새로 그림. cabin.js 다음에 로드
    ============================================================ */
 
-const MIR = {on:!/[?&]mirrors=0/.test(location.search), hfov:42, w:.2, asp:3.7, cx:.555, top:.022, pos:[0, 1.3, .15], pitch:-.025};
+const MIR = {on:true, hfov:42, w:.2, asp:3.7, cx:.555, top:.022, pos:[0, 1.3, .15], pitch:-.025};
 (() => {
   const ortho = new THREE.OrthographicCamera(0, 1, 1, 0, -1, 1), over = new THREE.Scene();
   const vert = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;

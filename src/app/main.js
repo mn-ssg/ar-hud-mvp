@@ -450,8 +450,7 @@ $$('#mapSeg button').forEach(b => b.onclick = () => {
   S.demoMap = b.dataset.m; S.demoTarget = defaultLeaf(mapById(S.demoMap)); prepDemo(); update(1); renderStatus();
 });
 $$('#jamSeg button').forEach(b => b.onclick = () => { if(stopDemo()){ S.demoJam = +b.dataset.j; prepDemo(); update(1); } });
-$('#mirrorChk').onchange = e => { MIR.on = e.target.checked; };
-$('#mirrorChk').checked = MIR.on;
+MIR.on = true;   // 룸미러는 늘 켬 (2026-11-07: 연구자 설정의 체크박스 삭제 — 실험 조건을 고정)
 // 개선 후 HUD 마감: B 선명 하나 (2026-11-04 사용자: A 절제 삭제 — hud.css 토큰이 곧 B 값). 기록의 'HUD 버전'에 '-B'로 붙는다(session.js). 고르는 UI 없음
 function setTone(t){ S.tone = 'B'; $('#cab').dataset.tone = 'B'; void t; }
 function togglePause(){
