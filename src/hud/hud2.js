@@ -114,7 +114,23 @@ function rearLevel2(G, needMove, t){
   return B.level;
 }
 
-/* ---------- 우리 HUD 2.1 ---------- */
+/* 들어갈 차로를 경로를 따라 이어진 한 줄 띠로 (D109): 본선 구간(들어갈 차로 x = tx, zNear → 갈림, 2m 간격) + 갈림 뒤 경로 곡선(2m 간격)을 한 점 목록으로 이어 strip 하나.
+   폭 w: 본선 1.75 → 출구 차로 폭(1차로 출구 2.3)으로 갈림 뒤 20m에 걸쳐 부드럽게, 안내 끝 18m는 뾰족하게. offFn(w) → [안쪽, 바깥쪽] 옆 거리(채움 · 왼쪽 레일 · 오른쪽 레일이 같은 함수).
+   toFork: 본선 구간만(해소 초록 채움) */
+function laneRibbon(zNear, onMain, offFn, proj, toFork = false){
+  const R = S.route, tx = R.tx, bc = R.afterCurve, L = R.afterL, bh = R.leaf.path[0].k === 1 ? 2.3 : 1.75;
+  const lastS = path.nodeS[path.nodeS.length - 1], bu = clamp((lastS + ROUTE_END - path.nodeS[0])/L), A = [], B = [];
+  if(onMain) for(let z = zNear; z > FORK_Z; z -= 2){ const [o1, o2] = offFn(1.75); A.push(proj(tx + o1, z)); B.push(proj(tx + o2, z)); }
+  if(!toFork){
+    const n = Math.max(24, Math.ceil(bu*L/2));
+    for(let i = 0; i <= n; i++){ const u = bu*i/n, s = u*L, q = bc.getPointAt(u), t = bc.getTangentAt(u), l = Math.hypot(t.x, t.z) || 1, nx = -t.z/l, nz = t.x/l;
+      const f = clamp((bu*L - s)/18), [o1, o2] = offFn(1.75 + (bh - 1.75)*clamp(s/20)).map(o => o*f);
+      A.push(proj(q.x + nx*o1, q.z + nz*o1)); B.push(proj(q.x + nx*o2, q.z + nz*o2)); }
+  } else if(onMain){ const [o1, o2] = offFn(1.75); A.push(proj(tx + o1, FORK_Z)); B.push(proj(tx + o2, FORK_Z)); }
+  return strip(A, B);
+}
+
+/* ---------- 우리 HUD 2.2 ---------- */
 function drawAr2(p, f, C, k){
   const m = S.map, R = S.route, st = C.st, onMain = C.i === 0, G = S.G;
   // 시계: 시뮬레이션 시간(주행 테스트 D.t · 시연 S.cityT — guide.js 게이트와 같은 시계). 단계 머무름 · 깜빡임 · 훑기 · 나타남이 모두 이 시계라 자동 테스트(빠른 시계)에서도 같게 돈다
@@ -187,12 +203,11 @@ function drawAr2(p, f, C, k){
   $('#bSurf').setAttribute('d', surf); $('#bEdges').setAttribute('d', edges); $('#bDash').setAttribute('d', dash);
   const fillTarget = st === 1 ? .85 : 1;
   S.fill += (fillTarget - S.fill)*k;
-  const lastS = path.nodeS[path.nodeS.length-1], endT = clamp((S.s - lastS)/ROUTE_END);
-  const bc = R.afterCurve, bu = clamp((lastS + ROUTE_END - path.nodeS[0])/R.afterL), bh = R.leaf.path[0].k === 1 ? 2.3 : 1.75, lf = S.fill;
-  const mainFill = onMain ? bandX(tx - 1.75, tx + 1.75, zNear, -230, proj) : '', mainRails = onMain ? lineX(tx - 1.75, zNear, -230, .1, proj) + lineX(tx + 1.75, zNear, -230, .1, proj) : '';
-  $('#bLaneFill').setAttribute('d', mainFill + bandC(bc, 0, bu, -bh, bh, 18, R.afterL, proj));
+  const lastS = path.nodeS[path.nodeS.length-1], endT = clamp((S.s - lastS)/ROUTE_END), lf = S.fill;
+  // 들어갈 차로 · 레일: 본선 들어갈 차로(zNear → 갈림) + 갈림 뒤 경로를 한 줄 띠로 (2026-11-07 D109 — 예전엔 두 조각(bandX 4m 걸음이 −230에 못 닿아 틈, 폭 1.75 → 2.3 계단). 1차 HUD(drawAr)는 그대로)
+  $('#bLaneFill').setAttribute('d', laneRibbon(zNear, onMain, w => [-w, w], proj));
   $('#bLaneFill').setAttribute('opacity', lf.toFixed(3));
-  $('#bRails').setAttribute('d', mainRails + bandC(bc, 0, bu, -bh - .1, -bh + .1, 18, R.afterL, proj) + bandC(bc, 0, bu, bh - .1, bh + .1, 18, R.afterL, proj));
+  $('#bRails').setAttribute('d', laneRibbon(zNear, onMain, w => [-w - .1, -w + .1], proj) + laneRibbon(zNear, onMain, w => [w - .1, w + .1], proj));
   $('#bRails').setAttribute('opacity', lf.toFixed(3));
   const praise = clamp((AS2.doneUntil - now)/1400), g = Math.max(praise, ease(endT)), lc = g > 0 ? mix2(T.route, T.go, g) : T.route;
   ['#lg2A', '#lg2B', '#lg2C'].forEach(s => $(s).setAttribute('stop-color', lc));
@@ -304,7 +319,7 @@ function drawAr2(p, f, C, k){
   eR.setAttribute('width', side > 0 ? B.edgeW.toFixed(1) : 0); eR.setAttribute('x', (520 - B.edgeW).toFixed(1)); eR.setAttribute('opacity', side > 0 ? ea : 0);
   // 06 해소 채움 (2026-11-04 사용자 선택 A): 들어갈 차로 전체(내 차 뒤부터 갈림까지)가 0.1초 안에 초록으로 차고 나머지 동안 천천히 빠짐. 끝나면 지워져 화살표 흐름(평상시)만 남는다
   const onFast = u => u < .12 ? u/.12 : Math.cos(Math.PI/2*(u - .12)/.88);
-  $('#bClearFill').setAttribute('d', clearing ? bandX(tx - 1.75, tx + 1.75, zNear, -230, proj) : ''); $('#bClearFill').setAttribute('fill-opacity', (clearing ? T.opClear*onFast(cu) : 0).toFixed(3));
+  $('#bClearFill').setAttribute('d', clearing ? laneRibbon(zNear, onMain, w => [-w, w], proj, true) : ''); $('#bClearFill').setAttribute('fill-opacity', (clearing ? T.opClear*onFast(cu) : 0).toFixed(3));
 
   /* 일반도로 (D69) — 개선 전과 같음: 멈출 곳 빨간 막대 · 보행자 점 */
   let cs = '', pd = '';

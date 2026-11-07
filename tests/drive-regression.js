@@ -385,6 +385,17 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('차량 3D 모델 5종이 불러와져 모든 차에 적용됨 (삼각형 승용차 ≤ 1.5만 · 버스 ≤ 2.5만)', models.n === 5 && models.applied === models.total && models.tris.every(t => t <= 25000), JSON.stringify(models));
   }
 
+  /* ---------- 8-4. 2차 HUD 들어갈 차로 띠가 한 덩어리 (2026-11-07, D109) — 갈림을 지나는 동안 채움 패스 조각 1 · 레일 조각 2 ---------- */
+  {
+    const seam = await E(() => { const out = {};
+      for(const [mapId, dest, lane] of [['ICR', '용인·기흥', 1], ['SEQ', '공주·논산', 1], ['CRT', '종합병원', 1]]){ const m = mapById(mapId), leaf = m.leaves.findIndex(l => l.dest === dest); let bad = 0, n = 0;
+        runDrive({map:m, leaf, lane, type:'rear', jam:0, seed:5, sigT:0}, {hud:'ar2', secs:mapId === 'SEQ' ? 40 : 30, noPeds:true, setup:() => { D.cars.forEach(c => c.mesh.visible = false); D.cars = []; },
+          sample:() => { const d = $('#bLaneFill').getAttribute('d') || '', r = $('#bRails').getAttribute('d') || ''; if(!d) return; n++; if((d.match(/M/g) || []).length !== 1 || (r.match(/M/g) || []).length !== 2) bad++; }});
+        out[mapId] = {n, bad}; }
+      return out; });
+    check('개선 후 들어갈 차로 띠 · 레일이 갈림(① · ③ 둘째 갈림 · ⑤ 우회전)을 지나는 내내 한 덩어리(채움 조각 1 · 레일 조각 2)', Object.values(seam).every(o => o.n > 100 && o.bad === 0), JSON.stringify(seam));
+  }
+
   /* ---------- 9. 화면 · 에셋 · 콘솔 ---------- */
   {
     const tex = await E(() => ({asphalt:!!(asphalt.map && asphalt.map.image && asphalt.map.image.src && /asphalt\.jpg/.test(asphalt.map.image.src)), facade:/facade\.jpg/.test((facadeMat.map.image || {}).src || '')}));
