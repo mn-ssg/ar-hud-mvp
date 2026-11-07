@@ -108,7 +108,7 @@ const PROPS = (() => {
 
   /* 연석: (x0, z0) → (x1, z1) 직선을 따라 폭 0.2m · 높이 0.17m (보도 면 0.15m보다 조금 높게) */
   const curbMat = new THREE.MeshStandardMaterial({color:lin('#b4b2ab'), roughness:.82});
-  const concrete = new THREE.MeshStandardMaterial({color:lin('#a8a59d'), roughness:.9, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
+  const concrete = new THREE.MeshStandardMaterial({color:lin('#8d8b84'), roughness:.92, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});   // 2026-11-07 D108: '#a8a59d' → 더 진한 콘크리트(햇빛에 흰 띠처럼 보였음)
   function curbs(group, segs){
     const parts = [];
     segs.forEach(([x0, z0, x1, z1]) => {

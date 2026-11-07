@@ -178,9 +178,9 @@ function drawAr2(p, f, C, k){
   /* ① 들어갈 차로 · 경로 — 개선 전과 같음. 다른 점: 대기 중에도 흐려지지 않음(어디로는 그대로), 미니 도로가 내 차 뒤까지 */
   let surf = bandX(-m.edgeX, m.edgeX, zNear, -232, proj), edges = lineX(-m.edgeX, zNear, -228, .09, proj) + lineX(m.edgeX, zNear, -228, .09, proj), dash = '';
   m.segs.forEach(e => {
-    const c = e.curve, hw = e.k*LANE/2, inner = 25/e.L;
+    const c = e.curve, hw = e.k*LANE/2;
     surf += strip(offsetPts(c, 0, 1, -e.half, proj, 40), offsetPts(c, 0, 1, e.half, proj, 40));
-    edges += lineC(c, e.outerL ? 0 : inner, 1, -e.half, .09, proj) + lineC(c, e.outerR ? 0 : inner, 1, e.half, .09, proj);
+    edges += lineC(c, 0, 1, -(hw + .15), .09, proj) + lineC(c, 0, 1, hw + .15, .09, proj);   // 2.2 (D108): 출구 가장자리 선을 본선과 같은 차로 끝 + .15에, 안쪽 선은 갈림부터(V자) — 예전 e.half(+.55) · 25m 뒤 시작은 3D 노면과 어긋나 두 겹으로 보였음
     for(let i=1;i<e.k;i++) for(let s=8; s<e.L-3; s+=9) dash += strip(offsetPts(c, s/e.L, (s+3)/e.L, -hw+i*LANE-.075, proj, 2), offsetPts(c, s/e.L, (s+3)/e.L, -hw+i*LANE+.075, proj, 2));
   });
   for(let i=1;i<m.lanes;i++) dash += dashX(m.laneX(i) - LANE/2, .075, zNear, proj);

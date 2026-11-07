@@ -165,6 +165,16 @@ function fillRibbon(g, curve, u0, u1, offA, offB, yA, yB = yA){
   }
   g.attributes.position.needsUpdate = true; g.computeBoundingSphere(); return g;
 }
+// 곡선을 따라 띠 — 가장자리 옆 거리를 u의 함수로 (안쪽 가장자리 선이 V자로 벌어지게, D108)
+function fillRibbonFn(g, curve, u0, u1, offFn, y){
+  const pos = g.attributes.position.array, n = pos.length/6;
+  for(let i=0;i<n;i++){
+    const u = clamp(u0+(u1-u0)*i/(n-1)), p = curve.getPointAt(u), tg = curve.getTangentAt(u), [a, b] = offFn(u);
+    let nx = -tg.z, nz = tg.x; const l = Math.hypot(nx,nz)||1; nx/=l; nz/=l;
+    pos[i*6]=p.x+nx*a; pos[i*6+1]=y; pos[i*6+2]=p.z+nz*a; pos[i*6+3]=p.x+nx*b; pos[i*6+4]=y; pos[i*6+5]=p.z+nz*b;
+  }
+  g.attributes.position.needsUpdate = true; g.computeBoundingSphere(); return g;
+}
 const asphaltTex = canvasTex(512, 512, (g,w,h) => {
   g.fillStyle = '#2d3034'; g.fillRect(0,0,w,h);
   for(let i=0;i<42000;i++){ const v = 28 + Math.random()*56 | 0; g.fillStyle = `rgba(${v},${v},${v+3},${.2+Math.random()*.3})`; g.fillRect(Math.random()*w, Math.random()*h, 1+Math.random()*.8, 1+Math.random()*.8); }
@@ -389,6 +399,15 @@ function buildMapScene(m){
   MG = new THREE.Group();
   seed = 7 + MAPS.indexOf(m)*977;
   const N = m.lanes, H = m.half;
+  // 같은 갈림의 형제 출구 · 출구 중심선 표본(500점) — 갈림 안쪽 띠 시작점(sepU) · 도류화 빗금에 씀 (D108)
+  const sibs = new Map(), samp = e => e._samp || (e._samp = Array.from({length:500}, (_, i) => e.vis.getPointAt(i/499)));
+  [m, ...m.segs.filter(e => e.node).map(e => e.node)].forEach(nd => nd.exits.forEach(e => sibs.set(e, nd.exits.filter(f => f !== e))));
+  const sepU = (e, side) => {   // 출구 e의 side(−1 왼쪽 · 1 오른쪽) 포장 가장자리가 형제 출구 포장에서 떨어지는 u
+    const L = e.vis.getLength(), fs = sibs.get(e) || [];
+    for(let i = 0; i <= 400; i++){ const u = i/400, p = e.vis.getPointAt(u), t = e.vis.getTangentAt(u), l = Math.hypot(t.x, t.z) || 1, x = p.x - t.z/l*side*(e.half + .3), z = p.z + t.x/l*side*(e.half + .3);
+      if(fs.every(f => { let d2 = Infinity; for(const q of samp(f)){ const dd = (q.x - x)**2 + (q.z - z)**2; if(dd < d2) d2 = dd; } return Math.sqrt(d2) > f.half + .1; })) return u; if(u*L > 160) return u; }
+    return 1;
+  };
 
   /* 도로까지 거리 → 지형 높이 */
   const BUCKET = 70, buckets = new Map();
@@ -427,7 +446,7 @@ function buildMapScene(m){
   mainRoad.rotation.x = -Math.PI/2; mainRoad.position.set(0,0,(40-235)/2);
   const mainLine = curveOf([V(0,60), V(0,-236)], 50);
   for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(40), mainLine, 0, 1, s*H, s*(H+3.6), -0.01, -0.45), verge);
-  for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(40), mainLine, 0, 1, s*(H - .05), s*(H + .55), .004), PROPS.concrete);   // 포장 끝 콘크리트 띠 — 가드레일 지주가 그 위에 섬
+  for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(40), mainLine, 0, 1, s*(H + .05), s*(H + .5), .004), PROPS.concrete);   // 포장 끝 콘크리트 띠 — 포장 바깥(H + .05 ~ .5)에만, 가드레일 지주가 그 위에 섬 (2026-11-07 D108: 예전 H − .05부터라 포장 위에 흰 띠처럼 보였음)
   for(let i=0;i<N;i++) for(const o of [-.85,.85]){ const t = addMesh(new THREE.PlaneGeometry(.75, 268), trackMat); t.rotation.x = -Math.PI/2; t.position.set(m.laneX(i)+o, .002, -94); }
 
   /* 차선: 본선 점선 · 가장자리 실선 + 갈림 뒤 구간의 차로 사이 점선 (3m 칠 · 6m 빈칸, hud.js 미니 도로와 같은 간격) */
@@ -440,9 +459,11 @@ function buildMapScene(m){
     const c = e.vis, Lv = c.getLength(), hw = e.k*LANE/2;
     addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, -e.half, e.half, .003 + e.layer*.002), asphalt);
     for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, s*e.half, s*(e.half+3.3), -0.02, -0.45), verge);
-    for(const s of [-1,1]) addMesh(fillRibbon(ribbonGeo(300), c, 0, 1, s*(e.half - .05), s*(e.half + .5), .006 + e.layer*.002), PROPS.concrete);
-    const inner = 30/Lv;   // 갈림 안쪽 가장자리는 갈림 뒤 약 30m부터
-    for(const [off, start] of [[-(hw+.5), e.outerL ? 0 : inner],[hw+.5, e.outerR ? 0 : inner]]) addMesh(fillRibbon(ribbonGeo(300), c, start, 1, off-.08, off+.08, .013), paint);
+    // 콘크리트 띠: 포장 바깥(half + .05 ~ .5)에, 갈림 안쪽은 옆 출구 포장과 겹치지 않게 된 곳(sepU)부터 (D108 — 예전엔 u = 0부터 옆 출구 노면 위에 깔려 두꺼운 흰 띠로 보였음)
+    for(const s of [-1,1]){ const u0 = (s < 0 ? e.outerL : e.outerR) ? 0 : sepU(e, s); if(u0 < 1) addMesh(fillRibbon(ribbonGeo(300), c, u0, 1, s*(e.half + .05), s*(e.half + .5), .006 + e.layer*.002), PROPS.concrete); }
+    // 가장자리 실선(폭 .16): 본선 가장자리 선과 같은 차로 끝 + .15 (2026-11-07 D108 — 예전 + .5는 본선 선과 0.35m 어긋나 갈림에서 두 겹으로 보였음).
+    // 갈림 안쪽 선은 u = 0(차로 경계 ± .075)부터 바깥쪽으로 .15까지 10m에 걸쳐 벌어져 두 출구의 선이 V자를 이룸(예전엔 30m 뒤부터 갑자기 시작)
+    for(const [sgn, outer] of [[-1, e.outerL], [1, e.outerR]]) addMesh(fillRibbonFn(ribbonGeo(300), c, 0, 1, u => { const o = outer ? hw + .15 : hw + .075 + .075*clamp(u*Lv/10); return [sgn*(o - .08), sgn*(o + .08)]; }, .013), paint);
     for(let i=1;i<e.k;i++){
       const off = -hw + i*LANE;
       for(let s=8; s<Lv-3; s+=9){
@@ -492,11 +513,17 @@ function buildMapScene(m){
   });
 
   /* 갈림목 코(gore)마다 노란 충격흡수대 */
+  const hatch = [];
   const goreAt = (node, z0) => {
     const samples = node.exits.map(e => Array.from({length:500}, (_,i) => e.vis.getPointAt(i/499)));
     const xAt = (i,z) => { let best = samples[i][0]; for(const p of samples[i]) if(Math.abs(p.z-z) < Math.abs(best.z-z)) best = p; return best.x; };
     for(let a=0; a<node.exits.length-1; a++){
       const need = node.exits[a].half + node.exits[a+1].half + 1.8;
+      // 도류화 빗금 (D108): 두 출구의 안쪽 가장자리 선(차로 끝 + .15) 사이 삼각형에 흰 사선(폭 .3 · 간격 1.5m · 45°, 별표 6 531 안전지대표시 [가정]) — 선이 .6m 넘게 벌어진 곳부터 코까지
+      { const ea = node.exits[a], eb = node.exits[a+1], hwA = ea.k*LANE/2 + .15, hwB = eb.k*LANE/2 + .15;
+        for(let z = z0 - 2; z > z0 - 120; z -= 1.5){ const xa = xAt(a, z) + hwA, xb = xAt(a+1, z) - hwB, gap = xb - xa; if(gap < .6) continue; if(gap > need - ea.half - eb.half + 1.2) break;
+          const z2 = z - gap; const q = [[xa + .1, z], [xb - .1, z2], [xb - .1, z2 - .42], [xa + .1, z - .42]];   // 45° 사선 한 줄(가로 폭 .3 ≈ 세로 .42)
+          hatch.push(q[0][0],.013,q[0][1], q[1][0],.013,q[1][1], q[2][0],.013,q[2][1], q[0][0],.013,q[0][1], q[2][0],.013,q[2][1], q[3][0],.013,q[3][1]); } }
       for(let z=z0-6; z>z0-120; z-=1){
         const xa = xAt(a,z), xb = xAt(a+1,z);
         if(xb - xa < need) continue;
@@ -509,6 +536,7 @@ function buildMapScene(m){
   };
   goreAt(m, FORK_Z);
   m.segs.filter(e => e.node).forEach(e => goreAt(e.node, e.node.pt[1]));
+  if(hatch.length){ const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(hatch,3)); g.computeVertexNormals(); addMesh(g, paint); }
 
   /* 잔디 덩어리: 본선 양옆 흙 띠 바깥(H + 3.6 ~ 9m)과 갈림 뒤 출구 처음 160m */
   (() => {
