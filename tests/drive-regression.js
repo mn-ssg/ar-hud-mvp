@@ -273,7 +273,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('세션: 예전 기록이 지워지거나 덮이지 않음', s.oldKept && s.storedN === 13, `저장 ${s.storedN}`);
     check('세션 끝: 질문 2블록 · HUD/테스트 상태 복원', p1.qs === 2 && !p2.testing, `질문 ${p1.qs}`);
     check('엑셀: 요약 · 기록 · 질문 · 이벤트 · 연습 · 설명 시트', s.sheets && ['요약','기록','질문','이벤트','연습','설명'].every(n => s.sheets.some(x => x[0] === n)), JSON.stringify(s.sheets));
-    check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에, 맨 뒤 연습 여부 · 정체 줄 합류 방식', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 5] === '연습 여부' && s.head[s.head.length - 4] === '정체 줄 합류 방식' && s.head[s.head.length - 1] === '그때 닿기까지 (초)' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
+    check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에(연습 여부 · 정체 줄 합류 방식 · 끼어들기 · 깜빡이 3칸)', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 8] === '연습 여부' && s.head[s.head.length - 7] === '정체 줄 합류 방식' && s.head[s.head.length - 4] === '그때 닿기까지 (초)' && s.head[s.head.length - 1] === '옮길 차로 뒤차 반응' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
   }
 
   {

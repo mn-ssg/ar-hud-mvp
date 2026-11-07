@@ -206,10 +206,10 @@ function updateQueue(p, dt){
       // 갈림(정지선)을 지난 차는 그 차로의 길(출구 · 회전)을 따라 150m 더 가서 사라진다 — 2026-11-03까지 고속도로는 갈림을 지나는 순간 사라져 내 차 25m 앞에서 줄이 통째로 없어졌음
       if(d > 150 && Math.hypot(c.position.x - p.x, c.position.z - p.z) > 60){ c.visible = false; continue; }   // 내 차가 60m 안에서 보고 있으면 아직 지우지 않음
       const [px, pz, ptx, ptz] = laneTurnPos(m, lane, s0 + d);
-      c.visible = true; c.position.set(px, 0, pz); c.rotation.y = Math.atan2(-ptx, -ptz); continue;
+      c.visible = true; c.position.set(px, 0, pz); c.rotation.y = Math.atan2(-ptx, -ptz); applyBlink(c, laneBlink(m, lane, pz), blinkOn(S.cityT, idx)); continue;
     }
     if(Math.abs(x - tx) < .1) zs.push(z);
-    c.visible = true; c.position.set(x, 0, z); c.rotation.y = 0;   // (2026-11-03) 내 차 7m 안 차를 숨기던 '안전망' 삭제 — 줄 뒤에 붙으면 맨 뒤차가 깜빡 사라졌음. 겹침은 demoLeader가 막는다
+    c.visible = true; c.position.set(x, 0, z); c.rotation.y = 0; applyBlink(c, laneBlink(m, lane, z), blinkOn(S.cityT, idx));   // 갈림 앞뒤 깜빡이 (D103)   // (2026-11-03) 내 차 7m 안 차를 숨기던 '안전망' 삭제 — 줄 뒤에 붙으면 맨 뒤차가 깜빡 사라졌음. 겹침은 demoLeader가 막는다
   }
   const backZ = zs.length ? Math.max(...zs) : null;
   let mergeNear = false;
@@ -350,7 +350,8 @@ function update(dt){
     otherCar.visible = R.side !== 0 && S.rearGap < 60 && S.rearGap > -95;
     if(otherCar.visible){ const oz = p.z + S.rearGap;
       if(oz < FORK_Z){ const [ox, ozz, otx, otz] = laneTurnPos(S.map, laneOf(S.map, rtx), LANE_START - oz); otherCar.position.set(ox, 0, ozz); otherCar.rotation.y = Math.atan2(-otx, -otz); }   // 갈림을 지나면 출구를 따라 (예전엔 곧장 가 갓길 · 코 위를 달렸음, 2026-11-03)
-      else { otherCar.position.set(rtx, 0, oz); otherCar.rotation.y = 0; } }
+      else { otherCar.position.set(rtx, 0, oz); otherCar.rotation.y = 0; }
+      applyBlink(otherCar, laneBlink(S.map, laneOf(S.map, rtx), oz), blinkOn(S.cityT, 7)); }
     if(S.rearGap < -95) S.rearActive = false;
     S.car = { pos:{ x:rtx, z: p.z + S.rearGap } };
   } else {
@@ -370,7 +371,10 @@ function update(dt){
   if(S.mode === 'ar') drawAr(p, f, C, k, dangerOn);
   else if(S.mode === 'ar2') drawAr2(p, f, C, k);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, remainKm, dangerOn);
-  updateCabin(steer, kmh);
+  // 시연 내 차 깜빡이 (D103): 옮겨야 하는 동안(guide.js need) 그쪽 — 계기판 화살표 · 똑딱
+  const dBl = S.running && S.G && S.G.need ? S.G.side : 0, dOn = !!dBl && blinkOn(S.cityT);
+  if(dOn !== S.blinkPhase){ S.blinkPhase = dOn; if(dBl) cabinTick(dOn); }
+  updateCabin(steer, kmh, dOn ? dBl : 0);
   cityFrame(S.cityT);
 }
 
@@ -407,7 +411,10 @@ function updateDrive(dt){
   if(S.mode === 'ar') drawAr(p, f, C, k, S.rearBlock);
   else if(S.mode === 'ar2') drawAr2(p, f, C, k);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1), S.rearBlock);
-  updateCabin(clamp(D.wheel*STEER_RATIO*STEER_GAIN*180/Math.PI, -360, 360), kmh);
+  // 깜빡이 (D103): 계기판 화살표 + 켜짐 · 꺼짐이 바뀔 때 똑딱 소리 (시계는 D.t — 일시정지 중엔 멈춤)
+  const bOn = !!D.blink && blinkOn(D.t - D.blinkT0);
+  if(bOn !== D.blinkPhase){ D.blinkPhase = bOn; if(D.blink) cabinTick(bOn); }
+  updateCabin(clamp(D.wheel*STEER_RATIO*STEER_GAIN*180/Math.PI, -360, 360), kmh, bOn ? D.blink : 0);
   cityFrame(D.t);
 }
 

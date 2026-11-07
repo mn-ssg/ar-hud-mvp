@@ -75,7 +75,8 @@ const mulberry32 = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imu
 
 /* ---------- 상태 ---------- */
 const KEYS = {left:false, right:false, up:false, down:false};
-const D = {x:0, z:0, psi:0, v:SPEED, steer:0, wheel:0, t:0, frozen:false, cars:[], jamLanes:[], cfg:null};
+const D = {x:0, z:0, psi:0, v:SPEED, steer:0, wheel:0, t:0, frozen:false, cars:[], jamLanes:[], cfg:null,
+  blink:0, blinkT0:0, blinkOnAt:null, blinkPhase:false, responder:null, blinkUsed:null, blinkLead:null, blinkResp:''};   // 깜빡이 (D103)
 
 // IDM(지능형 운전자 모델): 원하는 속도 v0 · 앞차와 간격 gap · 속도 차 dv(+ = 내가 빠름) → 가속도. T 차간 시간 · s0 최소 간격
 function idm(v, v0, gap, dv, A = 1.5, T = 1.1, s0 = 2.5){
@@ -108,6 +109,7 @@ function driveReset(cfg){
     seg:null, hint:-1, segS:0, cands:null, lane:cfg.lane, chosen:[], exitName:'',
     enterZ:null, changeDist:null, risky:0, enc:{}, lastCut:{}, offroad:0, lastTouch:-9, followT:0, crashWith:'', result:null, endT:0,
     safeOn:false, safeSince:0, reactT:null, moved:false, cutAhead:0, cutAheadGap:null, cutAheadTtc:null,   // 앞으로 끼어들기(2026-11-03): 옮길 차로의 뒤차 앞에 들어간 횟수 · 그때 뒤차 간격(m, 최소) · 닿기까지(초, 최소)
+    blink:0, blinkT0:0, blinkOnAt:null, blinkPhase:false, responder:null, blinkUsed:null, blinkLead:null, blinkResp:'',   // 깜빡이 (D103): 켜진 쪽 · 켠 시각 · 반응하는 뒤차 · 기록 3칸
     events:[], lc:null});   // events: 위험 · 판단 상태 · 차로 변경 시작/완료 · 끼어들기 · 충돌 시점 (2026-10-29, session.js가 기록에 붙임)
   Object.keys(KEYS).forEach(k => KEYS[k] = false);
   queueCars.forEach(c => c.visible = false); flowCars.forEach(c => { c.visible = false; c.userData.onc = false; setBrake(c, false); }); otherCar.visible = false; busMesh.visible = false;
@@ -123,7 +125,7 @@ function driveReset(cfg){
   // 내 차로 앞차는 늘 있음. 판마다 둘 중 하나: 앞차가 급정거해 완전히 섬(내 뒤는 비어 있음) / 뒤에 바짝 붙어 오는 차(급하게 서면 받힘, 뒤차 판만)
   // — 둘을 한 판에 같이 두면 세게 밟아도 약하게 밟아도 부딪혀 피할 길이 없음
   cfg.brake = cfg.type !== 'practice' && R() < HARD.brakeAhead;   // 연습 판(session.js)은 급정거 · 뒤차 · 정체 없이 앞차와 옆 차로 차만
-  const lead = add(flowCars[fi++], cfg.lane, D.z - DRV.carL - rr(HARD.block.leadNear ? HARD.leadNearGap : HARD.lead), V0, 'lead');   // block.leadNear: 앞차를 가까이
+  const lead = add(flowCars[fi++], cfg.lane, D.z - DRV.carL - rr(HARD.block.leadNear && cfg.type !== 'practice' ? HARD.leadNearGap : HARD.lead), V0, 'lead');   // block.leadNear: 앞차를 가까이 (연습 판은 보통 거리 — 내 속도가 흔들려 옆 차로 연습 뒤차가 먼저 지나가 버리지 않게)
   lead.brakeAt = cfg.brake ? rr(HARD.brakeAt) : null; lead.phase = 0;
   // 바짝 붙은 뒤차는 뒤차 판에만 — 정체 판은 줄 때문에 누구나 크게 줄여야 해서, 뒤차까지 붙으면 제대로 줄여도 받힘(실제론 뒤차도 정체를 보고 같이 줄임)
   if(!cfg.brake && cfg.type === 'rear') add(flowCars[fi++], cfg.lane, D.z + rr(HARD.tail), V0 + .4, 'tail', {T:.5, s0:2, v0:V0 + 1.5});
@@ -168,6 +170,8 @@ function driveReset(cfg){
       if(k + 1 === wideAt){ z += rr(HARD.qWideGap); wideAt += ri(HARD.qWideEvery); } else z += rr(HARD.qGap);   // 몇 대마다 넓은 틈
     }
   });
+  // 연습 판 (D103): 옮길 차로에 같은 속도로 따라오는 뒤차 2대 — 가까운 차(범퍼 7m 뒤, 그냥은 끼어들 틈이 없음)는 깜빡이를 켜면 반드시 양보, 뒤 차는 양보 안 함
+  if(cfg.type === 'practice'){ add(flowCars[fi++], tl, D.z + DRV.carL + 7, V0, 'rear', {T:.6, s0:2, pYield:BLINK.practiceYield ? 0 : null, match:true}); add(flowCars[fi++], tl, D.z + DRV.carL + 7 + 34, V0, 'rear', {T:.6, s0:2, pYield:1}); }   // match: 내 속도를 따라붙어 틈을 안 줌(양보 전까지)
   // 그 밖의 차: 시작 · 목표 · 정체 차로가 아닌 차로 앞쪽 1~3대
   const others = lanes.filter(l => l !== cfg.lane && l !== tl && !D.jamLanes.includes(l)), nAmb = ri([1, 3]);
   for(let k=0; k<nAmb && others.length && fi < flowCars.length; k++) add(flowCars[fi++], others[Math.floor(R()*others.length)], D.z - 30 - k*45 - R()*25, m.city ? V0*(.9 + R()*.15) : (61 + R()*11)/3.6, 'amb');
@@ -181,22 +185,62 @@ function driveReset(cfg){
       if(m.cw && c.mv === 'R') for(let i = Math.floor(stopS0); i < c.P.n; i++) if(c.P.x[i] >= m.cw.x0 - .3){ c.cwS = i*c.P.step; break; }
     });
   }
+  // 깜빡이 반응 난수 (D103): 차마다 양보 여부(yieldR < BLINK.yieldP) · 알아채는 시간 — 맨 끝에서 뽑아 위 교통 배치는 예전 seed 그대로. 연습 판은 정해진 값(pYield)
+  D.cars.forEach(c => { c.yieldR = c.pYield ?? R(); c.noticeT = rr(BLINK.notice); });
   placeCars();
   hudThreat(0);
 }
 function driveClear(){ D.cars.forEach(c => c.mesh.visible = false); D.cars = []; }
 
 function placeCars(){
-  D.cars.forEach(c => {
+  D.cars.forEach((c, i) => {
     const [x, z, tx, tz] = pathAt(c.P, c.s); c.x = x; c.z = z; c.tx = tx; c.tz = tz;
     c.mesh.position.set(x, 0, z); c.mesh.rotation.y = Math.atan2(-tx, -tz);
+    // AI 차 깜빡이 (D103): 꺾이는 출구로 나가는 차는 갈림 앞뒤에서 그쪽, 버스는 정류장 흐름(busSide)
+    applyBlink(c.mesh, c.kind === 'bus' ? (c.busSide || 0) : laneBlink(S.map, c.lane, c.z), blinkOn(D.t, i));
   });
+}
+// 본선 차로의 출구가 꺾이면(L · R) 갈림 60m 앞부터 갈림 뒤 25m까지 그쪽 깜빡이 (시연의 줄 차 · 옆 차로 차도 같은 규칙 — main.js)
+function laneBlink(m, lane, z){
+  if(lane < 0 || lane >= m.lanes || z > FORK_Z + 60 || z < FORK_Z - 25) return 0;
+  const e = m.exits.find(x => x.lanes.includes(lane)); return !e ? 0 : e.key === 'L' ? -1 : e.key === 'R' ? 1 : 0;
+}
+
+/* ---------- 깜빡이 (D103) ----------
+   setBlink(side): Q(−1) · E(1) 토글, 반대쪽을 누르면 그쪽으로. 차로 변경이 끝나면(trackLanes lcDone) 자동으로 꺼짐(auto).
+   stepBlink(): 옮길 쪽 차로에서 내 뒤 · 옆(BLINK.react m 안)의 가장 가까운 차 한 대가 반응 — noticeT초 뒤 양보(yielding: 속도를 줄여 내 앞에 틈) 또는 양보 안 함(passing: 조금 올려 그냥 지나감).
+   반응 여부(yieldR)는 driveReset에서 seed로 정해져 있어 같은 seed면 두 HUD 조건에서 같다. 깜빡이를 끄면 반응도 멈춘다. 2차 HUD 판단(guide.js)엔 연결하지 않음 */
+function setBlink(side, auto = false){
+  if(!S.drive || D.result) return;
+  const next = side && side !== D.blink ? side : 0;
+  if(next === D.blink) return;
+  D.blink = next; D.blinkT0 = D.t; if(next) D.blinkOnAt = D.t;
+  D.events.push({t:+D.t.toFixed(2), type:'blink', side:next, auto});
+  // 끄거나 쪽을 바꾸면 반응을 되돌림 — 알아챈 시계 · 결정도 지워 다시 켜면 처음부터(같은 seed면 같은 결정)
+  D.cars.forEach(c => { c.yielding = c.passing = false; delete c.blinkSeenAt; delete c.blinkDec; }); D.responder = null;
+}
+function stepBlink(){
+  if(!D.blink || D.seg || D.cands) return;   // 본선에서만 뒤차가 반응
+  const lane = D.lane + D.blink; if(lane < 0 || lane >= S.map.lanes) return;
+  const behindGap = c => c.z - D.z - halfL(c) - DRV.carL/2;   // 내 뒤 범퍼 간격(+ = 뒤, 음수 = 옆 · 앞)
+  const inRange = c => c.lane === lane && c.kind !== 'queue' && c.kind !== 'onc' && c.kind !== 'bus' && c.z > FORK_Z - 5 && behindGap(c) > -(halfL(c) + DRV.carL/2) && c.z - D.z <= BLINK.react;
+  // 범위에 든 차마다 알아채는 시계를 따로(한 번만) — 반응 차 하나를 매 프레임 다시 고르면 빠른 흐름에선 알아채기 전에 지나가 버려 아무도 반응하지 못했음(2026-11-07 확인)
+  D.cars.forEach(c => { if(inRange(c) && c.blinkSeenAt === undefined) c.blinkSeenAt = D.t + c.noticeT; });
+  if(D.responder && D.responder.yielding){ if(behindGap(D.responder) <= -(halfL(D.responder) + DRV.carL/2)){ D.responder.yielding = false; D.responder.passing = true; D.responder = null; } return; }   // 양보 중인 차가 있으면 그 차만. 어쩌다 나를 완전히 앞질렀으면 그냥 지나감으로
+  // 알아챈 차 중 가장 가까운 한 대가 정한다: 양보할 수 있는 자리(뒤에 있고, yieldDec로 줄여 내 뒤에 설 수 있는 간격)면 seed 난수로 양보 · 안 함, 이미 옆이거나 너무 가까이 빠르게 왔으면 그냥 지나감(결정으로 세지 않음)
+  const cand = D.cars.filter(c => inRange(c) && c.blinkDec === undefined && D.t >= c.blinkSeenAt).sort((p, q) => (p.z - D.z) - (q.z - D.z))[0];
+  if(!cand) return;
+  const gap = behindGap(cand), can = gap > 1 + Math.max(0, cand.v - D.v)**2/(2*BLINK.yieldDec), y = can && cand.yieldR < BLINK.yieldP;
+  cand.blinkDec = y ? 'yield' : 'pass'; if(y) cand.yielding = true; else cand.passing = true;
+  D.responder = cand;
+  if(can){ D.events.push({t:+D.t.toFixed(2), type:'blinkResp', with:KIND_NAME[cand.kind], yield:y, notice:+cand.noticeT.toFixed(1), gap:+gap.toFixed(1)}); if(!D.blinkResp) D.blinkResp = y ? '양보' : '양보 안 함'; }
 }
 
 /* ---------- 매 프레임 ---------- */
 function driveStep(dt){
   D.t += dt;
   stepPlayer(dt);
+  if(!D.result) stepBlink();
   stepCars(dt);
   if(!D.result){
     if(!D.seg && !D.cands) stepMain(dt);
@@ -256,15 +300,20 @@ function stepCars(dt){
       }
     }
     if(S.map.city) v0 = Math.min(v0, curveV(c));                                                   // 일반도로: 굽은 곳 앞에서 미리 부드럽게 줄임
-    // block.rearMatch: 옮길 차로 뒤차(내 뒤 60m 안)는 내가 순항보다 빨리 달리면 그만큼 더 빨라져 간격을 유지 — 끼워 주지 않는 차처럼. 가속은 matchA까지
-    let Aacc = 1.5;
-    if(HARD.block.rearMatch && c.kind === 'rear' && c.lane === laneOf(S.map, S.route.tx) && c.z > D.z && c.z - D.z < 60 && D.v > D.cruise + .3){ v0 = Math.max(v0, c.base + (D.v - D.cruise)); Aacc = HARD.matchA; }
+    // block.rearMatch: 옮길 차로 뒤차(내 뒤 60m 안)는 내가 순항보다 빨리 달리면 그만큼 더 빨라져 간격을 유지 — 끼워 주지 않는 차처럼. 가속은 matchA까지. 양보 중인 차(D103)는 예외
+    let Aacc = 1.5; const decCap = -9;
+    if(HARD.block.rearMatch && !c.yielding && c.kind === 'rear' && c.lane === laneOf(S.map, S.route.tx) && c.z > D.z && c.z - D.z < 60 && D.v > D.cruise + .3){ v0 = Math.max(v0, c.base + (D.v - D.cruise)); Aacc = HARD.matchA; }
+    // 깜빡이 반응 (D103): 양보 = 내 뒤 범퍼 간격이 yieldGap이 될 때까지 내 속도보다 yieldDv 느리게(감속은 yieldDec까지만 — 앞차가 가까우면 평소대로), 생기면 내 속도를 따라감 / 양보 안 함 = 기본 속도 + passDv로 지나가고, 지나가면 평소대로
+    if(c.match && !c.yielding && !c.passing) v0 = Math.min(v0, D.v);   // 연습 판 뒤차: 내 속도에 맞춰 따라옴(깜빡이로 양보받기 전엔 틈이 안 생김)
+    let aYield = Infinity;
+    if(c.yielding){ const gapMe = Math.max(.1, c.z - D.z - halfL(c) - DRV.carL/2); aYield = Math.max(-BLINK.yieldDec, idm(c.v, Math.min(v0, D.v + .3), gapMe, c.v - D.v, 1.5, BLINK.yieldT, BLINK.yieldGap)); }   // 나를 앞차로 보고 뒤로 물러남
+    if(c.passing){ v0 = Math.max(v0, c.base + BLINK.passDv); if(c.z - D.z < -(halfL(c) + DRV.carL/2 + 4)){ c.passing = false; if(D.responder === c) D.responder = null; } }
     // 내 차가 앞차면: 내 속도 변화를 HARD.aiLag초 늦게 알아채고, 최대 HARD.aiDec까지만 밟음
     c.seenV += (D.v - c.seenV)*Math.min(1, dt/HARD.aiLag);
     let gap = ld.gap, lv = ld.me ? c.seenV : ld.v;
     const st = cityStop(c); if(st !== null && st < gap){ gap = st; lv = 0; }                       // 빨간불 정지선 · 보행자 앞 = 서 있는 앞차처럼
-    const a = idm(c.v, v0, gap, c.v - lv, Aacc, T, s0);
-    c.v = Math.max(0, c.v + Math.max(ld.me ? -HARD.aiDec : -9, a)*dt);
+    const a = Math.min(idm(c.v, v0, gap, c.v - lv, Aacc, T, s0), aYield);
+    c.v = Math.max(0, c.v + Math.max(ld.me ? -HARD.aiDec : decCap, a)*dt);
     c.s += c.v*dt;
   });
   placeCars();
@@ -395,7 +444,8 @@ function trackLanes(){
   const side = S.route.side, next = D.lane + side;
   if(side && !D.moved){ const ok = laneSafe(next); if(ok && !D.safeOn) D.safeSince = D.t; D.safeOn = ok; }
   touch.forEach(l => {
-    if(side && !D.moved && l === next){ D.moved = true; D.reactT = D.safeOn ? +(D.t - D.safeSince).toFixed(2) : null; }   // 안전하지 않을 때 끼면 빈칸(위험 끼어들기로 잡힘)
+    if(side && !D.moved && l === next){ D.moved = true; D.reactT = D.safeOn ? +(D.t - D.safeSince).toFixed(2) : null;   // 안전하지 않을 때 끼면 빈칸(위험 끼어들기로 잡힘)
+      D.blinkUsed = D.blink === side; D.blinkLead = D.blinkUsed ? +(D.t - D.blinkOnAt).toFixed(2) : null; }   // 깜빡이 기록 (D103): 옮기기 시작할 때 켜져 있었나 · 켠 뒤 몇 초 만에
     if(!D.enc[l]){
       D.enc[l] = true;
       // 차로 변경 시작: 차 옆면이 선을 넘기 시작한 순간. 그때 판단 상태(S.G — 어느 HUD든 같은 판단, 보인 건 v2뿐)를 함께
@@ -405,7 +455,9 @@ function trackLanes(){
   });
   // 차로 변경 완료: 새 차로 가운데 ±settle에 들어옴 / 되돌아오면 취소
   if(D.lc){
-    if(li === D.lc.to && Math.abs(D.x - m.laneX(li)) < DRV.settle){ D.events.push({t:+D.t.toFixed(2), type:'lcDone', from:D.lc.from, to:li, dur:+(D.t - D.lc.t0).toFixed(2)}); D.lc = null; }
+    if(li === D.lc.to && Math.abs(D.x - m.laneX(li)) < DRV.settle){ D.events.push({t:+D.t.toFixed(2), type:'lcDone', from:D.lc.from, to:li, dur:+(D.t - D.lc.t0).toFixed(2)});
+      if(D.blink && D.blink === Math.sign(li - D.lc.from)) setBlink(0, true);   // 새 차로에 자리 잡으면 깜빡이 자동 끔 (D103)
+      D.lc = null; }
     else if(li === D.lc.from && !touch.includes(D.lc.to)){ D.events.push({t:+D.t.toFixed(2), type:'lcAbort', from:D.lc.from, to:D.lc.to}); D.lc = null; }
   }
   // 목표 차로 중앙 ±1m 안에 들어오면 그곳을 기억, 목표 차로를 벗어나면 지움 → 갈림에서 남은 값이 '자리 잡은 곳'

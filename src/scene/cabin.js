@@ -133,11 +133,11 @@ const cGlow = new THREE.PointLight(lin('#a9c6ff'), 0, .9, 2); cGlow.position.set
 
 /* ---------- 화면 내용 (글자는 최소, 실제 차 화면처럼. 내비 지도 없음 — 주행 테스트에 다른 단서가 생기지 않게) ---------- */
 const CF = '"Pretendard Variable","Pretendard",' + FONT;
-let cabinNight = false, lastKmh = -1, lastMin = -1;
+let cabinNight = false, lastKmh = -1, lastMin = -1, lastBlink = 0;
 const two = n => String(n).padStart(2, '0');
 /* 2026-10-29: 계기판 · 센터 화면 정리 — 운전에 쓰는 것(속도 · 기어 · 시각)만 남김.
    뺀 것: 회전수 게이지 · 누적 거리 · 차로 유지 그림 · 라디오 카드(보라 ~ 청록 앨범 그림). 참고 시안 assets/ref/0_art_day.jpg */
-function drawCluster(kmh){
+function drawCluster(kmh, blink = 0){
   const g = clusterCv.getContext('2d'), W = clusterCv.width, H = clusterCv.height, d = new Date();
   g.fillStyle = '#080b0f'; g.fillRect(0, 0, W, H);
   // 속도: 가는 호 + 큰 숫자 — 유리 가운데(= 눈 정면 = 핸들 가운데, 2026-11-04). 기어는 왼쪽, 시각은 오른쪽
@@ -149,6 +149,8 @@ function drawCluster(kmh){
   // 기어 · 시각
   g.font = `700 46px ${CF}`; g.fillStyle = '#f2f5f8'; g.fillText('D', 150, 165);
   g.font = `500 22px ${CF}`; g.fillStyle = '#8b96a3'; g.fillText(`${two(d.getHours())}:${two(d.getMinutes())}`, W - 150, 160);
+  // 방향 지시등 표시 (D103): 위 양쪽 초록 화살표. blink = 켜진 쪽(−1 · 1), 꺼진 순간은 0 — 실제 계기판처럼 꺼진 쪽은 안 보임
+  for(const s of [-1, 1]){ if(blink !== s) continue; const cx0 = W/2 + s*150, y = 46; g.fillStyle = '#3ddc84'; g.beginPath(); g.moveTo(cx0 + s*16, y); g.lineTo(cx0 - s*4, y - 12); g.lineTo(cx0 - s*4, y - 5); g.lineTo(cx0 - s*18, y - 5); g.lineTo(cx0 - s*18, y + 5); g.lineTo(cx0 - s*4, y + 5); g.lineTo(cx0 - s*4, y + 12); g.closePath(); g.fill(); }
   clusterMat.map.needsUpdate = true;
 }
 function drawInfo(){
@@ -167,11 +169,23 @@ try{ document.fonts && document.fonts.ready.then(() => { lastKmh = -1; drawInfo(
 
 /* ---------- main.js가 부르는 것 ---------- */
 // 매 프레임: 실내를 눈(카메라)에 붙이고, 핸들을 돌리고, 계기판 속도를 바꾼다(바뀔 때만 다시 그림)
-function updateCabin(steerDeg, kmh){
+function updateCabin(steerDeg, kmh, blink = 0){
   cabin.position.copy(camera.position); cabin.quaternion.copy(camera.quaternion);
   wheelSpin.rotation.z = -steerDeg*Math.PI/180;   // + = 오른쪽으로 돌림(운전자가 볼 때 시계 방향)
   const m = new Date().getMinutes();
-  if(kmh !== lastKmh || m !== lastMin){ drawCluster(kmh); if(m !== lastMin) drawInfo(); lastKmh = kmh; lastMin = m; }
+  if(kmh !== lastKmh || m !== lastMin || blink !== lastBlink){ drawCluster(kmh, blink); if(m !== lastMin) drawInfo(); lastKmh = kmh; lastMin = m; lastBlink = blink; }
+}
+/* 깜빡이 똑딱 소리 (D103): 파일 없이 WebAudio로 짧은 클릭(켜짐 높은 음 · 꺼짐 낮은 음, 30ms, 작게). 브라우저가 소리를 막으면(사용자 조작 전) 조용히 건너뜀 */
+const SND = {ctx:null};
+function cabinTick(on){
+  try{
+    if(!SND.ctx) SND.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const c = SND.ctx; if(c.state === 'suspended') c.resume();
+    const t0 = c.currentTime, o = c.createOscillator(), g = c.createGain();
+    o.type = 'square'; o.frequency.value = on ? 1800 : 1300;
+    g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(on ? .03 : .022, t0 + .003); g.gain.exponentialRampToValueAtTime(.0001, t0 + .03);
+    o.connect(g).connect(c.destination); o.start(t0); o.stop(t0 + .035);
+  }catch(e){}
 }
 function setCabinLight(night){
   cabinNight = night;

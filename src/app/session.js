@@ -84,7 +84,7 @@ function sesCard({icon = '', tone = '', eyebrow = '', title, body = '', btn, btn
   const inp = $('#sesPid'); (inp ? inp : b1).focus();
 }
 const hideCard = () => { $('#sess').hidden = true; };
-const KEY_HINT = '<div class="keyrow"><span><kbd>←</kbd><kbd>→</kbd> 핸들</span><span><kbd>↑</kbd> 가속</span><span><kbd>↓</kbd> 브레이크</span></div>';
+const KEY_HINT = '<div class="keyrow"><span><kbd>←</kbd><kbd>→</kbd> 핸들</span><span><kbd>↑</kbd> 가속</span><span><kbd>↓</kbd> 브레이크</span><span><kbd>Q</kbd><kbd>E</kbd> 깜빡이</span></div>';
 function lockUi(on){
   $('#setup').classList.toggle('locked', on);
   $$('#scenario button, #modeSeg button, #lightSeg button').forEach(b => b.disabled = on);
@@ -132,9 +132,9 @@ function runStep(st){
   countdown(false);   // 키 안내는 연습 주행에서 끝까지 보여 줬으므로 본 주행에선 3 · 2 · 1 동안만
 }
 
-/* 연습 주행: HUD 없이 ① IC 오른쪽 진출, 앞차와 옆 차로 차만 (급정거 · 뒤차 무리 · 정체 없음). 기록은 따로 */
+/* 연습 주행: HUD 없이 ① IC 오른쪽 진출, 앞차 · 옆 차로 차 + 옮길 차로 뒤차 2대(가까운 차는 깜빡이를 켜면 반드시 양보 — D103) (급정거 · 뒤차 무리 · 정체 없음). 기록은 따로 */
 function practiceCard(){
-  sesCard({eyebrow:'연습', title:'오른쪽 출구로 나가 보세요', body:KEY_HINT, btn:['연습 시작', runPractice], btn2:SES.on ? null : ['처음으로', goHome]});
+  sesCard({eyebrow:'연습', title:'오른쪽 출구로 나가 보세요', body:'<p class="lead">차로를 옮기기 전에 깜빡이(<kbd>Q</kbd> 왼쪽 · <kbd>E</kbd> 오른쪽)를 켜 보세요. 옆 차로 뒤차가 틈을 내줍니다.</p>' + KEY_HINT, btn:['연습 시작', runPractice], btn2:SES.on ? null : ['처음으로', goHome]});
 }
 function runPractice(){
   const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
@@ -202,7 +202,8 @@ function onDriveEnd(){
     // 2026-10-29 추가 (예전 기록엔 없음)
     scn:st ? st.scn : 'practice-ICR', ver:practice ? '-' : hudVerOf(st.hud), env:envName(), order:SES.order, seq:practice ? 0 : ++SES.seq, practice:!!practice,
     waitSecs:es.waitSecs, waitMoves:es.waitMoves, goReact:es.goReact, hazards:es.hazards, lcN, riskyWith, events:ev,
-    cutAhead:D.cutAhead, cutAheadGap:D.cutAheadGap, cutAheadTtc:D.cutAheadTtc};   // 2026-11-03 앞으로 끼어들기
+    cutAhead:D.cutAhead, cutAheadGap:D.cutAheadGap, cutAheadTtc:D.cutAheadTtc,   // 2026-11-03 앞으로 끼어들기
+    blinkUsed:D.blinkUsed, blinkLead:D.blinkLead, blinkResp:D.blinkResp};   // 2026-11-07 깜빡이 (D103)
   if(practice){
     // 연습은 조작 익히기 — 판정 · 결과 카드 · 요약 없이 바로 다음으로 (2026-11-03). 기록은 '연습' 시트에만
     practices.push(row); saveArr(PKEY, practices); SES.prs.push(row);
@@ -258,23 +259,26 @@ function summaryHtml(rows){
 }
 // 기록: 한 회 = 한 줄. 앞 11칸은 1차 실험 그대로(정의 · 순서 바꾸지 않음), 뒤는 2026-10-29 추가(시나리오 ~ 충돌 상대), 맨 뒤 '연습 여부'는 2026-11-03 추가
 const HEAD = ['참가자','HUD','시간대','맵','상황','결과','차로 옮긴 곳 (마감선 앞 m)','안전해진 뒤 옮기기까지 (초)','위험한 끼어들기 (번)','보행자 양보 안 함 (번)','도로 벗어남 (번)',
-  '시나리오 ID','HUD 버전','환경 버전','제시 순서','판 순서','대기 판단 시간 (초)','대기 · 확인 중 옮기기 시작 (번)','이동 판단 뒤 옮기기까지 (초)','위험 발생 (번)','차로 변경 완료 (번)','위험한 끼어들기 상대','충돌 상대','연습 여부','정체 줄 합류 방식','앞으로 끼어들기 (번)','그때 뒤차 간격 (m)','그때 닿기까지 (초)'];
+  '시나리오 ID','HUD 버전','환경 버전','제시 순서','판 순서','대기 판단 시간 (초)','대기 · 확인 중 옮기기 시작 (번)','이동 판단 뒤 옮기기까지 (초)','위험 발생 (번)','차로 변경 완료 (번)','위험한 끼어들기 상대','충돌 상대','연습 여부','정체 줄 합류 방식','앞으로 끼어들기 (번)','그때 뒤차 간격 (m)','그때 닿기까지 (초)',
+  '깜빡이 켬 (차로 변경 때)','깜빡이 → 차선 넘기 시작 (초)','옮길 차로 뒤차 반응'];   // 2026-11-07 깜빡이 (D103)
 // 정체 판 성공이 '줄 합류'였는지, 줄을 건너뛰고 갈림 뒤에 출구로 들어갔는지 (2026-11-03 — 자동 운전에서 후자가 '성공 · 옮긴 곳 빈칸 · 반응 빈칸'으로 남는 것을 확인, 결과 정의는 바꾸지 않고 칸만 추가)
 const jamJoinOf = r => r.type !== 'jam' ? '' : r.result !== 'ok' ? '' : /줄 합류$/.test(r.exit || '') ? '줄 합류' : '줄 건너뜀 (갈림 뒤 진입)';
 const rowCells = r => [r.p, modeName(r.hud), lightName(r.light), mapLabel(r.map), situName(r), resultName(r), marginOf(r) ?? '', r.react ?? '',
   r.risky, (mapById(r.map) || {}).cw ? (r.ped ?? '') : '', r.offroad,
-  r.scn ?? '', r.ver ?? '', r.env ?? '', orderText(r.order), r.seq ?? '', r.waitSecs ?? '', r.waitMoves ?? '', r.goReact ?? '', r.hazards ?? '', r.lcN ?? '', r.riskyWith ?? '', r.crash ?? '', r.practice ? '연습' : r.scn ? '본 실험' : '', jamJoinOf(r), r.cutAhead ?? '', r.cutAheadGap ?? '', r.cutAheadTtc ?? ''];
+  r.scn ?? '', r.ver ?? '', r.env ?? '', orderText(r.order), r.seq ?? '', r.waitSecs ?? '', r.waitMoves ?? '', r.goReact ?? '', r.hazards ?? '', r.lcN ?? '', r.riskyWith ?? '', r.crash ?? '', r.practice ? '연습' : r.scn ? '본 실험' : '', jamJoinOf(r), r.cutAhead ?? '', r.cutAheadGap ?? '', r.cutAheadTtc ?? '',
+  r.blinkUsed === undefined ? '' : r.blinkUsed === null ? '(안 옮김)' : r.blinkUsed ? '켬' : '안 켬', r.blinkLead ?? '', r.blinkResp ?? ''];
 const SUM_HEAD = ['HUD','판 종류','판 수','성공률 (%)','다른 출구 (판)','충돌 (판)','위험한 끼어들기 (번)','신호 위반 (판)','보행자 양보 안 함 (번)','도로 벗어남 (번)','차로 옮긴 곳 평균 (마감선 앞 m, 위험 0인 판)','안전해진 뒤 옮기기까지 평균 (초)','확신 평균 (1~5)','대기 · 확인 중 옮기기 시작 (번)','대기 이해 정답 (A / 답한 수)'];
 const sumCells = (rows, qs) => HUDS_IN(rows).flatMap(h => [null, '고속도로 뒤차', '고속도로 정체', '일반도로'].map(k => { const s = summarize(rows, h, qs, k);
   return [modeName(h), k || '전체', s.n, s.rate ?? '', s.wrong, s.crash, s.risky, s.sig, s.ped, s.off, r1(s.margin), s.react === null ? '' : Math.round(s.react*100)/100, k ? '' : r1(s.sure), s.waitMoves ?? '', k ? '' : (summarize(rows, h, qs).waitOk || '')]; }));
 const Q_HEAD = ['참가자','HUD','질문','답 (1 전혀 ~ 5 매우)','질문 2','답 2','HUD 버전','제시 순서'];
 const qCells = q => [q.p, modeName(q.hud), Q_TEXT, q.rate, q.wait ? Q2_TEXT : '', q.wait ? `${'ABCD'[q.wait - 1]} ${q.waitText}` : '', q.ver ?? '', orderText(q.order)];
-const EV_NAME = {gate:'판단 상태', hazardOn:'위험 발생', hazardOff:'위험 해소', lcStart:'차로 변경 시작', lcDone:'차로 변경 완료', lcAbort:'차로 변경 취소', cutIn:'옆 차로 진입', crash:'충돌'};
+const EV_NAME = {gate:'판단 상태', hazardOn:'위험 발생', hazardOff:'위험 해소', lcStart:'차로 변경 시작', lcDone:'차로 변경 완료', lcAbort:'차로 변경 취소', cutIn:'옆 차로 진입', crash:'충돌', blink:'깜빡이', blinkResp:'뒤차 반응'};
 const GATE_NAME = {none:'없음', wait:'대기', clearing:'확인', go:'이동'};
 const EV_HEAD = ['참가자','HUD','시나리오 ID','판 순서','시각 (초)','이벤트','내용'];
 const evDetail = e => e.type === 'gate' ? `${GATE_NAME[e.from]} → ${GATE_NAME[e.to]}${e.rel ? ' · 이유 ' + ({rear:'뒤차', side:'옆 차', front:'앞 간격'})[e.rel] : ''}${e.side ? ' · ' + (e.side > 0 ? '오른쪽' : '왼쪽') : ''}${e.shown ? '' : ' (화면에 안 보임)'}`
   : e.type === 'lcStart' ? `${e.from + 1} → ${e.to + 1}차로 · 그때 판단 ${GATE_NAME[e.gate] || '-'}${e.toward ? '' : ' (목표 반대쪽)'}` : e.type === 'lcDone' ? `${e.from + 1} → ${e.to + 1}차로 · ${e.dur}초`
-  : e.type === 'cutIn' ? `${e.lane + 1}차로${e.risky ? ' · 위험 (' + e.with + ')' : ''}${e.ahead ? ' · 뒤차 앞에 끼어듦 (간격 ' + e.gap + 'm' + (e.ttc !== null && e.ttc !== undefined ? ' · ' + e.ttc + '초' : '') + ')' : ''}` : e.type === 'hazardOn' ? `${e.lane + 1}차로 · ${e.with}` : e.type === 'crash' ? e.with : e.type === 'lcAbort' ? `${e.from + 1} → ${e.to + 1}차로` : '';
+  : e.type === 'cutIn' ? `${e.lane + 1}차로${e.risky ? ' · 위험 (' + e.with + ')' : ''}${e.ahead ? ' · 뒤차 앞에 끼어듦 (간격 ' + e.gap + 'm' + (e.ttc !== null && e.ttc !== undefined ? ' · ' + e.ttc + '초' : '') + ')' : ''}` : e.type === 'hazardOn' ? `${e.lane + 1}차로 · ${e.with}` : e.type === 'crash' ? e.with : e.type === 'lcAbort' ? `${e.from + 1} → ${e.to + 1}차로`
+  : e.type === 'blink' ? (e.side ? (e.side < 0 ? '왼쪽 켬' : '오른쪽 켬') : (e.auto ? '자동 끔 (차로 변경 완료)' : '끔')) : e.type === 'blinkResp' ? `${e.with} · ${e.yield ? '양보' : '양보 안 함'} (${e.notice}초 뒤 알아챔)` : '';
 const evRows = rows => rows.flatMap(r => (r.events || []).map(e => [r.p, modeName(r.hud), r.scn ?? '', r.seq ?? '', e.t, EV_NAME[e.type] || e.type, evDetail(e)]));
 const EXPLAIN = [['칸','뜻','어떻게 읽나'],
   ['HUD','현대 HUD = 지금 차에 있는 HUD(1차와 같은 대조군) · 우리 HUD (2차) = 뒤차 표현을 고친 HUD(2026-11-03) · 우리 HUD (1차) = 1차 실험 때 HUD(시연 전용). \'HUD 버전\' 칸이 빈칸이면 1차 실험 기록','2차: 같은 사람이 현대 3회 · 2차 3회. 같은 시나리오 ID끼리 짝'],
@@ -282,6 +286,7 @@ const EXPLAIN = [['칸','뜻','어떻게 읽나'],
   ['연습 여부','본 실험 / 연습. 연습 주행은 \'연습\' 시트에만 있고 요약 · 기록에 들어가지 않음',''],
   ['정체 줄 합류 방식','정체 판 성공이 \'줄 합류\'(목표 차로 줄 뒤에 붙어 3초)였는지 \'줄 건너뜀\'(줄 옆을 지나 갈림 뒤에 출구로 들어감)이었는지. 건너뜀이면 차로 옮긴 곳 · 반응 시간이 빈칸으로 남음','정체 판 성공률을 읽을 때 둘을 나눠 볼 것. 1차 엑셀엔 이 칸이 없음'],
   ['앞으로 끼어들기 (번) · 그때 뒤차 간격 · 닿기까지','옮길 차로에서 내 뒤 60m 안에 차가 있는데 그 앞에 들어간 횟수, 그때 가장 가까운 뒤차와의 범퍼 간격(m)과 닿기까지 시간(초, 뒤차가 더 빠를 때만). 위험 여부와 상관없이 셈','2차 가설의 \'위험한 차로 변경\' 지표. 간격 · 시간이 작을수록 무리한 끼어들기'],
+  ['깜빡이 켬 · 깜빡이 → 차선 넘기 시작 · 옮길 차로 뒤차 반응','목표 쪽으로 처음 옮기기 시작할 때 깜빡이(Q · E)가 켜져 있었나, 켠 뒤 몇 초 만에 차선을 넘기 시작했나, 깜빡이에 반응한 옮길 차로 뒤차가 양보했나(양보 · 양보 안 함, 반응한 차 없으면 빈칸). 양보 여부는 교통 번호로 정해져 두 HUD가 같음 (2026-11-07)','깜빡이를 켜야 양보받을 가능성이 생김. 안 켜고 옮긴 판은 \'안 켬\''],
   ['시간대','주간 · 야간 (시나리오마다, 같은 시나리오는 두 HUD가 같은 시간대)','야간에 차이가 더 커지는지 볼 수 있음'],
   ['맵 · 상황','고속도로 ① IC 진출 · ② JC 4차로 · ③ 연속 분기 / 일반도로 ④ 이중 좌회전 · ⑤ 우회전 · 횡단보도','같은 상황끼리 HUD를 비교'],
   ['결과','성공 = 목적지 출구로 감 · 다른 출구 · 충돌(무엇과) · 시간 초과 · 신호 위반','성공률이 높을수록 좋음'],
@@ -349,6 +354,7 @@ const ARROW = {ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'do
 addEventListener('keydown', e => {
   if(e.target.tagName === 'INPUT'){ if(e.key === 'Enter' && e.target.id === 'sesPid'){ e.preventDefault(); $('#sesBtn').click(); } return; }
   if(ARROW[e.key] && S.testing){ e.preventDefault(); KEYS[ARROW[e.key]] = true; return; }
+  if(S.testing && S.drive && !e.repeat && (e.code === 'KeyQ' || e.code === 'KeyE')){ setBlink(e.code === 'KeyQ' ? -1 : 1); return; }   // 깜빡이 (D103): Q 왼쪽 · E 오른쪽, 다시 누르면 끔
   if(e.key === 'Escape' && S.testing){ abortRun(); return; }
   if(/^[1-5]$/.test(e.key) && $('#rate')){ setRate(+e.key); return; }
   if(/^[a-dA-D]$/.test(e.key) && $('#choice')){ setWait('abcd'.indexOf(e.key.toLowerCase())); return; }

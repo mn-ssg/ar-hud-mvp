@@ -586,6 +586,9 @@ const carMats = (() => {
     head: std('#cfd5da', {emissive:lin('#fff4e0'), emissiveIntensity:.18, metalness:.3, roughness:.15}),   // 전조등 (밤에 밝아짐 — setSceneLight)
     grille: std('#0d0f12', {roughness:.5, metalness:.4}),
     brake: std('#4a0606', {emissive:lin('#ff1c1c'), emissiveIntensity:3, roughness:.25}),
+    // 방향 지시등 (2026-11-07, D103): 주황 렌즈. 켜짐은 applyBlink()이 재질을 바꿔 끼움 — 밤엔 더 밝게(setSceneLight)
+    indOff: std('#b8742c', {emissive:lin('#ff9a1f'), emissiveIntensity:0, roughness:.3}),
+    indOn: std('#ffb340', {emissive:lin('#ff9a1f'), emissiveIntensity:1.6, roughness:.3}),
     shadow: new THREE.MeshBasicMaterial({map:radialTex('0,0,0',.65), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4})
   };
 })();
@@ -629,6 +632,8 @@ function carParts(type){
   P.grille.push([box(T.W - .3, .1, .05), at(0, .36, T.hz + .02)]);
   P.plate.push([box(.52, .11, .02), at(0, T.hy - .3, T.hz - .03)]);
   for(const s of [T.wf, T.wr]) for(const sx of [-1,1]){ P.tire.push([tireGeo(T.r), at(sx*(T.W/2-.13), T.r, -s)]); P.rim.push([rimGeo(T.r), at(sx*(T.W/2-.13), T.r, -s)]); }
+  // 방향 지시등: 앞 · 뒤 모서리(바깥쪽) — 왼쪽 · 오른쪽을 따로 모아 한 쪽씩 켤 수 있게 (D103)
+  for(const sx of [-1,1]){ const k = sx < 0 ? 'indL' : 'indR'; P[k] = P[k] || []; P[k].push([box(.14, .09, .1), at(sx*(T.W/2-.07), T.hy + .01, T.hz + .03)], [box(.14, .1, .07), at(sx*(T.W/2-.08), T.tail + .02, T.tz - .01)]); }
   const out = {};
   for(const k in P) if(P[k].length) out[k] = merge(P[k]);
   out.shadow = new THREE.PlaneGeometry(T.W + .7, T.L + .9).rotateX(-Math.PI/2).translate(0, .02, 0);
@@ -637,10 +642,12 @@ function carParts(type){
 function makeCar(type, hex, braking){
   const parts = carParts(type), g = new THREE.Group();
   const mats = {paint:paintOf(hex), glass:carMats.glass, trim:carMats.trim, box:carMats.box, lamp:braking ? carMats.brake : carMats.tail,
-    head:carMats.head, grille:carMats.grille, plate:carMats.plate, tire:carMats.tire, rim:carMats.rim, shadow:carMats.shadow};
+    head:carMats.head, grille:carMats.grille, plate:carMats.plate, tire:carMats.tire, rim:carMats.rim, shadow:carMats.shadow, indL:carMats.indOff, indR:carMats.indOff};
+  g.userData.ind = {};
   for(const k in parts){
     const m = new THREE.Mesh(parts[k], mats[k]);
-    m.castShadow = !['lamp','head','plate','rim','shadow'].includes(k); m.receiveShadow = k !== 'shadow';
+    m.castShadow = !['lamp','head','plate','rim','shadow','indL','indR'].includes(k); m.receiveShadow = k !== 'shadow';
+    if(k === 'indL') g.userData.ind.L = m; if(k === 'indR') g.userData.ind.R = m;
     g.add(m);
   }
   // 밤: 전조등 빛 번짐 (미러 · 앞 화면에서 다가오는 차가 보이게). 실제 빛(조명)은 무거워 그림으로만
@@ -649,6 +656,14 @@ function makeCar(type, hex, braking){
   g.userData.L = CAR_TYPES[type].L; g.userData.W = CAR_TYPES[type].W;   // 충돌 판정 크기 = 차체 크기 (drive.js)
   g.visible = false; scene.add(g); return g;
 }
+// 방향 지시등 켜기 (D103): side −1 왼쪽 · 1 오른쪽 · 2 비상등(양쪽) · 0 끔. on = 깜빡임 켜짐 순간. 버스(city.js)도 userData.ind가 있어 같이 쓴다
+function applyBlink(mesh, side, on){
+  const I = mesh.userData.ind; if(!I || !I.L) return;
+  I.L.material = on && (side < 0 || side === 2) ? carMats.indOn : carMats.indOff;
+  I.R.material = on && (side > 0) ? carMats.indOn : carMats.indOff;
+}
+// 깜빡임 켜짐 순간인가: 시계 t(초) · 차마다 박자를 어긋나게(i) — 실제 교통처럼 서로 맞지 않음
+const blinkOn = (t, i = 0) => ((t*BLINK.hz + i*.37) % 1) < .5;
 // 옆 차로에서 다가오는 차 (위험 상황 시연용)
 const otherCar = makeCar('sedan', '#e8eaec', false);
 // 정체 대기열: 목표 차로에 늘어선 차들. 서 있는 차라 브레이크등을 켠다
@@ -662,9 +677,9 @@ const queueCars = Array.from({length:22}, (_,i) => makeCar(QTYPES[i%QTYPES.lengt
    밤: 달빛 + 내 차 전조등 + 가로등 불빛 웅덩이 · 표지판과 차선은 살짝 발광(실제 재귀반사처럼) · 앞차 미등 */
 const LIGHT = {
   day:  {top:'#3f78cc', horizon:'#d4dee7', ground:'#a3aeb4', dir:SUN_DIR, sunCol:'#fff0d4', haloK:.18, discPow:900, discK:20, stars:0, cloudK:1, cloudLo:[.70,.74,.80], cloudHi:[1.05,1.05,1.05],
-         hemi:['#d6e4f5','#55643f',.6], sun:['#fff1dc',2.0], exposure:.92, fog:[110,950], far:'#ffffff', head:0, lamp:.15, refl:.35, paint:0, sign:0, win:0, tail:.7, headlamp:.18},
+         hemi:['#d6e4f5','#55643f',.6], sun:['#fff1dc',2.0], exposure:.92, fog:[110,950], far:'#ffffff', head:0, lamp:.15, refl:.35, paint:0, sign:0, win:0, tail:.7, headlamp:.18, ind:1.6},
   night:{top:'#02040a', horizon:'#141c2b', ground:'#06080b', dir:MOON_DIR, sunCol:'#3c4658', haloK:.025, discPow:12000, discK:60, stars:1, cloudK:.75, cloudLo:[.010,.012,.017], cloudHi:[.03,.034,.045],
-         hemi:['#4a5a7a','#10140e',.32], sun:['#a9bce8',.28], exposure:.95, fog:[55,620], far:'#0c1018', head:1.8, lamp:5, refl:2.2, paint:.07, sign:.5, win:1.3, tail:2.2, headlamp:3}
+         hemi:['#4a5a7a','#10140e',.32], sun:['#a9bce8',.28], exposure:.95, fog:[55,620], far:'#0c1018', head:1.8, lamp:5, refl:2.2, paint:.07, sign:.5, win:1.3, tail:2.2, headlamp:3, ind:3}
 };
 function applySky(L){
   const u = skyMat.uniforms;
@@ -691,7 +706,7 @@ function setSceneLight(night){
   headlight.intensity = L.head;
   lampMat.emissiveIntensity = L.lamp; reflMat.emissiveIntensity = L.refl; paint.emissiveIntensity = L.paint;
   signMats.forEach(mt => mt.emissiveIntensity = L.sign); facadeMat.emissiveIntensity = L.win;
-  carMats.tail.emissiveIntensity = L.tail; carMats.head.emissiveIntensity = L.headlamp;
+  carMats.tail.emissiveIntensity = L.tail; carMats.head.emissiveIntensity = L.headlamp; carMats.indOn.emissiveIntensity = L.ind;
   nightOnly.forEach(o => o.visible = night);
   if(typeof cityLight === 'function') cityLight(night);   // 일반도로 건물 창 · 노란 칠 · 길바닥 화살표 (city.js)
 }

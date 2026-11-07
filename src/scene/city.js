@@ -143,6 +143,8 @@ const busMesh = (() => {
   add(B(1.9, .85, .04), carMats.glass, 0, 2.3, 5.715, false);                      // 뒷유리
   for(const sx of [-1, 1]) add(B(.18, .55, .05), carMats.tail, sx*1.08, 1.05, 5.72, false);   // 뒤 등
   add(B(.52, .12, .02), carMats.plate, 0, .62, 5.72, false);
+  g.userData.ind = {};   // 방향 지시등 · 비상등 (D103): 앞 · 뒤 모서리, 왼쪽 · 오른쪽 한 덩이씩
+  for(const sx of [-1, 1]){ const geo = merge([[B(.22, .14, .08), M4().makeTranslation(sx*1.12, .95, -5.72)], [B(.2, .22, .08), M4().makeTranslation(sx*1.12, 1.55, 5.72)]]); const m = add(geo, carMats.indOff, 0, 0, 0, false); g.userData.ind[sx < 0 ? 'L' : 'R'] = m; }
   for(const sx of [-1, 1]){ add(B(.06, .06, .5), dark, sx*1.4, 2.35, -5.9); add(B(.08, .42, .22), dark, sx*1.42, 2.1, -6.1); }   // 거울 팔 · 거울
   const tire = new THREE.CylinderGeometry(.5, .5, .3, 18); tire.rotateZ(Math.PI/2);
   for(const z of [-3.6, 3.4]) for(const sx of [-1, 1]){ add(tire, carMats.tire, sx*1.1, .5, z); add(B(.04, .6, 1.35), dark, sx*1.26, .78, z, false); }
