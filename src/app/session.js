@@ -145,29 +145,24 @@ function runPractice(){
   countdown(true);
 }
 
-/* 블록 끝 질문 2개: ① 확신 1~5(1차와 같음) ② '기다려' 신호를 읽었는지 (2026-11-03, 10주차 발표 '실험 조건 보완'. 10-29 초안을 다듬음). 문항은 [가정 — 파일럿에서 확인] */
+/* 블록 끝 질문: ① 확신 1~5(1차와 같음)만 (2026-11-07 밤 사용자: '기다려' 이해 문항 ②는 뜻이 없어 삭제). Q2_TEXT · Q2_OPTS는 예전 기록(2026-11-03 ~ 11-07)의 '질문' 시트를 읽을 때만 쓴다 */
 const Q_TEXT = '차로를 옮길 때 얼마나 확신했나요?';
 const Q2_TEXT = '옆 차로로 옮기려는데 뒤차 때문에 HUD에 \'기다려\' 표시가 나왔을 때, 그 표시를 봤나요? 봤다면 어떤 뜻으로 읽었나요?';
 const Q2_OPTS = ['봤다 · 지금 차로를 유지하고 기다린다', '봤다 · 브레이크를 밟아 멈춘다', '봤다 · 빨리 옮긴다', '못 봤다 · 모르겠다'];
 function surveyCard(st){
-  SES.rate = 0; SES.wait = -1;
-  sesCard({eyebrow:`${st.block} / 2`, title:'질문', body:`<div class="q"><p class="q-title">1. ${Q_TEXT}</p>
+  SES.rate = 0;
+  sesCard({eyebrow:`${st.block} / 2`, title:'질문', body:`<div class="q"><p class="q-title">${Q_TEXT}</p>
       <div class="rate" id="rate">${[1,2,3,4,5].map(n => `<button data-r="${n}">${n}</button>`).join('')}</div>
-      <div class="rate-ends"><span>전혀</span><span>매우</span></div></div>
-    <div class="q"><p class="q-title">2. ${Q2_TEXT}</p>
-      <div class="choice" id="choice">${Q2_OPTS.map((o, i) => `<button data-c="${i}"><span>${'ABCD'[i]}</span>${o}</button>`).join('')}</div></div>`,
+      <div class="rate-ends"><span>전혀</span><span>매우</span></div></div>`,
     btn:[st.block === 1 ? '다음 블록' : '마치기', () => {
-      if(!SES.rate || SES.wait < 0) return;
-      const q = {p:SES.pid, block:st.block, hud:st.hud, ver:hudVerOf(st.hud), rate:SES.rate, wait:SES.wait + 1, waitText:Q2_OPTS[SES.wait], order:SES.order, at:new Date().toISOString()};
+      if(!SES.rate) return;
+      const q = {p:SES.pid, block:st.block, hud:st.hud, ver:hudVerOf(st.hud), rate:SES.rate, wait:0, order:SES.order, at:new Date().toISOString()};   // wait 0 = ② 문항 없음(2026-11-07 밤부터)
       surveys.push(q); saveArr(QKEY, surveys); SES.qs.push(q); nextStep();
     }]});
   $('#sesBtn').disabled = true; $('#sesBtn').focus();
   $$('#rate button').forEach(b => b.onclick = () => setRate(+b.dataset.r));
-  $$('#choice button').forEach(b => b.onclick = () => setWait(+b.dataset.c));
 }
-const surveyReady = () => { $('#sesBtn').disabled = !(SES.rate && SES.wait >= 0); };
-function setRate(n){ SES.rate = n; $$('#rate button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.r === n))); surveyReady(); }
-function setWait(i){ SES.wait = i; $$('#choice button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.c === i))); surveyReady(); }
+function setRate(n){ SES.rate = n; $$('#rate button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.r === n))); $('#sesBtn').disabled = !SES.rate; }
 
 /* 한 판에서 뽑는 새 값 (이벤트에서): 대기 표시 시간 · 대기(또는 확인) 중 옮기기 시작한 횟수 · 이동 판단 뒤 옮기기까지 · 위험 발생 횟수.
    판단(S.G)은 어느 HUD에서든 같게 계산 — 화면에 보인 건 우리 HUD뿐(이벤트 shown) */

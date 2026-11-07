@@ -23,7 +23,7 @@ const cabinEl = document.getElementById('cabin');
 const cabinBase = cabinEl.querySelector('#cabinBase'), wheelImg = cabinEl.querySelector('#cabinWheel'), cabinNight = cabinEl.querySelector('#cabinNight');
 const clusterCv = cabinEl.querySelector('#clusterCv'), infoCv = cabinEl.querySelector('#infoCv');
 clusterCv.width = 768; clusterCv.height = 252; infoCv.width = 900; infoCv.height = 252;
-let cabinNightOn = false, lastKmh = -1, lastMin = -1, lastBlink = 0, lastLim = 0, mapImg = null;
+let cabinNightOn = false, lastKmh = -1, lastMin = -1, lastBlink = 0, lastLim = 0, lastTrip = -1, mapImg = null;
 const CF = '"Pretendard Variable","Pretendard",' + FONT;
 const two = n => String(n).padStart(2, '0');
 
@@ -39,6 +39,7 @@ function layoutCabin(){
   cabinBase.style.cssText = `left:${left}px;top:${top}px;width:${iw}px;height:${ih}px`;
   const box = (r, el) => { el.style.cssText = `left:${left + r.x0*iw}px;top:${top + r.y0*ih}px;width:${(r.x1 - r.x0)*iw}px;height:${(r.y1 - r.y0)*ih}px`; };
   box(CAB.cluster, clusterCv); box(CAB.info, infoCv);
+  infoCv.style.borderRadius = ((CAB.info.x1 - CAB.info.x0)*iw*.03).toFixed(1) + 'px';   // 센터 화면 모서리 라운드 (2026-11-07 밤 사용자) — 화면 폭의 3%
   const wd = CAB.wheel.d*H, wx = left + CAB.wheel.cx*iw, wy = CAB.wheel.cy*H;
   wheelImg.style.cssText = `left:${wx - wd/2}px;top:${wy - wd/2}px;width:${wd}px;height:${wd}px`;
   cabinNight.style.setProperty('-webkit-mask-size', `${iw}px ${ih}px`); cabinNight.style.setProperty('mask-size', `${iw}px ${ih}px`); cabinNight.style.setProperty('-webkit-mask-position', `${left}px ${top}px`); cabinNight.style.setProperty('mask-position', `${left}px ${top}px`);
@@ -58,6 +59,7 @@ wheelImg.onerror = () => { wheelImg.style.display = 'none'; };
 
 /* ---------- 계기판 · 센터 화면 ---------- */
 // 계기판: 속도 · 기어 · 깜빡이 · 제한속도 표지. blink = 켜진 쪽(−1 · 1), 꺼진 순간 0
+let trip = 0, tripT = null;   // 트립 거리(km): 속도 × 실시간으로 누적(표시용)
 function drawCluster(kmh, blink = 0, lim = 80){
   const g = clusterCv.getContext('2d'), W = clusterCv.width, H = clusterCv.height;
   g.fillStyle = '#06080b'; g.fillRect(0, 0, W, H);
@@ -67,9 +69,15 @@ function drawCluster(kmh, blink = 0, lim = 80){
   g.textAlign = 'center'; g.fillStyle = '#f2f5f8'; g.font = `600 78px ${CF}`; g.fillText(kmh, cx, cy + 24);
   g.font = `500 19px ${CF}`; g.fillStyle = '#8b96a3'; g.fillText('km/h', cx, cy + 54);
   g.font = `700 42px ${CF}`; g.fillStyle = '#f2f5f8'; g.fillText('D', 196, 150);   // 핸들 테에 가리지 않게 안쪽으로
-  // 제한속도 표지(오른쪽): 흰 원 · 빨간 테 · 숫자
-  g.beginPath(); g.arc(W - 196, 138, 36, 0, 6.3); g.fillStyle = '#f4f4f2'; g.fill(); g.lineWidth = 8; g.strokeStyle = '#d8232a'; g.stroke();
-  g.fillStyle = '#111'; g.font = `700 32px ${CF}`; g.fillText(lim, W - 196, 149);
+  // 오른쪽: 연료 게이지(E ~ F, 7/10) + 트립 거리 (2026-11-07 밤 사용자: 제한속도 표지 대신 다른 정보 — HUD와 겹치는 길 안내 · 제한속도는 계기판에 두지 않음). lim은 안 씀
+  void lim;
+  { const x0 = W - 255, y = 128, w = 80, hgt = 10, fuel = .7;   // 오른쪽 끝(F)이 핸들 테에 가리지 않게 짧게 · 안쪽으로
+    g.textAlign = 'center'; g.fillStyle = '#8b96a3'; g.font = `600 17px ${CF}`; g.fillText('E', x0 - 14, y + 9); g.fillText('F', x0 + w + 14, y + 9);
+    g.fillStyle = '#1b232d'; g.beginPath(); g.roundRect ? g.roundRect(x0, y, w, hgt, 5) : g.rect(x0, y, w, hgt); g.fill();
+    g.fillStyle = '#a9c7ec'; g.beginPath(); g.roundRect ? g.roundRect(x0, y, w*fuel, hgt, 5) : g.rect(x0, y, w*fuel, hgt); g.fill();
+    for(let i = 1; i < 4; i++){ g.fillStyle = '#06080b'; g.fillRect(x0 + w*i/4 - 1, y, 2, hgt); }
+    g.fillStyle = '#8b96a3'; g.font = `500 15px ${CF}`; g.fillText('TRIP', W - 215, y - 16);   // 핸들 허브에 가리지 않게 게이지 위 · 값은 바로 아래
+    g.fillStyle = '#f2f5f8'; g.font = `600 26px ${CF}`; g.fillText(trip.toFixed(1) + ' km', W - 215, y + 42); }
   // 깜빡이 화살표 (D103): 위 양쪽 초록, 켜진 쪽만
   for(const s of [-1, 1]){ if(blink !== s) continue; const cx0 = W/2 + s*96, y = 52; /* 핸들 테 안쪽에 보이게 가운데 가까이 */ g.fillStyle = '#3ddc84'; g.beginPath(); g.moveTo(cx0 + s*16, y); g.lineTo(cx0 - s*4, y - 12); g.lineTo(cx0 - s*4, y - 5); g.lineTo(cx0 - s*18, y - 5); g.lineTo(cx0 - s*18, y + 5); g.lineTo(cx0 - s*4, y + 5); g.lineTo(cx0 - s*4, y + 12); g.closePath(); g.fill(); }
 }
@@ -90,8 +98,10 @@ try{ document.fonts && document.fonts.ready.then(() => { lastKmh = -1; drawInfo(
 /* ---------- main.js가 부르는 것 ---------- */
 function updateCabin(steerDeg, kmh, blink = 0){
   wheelImg.style.transform = `perspective(900px) rotateX(${CAB.wheel.tilt}deg) rotateZ(${steerDeg.toFixed(1)}deg)`;   // + = 오른쪽으로 돌림(시계 방향)
-  const m = new Date().getMinutes(), lim = (S.map && S.map.limit) || 80;
-  if(kmh !== lastKmh || m !== lastMin || blink !== lastBlink || lim !== lastLim){ drawCluster(kmh, blink, lim); if(m !== lastMin) drawInfo(); lastKmh = kmh; lastMin = m; lastBlink = blink; lastLim = lim; }
+  const m = new Date().getMinutes(), lim = (S.map && S.map.limit) || 80, now = performance.now();
+  if(tripT !== null) trip += kmh*(now - tripT)/3.6e6; tripT = now;   // km/h × 시간(ms) → km (멈추면 0)
+  const tripK = Math.round(trip*10);
+  if(kmh !== lastKmh || m !== lastMin || blink !== lastBlink || lim !== lastLim || tripK !== lastTrip){ drawCluster(kmh, blink, lim); if(m !== lastMin) drawInfo(); lastKmh = kmh; lastMin = m; lastBlink = blink; lastLim = lim; lastTrip = tripK; }
 }
 function setCabinLight(night){
   cabinNightOn = night; cabinEl.classList.toggle('night', night);

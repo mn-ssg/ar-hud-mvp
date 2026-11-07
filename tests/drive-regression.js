@@ -247,7 +247,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         let guard = 0;
         while(SES.on && guard++ < 40){
           const st = SES.steps[SES.i];
-          if(!$('#sess').hidden && $('#rate')){ setRate(4); setWait(0); $('#sesBtn').click(); continue; }
+          if(!$('#sess').hidden && $('#rate')){ setRate(4); $('#sesBtn').click(); continue; }
           if(!$('#sess').hidden){ if(/연습/.test($('#sesEyebrow').textContent) && /성공|다른 출구|충돌|시간 초과/.test($('#sesTitle').textContent)) window.__practiceCard = $('#sesTitle').textContent; $('#sesBtn').click(); continue; }
           // 주행 중: 카운트다운 건너뛰고 자동 운전
           clearTimeout(SES.timer); $('#count').hidden = true; D.frozen = false;
