@@ -7,21 +7,51 @@
      3 대기(빨강, 이동 화살표 빨간 점으로 멈춤, 위험 구간, 깜빡임, 갈 방향 흐리게, 막대 회색) / 4 위험 강화(차로 경계 빨간 선, 가장자리 빛 최대, 깜빡임 속도 그대로) /
      해소(뒤차 fade out · 초록 해소 신호 한 번 = 들어갈 차로 전체가 초록으로 찼다 천천히 빠짐 + 빨간 점이 초록 화살표로 바뀌며 한 번 커짐 · 화살표 다시 흐름)
    · 2026-11-04 보이는 정도만 고침(구조 그대로): 갈 방향 화살표 키움(네모 바탕 · 모양 그림자는 넣었다가 사용자 요청으로 삭제) · 깜빡임 켜짐/꺼짐 딱 끊김(REAR2.blink · blinkDuty · blinkLow) · 해소 신호 차로 전체 초록 + 화살표 한 번 커짐(REAR2.clearT, 사용자 선택 A+C)
+   · 2026-11-07 (D102): 미니 도로 투영을 내 차 기준 → 도로 기준으로(roadFrame · makeProjRoad) — 핸들을 틀어도 미니 도로는 제자리, 내 차 아이콘만 옆으로 움직이고 살짝 기울어짐. 정보 · 판단은 그대로
    · 판단: 대기 · 해소는 guide.js 게이트(S.G.gate — 1차와 같은 10m · 3.5초, 해제는 1.2배 + 0.8초 유지 → 경계값에서 깜빡이지 않음).
      감지 · 주의 값은 config.js REAR2 (파일럿에서 정함). 내릴 때는 REAR2.dwell초 머문 뒤 · 올릴 때는 바로
    · 색 · 굵기 · 투명도 · 시간은 hud.css 맨 위 토큰(--h2-*)을 읽어 쓴다 — 상태에 따라 바뀌는 값만 여기서 넣고, 정적인 값은 CSS
    config.js · guide.js · hud.js 다음에 로드. S · path · EGO는 main.js (호출 시점엔 존재)
    ============================================================ */
 
-const B_BEHIND = 14;
-const ICON_Y = 30;     // 갈 방향 화살표 가운데 y (HUD 상자 단위). 막대 y = ICON_Y + 13 × --h2-icon-scale + --h2-sp3 (2026-11-04)   // 미니 도로를 내 차 뒤 이만큼(m)까지 그린다 — 뒤차가 실제 쪽 차로에서 내 차 쪽으로 올라오는 자리
-// 투영: hud.js makeProj와 같은 식, 뒤(d < 0)도 B_BEHIND까지 허용 (같은 원근식을 그대로 늘린 것)
-function makeProj2(p, f){
-  const rx = -f.z, rz = f.x;
+const B_BEHIND = 14;   // 미니 도로를 내 차 뒤 이만큼(m)까지 그린다 — 뒤차가 실제 쪽 차로에서 내 차 쪽으로 올라오는 자리
+const ICON_Y = 30;     // 갈 방향 화살표 가운데 y (HUD 상자 단위). 막대 y = ICON_Y + 13 × --h2-icon-scale + --h2-sp3 (2026-11-04)
+/* ---------- 미니 도로 투영: 도로 기준 (2026-11-07, D102) ----------
+   예전(makeProj2)은 내 차 위치 · 방향 기준이라 핸들을 조금만 틀어도 미니 도로 전체가 좌우로 밀리고 돌았다.
+   · 기준 방향 = 내 차가 있는 도로의 진행 방향: 본선(갈림 전)은 -z 고정, 갈림을 지나면 내 차가 올라탄 출구 곡선의 접선(일반도로 우회전 뒤엔 가로 도로 방향)
+   · 기준 옆 위치 = 도로 가운데(본선 가운데 · 출구 가운데)에 고정 → 차로를 바꿔도 미니 도로는 제자리, 내 차 아이콘(#bEgo)이 차로 사이를 옆으로 움직인다
+   · 앞뒤 기준은 내 차(도로가 앞으로 흘러오는 것은 그대로). 원근식(K · PXM · HY_*)은 hud.js makeProj와 같고 뒤(d < 0)는 B_BEHIND까지
+   · 기준이 바뀌어 튈 때(본선 → 출구, 출구 → 다음 출구: 한 프레임에 0.5m · 5° 넘게)는 그 차이를 corr에 담아 RF.tau초에 걸쳐 흘려보낸다 — 차가 움직여서 생긴 변화는 그대로(지연 없음).
+     내 차 아이콘은 도로 방향과 내 차 방향의 차이만큼 기울어짐(최대 ±RF.tiltMax°) */
+const RF = {tau:.4, tiltMax:12, psi:0, off:0, tilt:0, corrPsi:0, corrOff:0, prevPsi:0, prevOff:0, hints:null, init:false};
+function roadFrame(p, m, dt){
+  let tx = 0, tz = -1, off = p.x;   // 본선: -z 방향 · 본선 가운데(x = 0) 기준 → 옆 거리 = p.x
+  if(p.z <= FORK_Z){
+    if(!RF.hints || RF.hints.m !== m) RF.hints = {m, h:m.segs.map(() => -1)};
+    let best = null;   // 내 차가 올라탄 출구(가운데선에서 가장 가까운 것, 포장 + 한 차로 안)
+    m.segs.forEach((e, i) => { const r = project(segPts(e), p.x, p.z, RF.hints.h[i]); RF.hints.h[i] = r.i; if(Math.abs(r.d) <= e.half + LANE && (!best || Math.abs(r.d) < Math.abs(best.d))) best = r; });
+    if(best){ tx = best.tx; tz = best.tz; off = best.d; }
+    else if(RF.init){ tx = Math.sin(RF.psi); tz = -Math.cos(RF.psi); off = RF.off; }   // 갈림 코 · 도로 밖: 직전 기준 유지
+  }
+  const psiT = Math.atan2(tx, -tz);
+  if(!RF.init){ RF.corrPsi = RF.corrOff = 0; RF.tilt = 0; RF.init = true; }
+  else {
+    const dO = off - RF.prevOff, dP = wrapA(psiT - RF.prevPsi);
+    if(Math.abs(dO) > .5) RF.corrOff -= dO;   if(Math.abs(dP) > 5*Math.PI/180) RF.corrPsi -= dP;
+    const k = Math.min(1, dt/RF.tau); RF.corrOff *= 1 - k; RF.corrPsi *= 1 - k;
+  }
+  RF.prevOff = off; RF.prevPsi = psiT;
+  RF.off = off + RF.corrOff; RF.psi = psiT + RF.corrPsi;
+  const tiltT = clamp(wrapA(EGO.psi - RF.psi)*180/Math.PI, -RF.tiltMax, RF.tiltMax);
+  RF.tilt += (tiltT - RF.tilt)*Math.min(1, dt/.15);
+  return {fx:Math.sin(RF.psi), fz:-Math.cos(RF.psi), off:RF.off, tilt:RF.tilt};
+}
+function makeProjRoad(p, F){
+  const rx = -F.fz, rz = F.fx, off = F.off;
   return (wx, wz) => {
-    const dx = wx - p.x, dz = wz - p.z, d = dx*f.x + dz*f.z;
+    const dx = wx - p.x, dz = wz - p.z, d = dx*F.fx + dz*F.fz;
     if(d < -B_BEHIND || d > 300) return null;
-    const X = dx*rx + dz*rz, s = K/(d + K);
+    const X = dx*rx + dz*rz + off, s = K/(d + K);
     return [HX + X*PXM*s, HY_FAR + (HY_NEAR - HY_FAR)*s, s, d];
   };
 }
@@ -34,6 +64,7 @@ function resetHud2(){
   $('#bRear').setAttribute('opacity', 0); $('#bRearOld').setAttribute('opacity', 0); $('#bDistBand').setAttribute('d', ''); $('#bFlow').setAttribute('d', ''); $('#bClearFill').setAttribute('d', '');
   $('#bBound').setAttribute('d', ''); $('#bBoundCore').setAttribute('d', ''); $('#bEdgeL').setAttribute('opacity', 0); $('#bEdgeR').setAttribute('opacity', 0); $('#bMoveGrp').removeAttribute('transform');
   $('#arHud2').dataset.level = 0;
+  RF.init = false; RF.hints = null; $('#bEgo').setAttribute('transform', `translate(${HX} 221) scale(1.5)`);
 }
 // 디자인 토큰 읽기 (0.5초마다 — 시간대 · 마감 바뀌면 그때 반영). 빛 번짐은 여기서 #glow2에 넣는다
 function tk2(now){
@@ -89,7 +120,10 @@ function drawAr2(p, f, C, k){
   // 시계: 시뮬레이션 시간(주행 테스트 D.t · 시연 S.cityT — guide.js 게이트와 같은 시계). 단계 머무름 · 깜빡임 · 훑기 · 나타남이 모두 이 시계라 자동 테스트(빠른 시계)에서도 같게 돈다
   const now = performance.now(), t = S.drive ? D.t : S.cityT, dt = B.lastT === null ? 1/60 : clamp(t - B.lastT, 0, .1); B.lastT = t;
   const T = tk2(now);
-  const proj = makeProj2(p, f), tx = R.tx, sgn = R.side;
+  const F = roadFrame(p, m, dt), proj = makeProjRoad(p, F), tx = R.tx, sgn = R.side;   // 도로 기준 투영 (D102). f(내 차 방향)는 쓰지 않는다 — 핸들을 틀어도 미니 도로가 돌지 않게
+  void f;
+  // 내 차 아이콘: 옆 자리 = 실제 옆 위치를 같은 원근식으로(d = 0 → s = 1), 기울기 = 내 차 방향 − 도로 방향
+  $('#bEgo').setAttribute('transform', `translate(${(HX + F.off*PXM).toFixed(1)} 221) rotate(${F.tilt.toFixed(1)}) scale(1.5)`);
   const inLane = !onMain || Math.abs(p.x - tx) < 1.2;
   const tail = onMain && S.jam > 0 && S.q && S.q.backZ !== null ? S.q.backZ : null;
   const needMove = onMain && !inLane && st <= 3;
