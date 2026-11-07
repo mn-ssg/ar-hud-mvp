@@ -4,7 +4,6 @@
 const { chromium } = require('playwright-core');
 const http = require('http'), fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..'), OUT = process.argv[2] || path.join(__dirname, 'shots');
-const SKINS = (process.env.SKINS || '').split(',').filter(s => s !== undefined);   // SKINS=,A,B,C → 2차 HUD를 시안마다 찍음 ('' = 2.1 그대로)
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const TYPES = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.jpg':'image/jpeg', '.png':'image/png'};
 const serve = () => new Promise(res => { const srv = http.createServer((q, r) => { const u = decodeURIComponent(q.url.split('?')[0]); const p = path.join(ROOT, u === '/' ? 'index.html' : u);
@@ -25,8 +24,8 @@ const STATES = [
   await page.goto(url, {waitUntil:'networkidle'}); await page.waitForTimeout(800);
   await page.evaluate(() => { const _sp = stepPlayer; window.__off = 0; stepPlayer = function(dt){ const tx = S.map.laneX(1) + window.__off, tz = D.z - 10, fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1;
     const sinA = (fx*dz - fz*dx)/l, dMax = Math.min(DRV.wheelMax, Math.atan(DRV.latMax*WHEELBASE/Math.max(D.v*D.v, .01))); KEYS.left = KEYS.right = false; _sp(dt); D.steer = clamp(Math.atan(2*WHEELBASE*sinA/l)/dMax, -1, 1); D.wheel = D.steer*dMax; };
-    window.setupScene = (hud, light, tone, st, skin) => {
-      setTone(tone); setSkin(skin || ''); setMode(hud); setLight(light); MIR.on = true; setScreen('drive'); $('#intro').hidden = true; $('#sess').hidden = true;
+    window.setupScene = (hud, light, tone, st) => {
+      setTone(tone); setMode(hud); setLight(light); MIR.on = true; setScreen('drive'); $('#intro').hidden = true; $('#sess').hidden = true;
       const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
       startDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed:5, sigT:0}); D.frozen = false;
       D.cars.forEach(c => c.mesh.visible = false); const car = D.cars.find(c => c.kind === 'rear') || D.cars[1]; D.cars = [car]; car.mesh.visible = true; car.lane = 2; car.P = lanePath(S.map, 2, 0); car.kind = 'rear'; car.brakeAt = null;
@@ -41,10 +40,10 @@ const STATES = [
       return {x:r.left - 60, y:r.top - 40, w:r.width + 120, h:r.height + 70, lv:$('#arHud2').dataset.level, gate:S.G && S.G.gate, cab:[c.left, c.top, c.width, c.height]}; };
   });
   const shots = {};
-  const ROWS = [['ar', 'B', '', '개선 전 (1차 v1.9)'], ...(SKINS.length ? SKINS : ['']).map(sk => ['ar2', 'B', sk, sk ? `2차 시안 ${sk}` : '개선 후 (2.1)'])];
+  const ROWS = [['ar', 'B', '', '개선 전 (1차 v1.9)'], ['ar2', 'B', '', '개선 후 (2.2)']];
   for(const light of ['day', 'night']) for(const [hud, tone, skin, label] of ROWS){
     for(const st of STATES){
-      const box = await page.evaluate(([hud, light, tone, st, skin]) => setupScene(hud, light, tone, st, skin), [hud, light, tone, st, skin]);
+      const box = await page.evaluate(([hud, light, tone, st]) => setupScene(hud, light, tone, st), [hud, light, tone, st]);
       await page.waitForTimeout(120);
       const name = `${light}_${hud}${hud === 'ar2' ? tone + skin : ''}_${st.id}`;
       const buf = await page.screenshot({clip:{x:box.x, y:box.y, width:box.w, height:box.h}});
@@ -76,7 +75,7 @@ const STATES = [
     const html = `<html><body style="margin:0;background:#101418;color:#e7ecf1;font-family:-apple-system,'Pretendard','Apple SD Gothic Neo',sans-serif"><div style="padding:18px 22px 6px;font-size:20px;font-weight:700">우리 HUD 개선 전 · 후 — 상태 6개 · ${light === 'day' ? '주간' : '야간'} (2026-11-03, 같은 장면: ① IC 오른쪽 진출, 2차로 뒤차 한 대)</div>
       <table style="border-collapse:collapse;margin:8px 16px 18px"><tr><td></td>${STATES.map(s => `<td style="padding:6px 8px;font-size:14px;font-weight:600;color:#9fb3c8">${s.id} ${s.name}</td>`).join('')}</tr>
       ${rows.map(r => `<tr><td style="padding:6px 10px;font-size:13px;font-weight:700;white-space:nowrap;color:#e7ecf1">${r.label}</td>${r.cells.map(c => `<td style="padding:4px"><img src="data:image/png;base64,${c.buf.toString('base64')}" style="width:300px;display:block;border-radius:6px"></td>`).join('')}</tr>`).join('')}</table></body></html>`;
-    const p2 = await browser.newPage({viewport:{width:1960, height:300 + 230*ROWS.length}, deviceScaleFactor:1});
+    const p2 = await browser.newPage({viewport:{width:1960, height:900}, deviceScaleFactor:1});
     await p2.setContent(html); await p2.waitForTimeout(300);
     await p2.screenshot({path:path.join(OUT, `상태6_${light === 'day' ? '주간' : '야간'}.png`), fullPage:true}); await p2.close();
   }

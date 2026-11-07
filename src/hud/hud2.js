@@ -1,5 +1,5 @@
 /* ============================================================
-   hud2.js — 우리 HUD 2.1 (개선 후, 2026-11-03) · 10주차 발표 '2차 HUD 디자인 근거 · 상태 6개'를 그대로 옮김
+   hud2.js — 우리 HUD 2.2 (개선 후 — 2026-11-03 2.1, 2026-11-07 그래픽 2.2 D107: 위에서 본 실루엣 아이콘 · 채움 .7 · 윤곽 .34 · 번짐 1.6 · 먼 곳 소실. 정보 구조 · 상태 6개 · 판단은 2.1 그대로) · 10주차 발표 '2차 HUD 디자인 근거 · 상태 6개'를 그대로 옮김
    · 자리 · 크기 · 정보 구조 · 길 안내(① 들어갈 차로 ② 갈 방향 ③ 막대 ④ 제한속도)는 개선 전(hud.js drawAr, 1차 실험 v1.9)과 같다
    · 바뀐 것은 뒤차 표현뿐 — 움직이는 뒤차(가장 가까운 한 대, 꺾쇠 = 접근 속도) · 거리 구간(내 차 뒤부터 뒤차까지, 간격 막대 대신) · 더 오는 차 흐름 띠 · 가장자리 빛 · 깜빡임 (2026-11-03 사용자 선택 4-C · 7-B).
      뺀 것: 작은 경고 아이콘(#carBehind) · 크기 변화(원근 도로에서 반대로 읽힘)
@@ -64,7 +64,7 @@ function resetHud2(){
   $('#bRear').setAttribute('opacity', 0); $('#bRearOld').setAttribute('opacity', 0); $('#bDistBand').setAttribute('d', ''); $('#bFlow').setAttribute('d', ''); $('#bClearFill').setAttribute('d', '');
   $('#bBound').setAttribute('d', ''); $('#bBoundCore').setAttribute('d', ''); $('#bEdgeL').setAttribute('opacity', 0); $('#bEdgeR').setAttribute('opacity', 0); $('#bMoveGrp').removeAttribute('transform');
   $('#arHud2').dataset.level = 0;
-  RF.init = false; RF.hints = null; $('#bEgo').setAttribute('transform', `translate(${HX} 221) scale(${B.tk ? B.tk.egoScale : 1.5})`);
+  RF.init = false; RF.hints = null; $('#bEgo').setAttribute('transform', `translate(${HX} 221) scale(${B.tk ? B.tk.egoScale : 1.05})`);
 }
 // 디자인 토큰 읽기 (0.5초마다 — 시간대 · 마감 바뀌면 그때 반영). 빛 번짐은 여기서 #glow2에 넣는다
 function tk2(now){
@@ -73,10 +73,9 @@ function tk2(now){
   B.tk = {route:g('--h2-route'), go:g('--h2-go'), warn:g('--h2-warn'), danger:g('--h2-danger'), neutral:g('--h2-neutral'), idle:g('--h2-idle'), core:g('--h2-core'),
     opFill:+g('--h2-op-fill'), opCtx:+g('--h2-op-ctx'), opDetect:+g('--h2-op-detect'), opEdge:+g('--h2-op-edge'),
     glow:+g('--h2-glow'), w1:parseFloat(g('--h2-w1')), w2:parseFloat(g('--h2-w2')), w3:parseFloat(g('--h2-w3')),
-    iconScale:+g('--h2-icon-scale') || 1.75, sp3:+g('--h2-sp3') || 16, opClear:+g('--h2-op-clear'), egoScale:+g('--h2-ego-scale') || 1.5, chevY:+g('--h2-chev-y') || 0, skin:$('#cab').dataset.skin || ''};   // 시안(작업 7): 실루엣 크기 · 꺾쇠 자리 · 먼 곳 마스크
+    iconScale:+g('--h2-icon-scale') || 1.75, sp3:+g('--h2-sp3') || 16, opClear:+g('--h2-op-clear'), egoScale:+g('--h2-ego-scale') || 1.05};   // 2.2: 내 차 실루엣 크기
   B.tkAt = now;
   $('#glow2 feGaussianBlur').setAttribute('stdDeviation', B.tk.glow);
-  $('#bRoadGrp').setAttribute('mask', B.tk.skin === 'B' ? 'url(#roadMask2b)' : 'url(#roadMask2)'); $('#bChev').setAttribute('transform', `translate(0 ${B.tk.chevY})`);
   return B.tk;
 }
 const bVehEls = Array.from({length:24}, () => { const r = document.createElementNS(SVGNS, 'rect'); r.setAttribute('rx', 2.5); r.setAttribute('class', 'b-q'); $('#bVeh').appendChild(r); return r; });
@@ -267,7 +266,7 @@ function drawAr2(p, f, C, k){
   if(carPt && B.alpha > .001){
     rear.setAttribute('transform', `translate(${carPt[0].toFixed(1)} ${carPt[1].toFixed(1)})`);
     rear.setAttribute('opacity', (B.alpha*(lv === 1 ? T.opDetect : 1)*(lv >= 3 ? blink : 1)).toFixed(3));
-    for(const el of ['#bRearBody', '#bRearSil']){ $(el).setAttribute('fill', col); $(el).setAttribute('stroke', lv >= 3 ? T.core : 'none'); $(el).setAttribute('stroke-width', T.w1); }
+    $('#bRearBody').setAttribute('fill', col); $('#bRearBody').setAttribute('stroke', lv >= 3 ? T.core : 'none'); $('#bRearBody').setAttribute('stroke-width', T.w1);
     // 꺾쇠 = 접근 속도 (주의부터). 내 차 쪽(위)을 가리킴
     const cl = cand.cl, n = lv >= 2 && cand.behind && cl > 0 ? (cl < REAR2.chevronV[0] ? 1 : cl < REAR2.chevronV[1] ? 2 : 3) : 0;
     $$('#bChev path').forEach((q, i) => { q.style.display = i < n ? '' : 'none'; q.setAttribute('stroke', col); });
@@ -292,7 +291,7 @@ function drawAr2(p, f, C, k){
   $('#bFlow').setAttribute('d', flow); $('#bFlow').setAttribute('fill-opacity', (REAR2.flowOp*B.alpha).toFixed(3));
   // 05 위험 강화: 넘으려는 차로 경계에 빨간 선 (내 차 뒤 6m ~ 앞 16m), 밝은 심
   let bnd = '', core = '';
-  if(lv >= 4 && G){ const xb = m.laneX(G.my) + G.side*1.75; bnd = lineX(xb, p.z + 6, p.z - 16, .13, proj); core = lineX(xb, p.z + 6, p.z - 16, .045, proj); }
+  if(lv >= 4 && G){ const xb = m.laneX(G.my) + G.side*1.75; bnd = lineX(xb, p.z + 6, p.z - 16, .16, proj); core = lineX(xb, p.z + 6, p.z - 16, .09, proj); }   // 선 .13 → .16 · 밝은 심 .045 → .09 (2.2: 번짐을 줄여(2.2 → 1.6) 측정 대비가 5.9 → 3.8로 떨어진 것을 심 폭으로 보충, D107)
   $('#bBound').setAttribute('d', bnd); $('#bBoundCore').setAttribute('d', core);
   // 가장자리 빛: 뒤차 쪽, 주의부터. 위험할수록 넓고 밝게. 대기 · 위험 강화에선 뒤차와 같은 길이로 깜빡임
   const wTo = lv >= 4 ? 34 : lv === 3 ? 22 : lv === 2 ? 12 : 0, aTo = lv >= 4 ? 1 : lv === 3 ? .85 : lv === 2 ? .55 : 0;

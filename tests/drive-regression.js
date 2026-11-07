@@ -265,7 +265,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('세션: 연습 기록은 본 기록에 섞이지 않음 (따로 저장)', s.practiceN === 2 && !s.practiceInDrives && p1.prs === 1, `연습 ${s.practiceN}`);
     const first = (rows, a, b) => rows.slice(0, 3).every(r => r.hud === a) && rows.slice(3).every(r => r.hud === b);
     check('세션: 번호와 상관없이 늘 현대 → 2차 (2026-11-04 고정, 1차 HUD 없음)', first(p1.rows, 'nav', 'ar2') && first(p2.rows, 'nav', 'ar2') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'AB', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
-    check('세션: HUD 버전 칸 — 현대 3.3 · 우리 2.1-A/B', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.1-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.3'), JSON.stringify(p1.rows.map(r => r.ver)));
+    check('세션: HUD 버전 칸 — 현대 3.3 · 우리 2.2-A/B', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.2-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.3'), JSON.stringify(p1.rows.map(r => r.ver)));
     check('세션: 연습이 끝나면 결과 카드 없이 바로 첫 주행(연습 기록 1 · 카드에 결과 글 없음)', p1.prs === 1 && !s.practiceCard, JSON.stringify(s.practiceCard));
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
     check('세션: 같은 시나리오 ID를 두 HUD가 한 번씩 (교통 · 목적지 · 시간대 고정)', pairOk(p1.rows) && pairOk(p2.rows), JSON.stringify(p1.rows.map(r => r.scn)));

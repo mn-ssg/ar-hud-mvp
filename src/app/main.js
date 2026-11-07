@@ -95,7 +95,7 @@ function setLight(l){
 }
 // HUD 세 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD 개선 전(1차 실험 v1.9, hud.js drawAr) · 'ar2' 우리 HUD 개선 후(2.1, hud2.js drawAr2). 'off' = 연습 주행(HUD 없음)
 // HUD_VER는 기록 식별용(엑셀 'HUD 버전' 칸). 개선 후는 마감(A · B)을 뒤에 붙인다(session.js). 1차 실험 기록은 이 칸이 비어 있음
-const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9', ar2:'우리 2.1'};   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용
+const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9', ar2:'우리 2.2'};   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용. 2.2 (2026-11-07, D107): 그래픽만 바뀜(실루엣 아이콘 · 채움 · 먼 곳 소실)
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
@@ -460,9 +460,7 @@ $$('#jamSeg button').forEach(b => b.onclick = () => { if(stopDemo()){ S.demoJam 
 MIR.on = true;   // 룸미러는 늘 켬 (2026-11-07: 연구자 설정의 체크박스 삭제 — 실험 조건을 고정)
 // 개선 후 HUD 마감: B 선명 하나 (2026-11-04 사용자: A 절제 삭제 — hud.css 토큰이 곧 B 값). 기록의 'HUD 버전'에 '-B'로 붙는다(session.js). 고르는 UI 없음
 function setTone(t){ S.tone = 'B'; $('#cab').dataset.tone = 'B'; void t; }
-// 2차 HUD 그래픽 시안 (2026-11-07, 작업 7): ?skin=A · B · C 로 보기. 사용자가 고르면 기본값으로 올리고 HUD_VER.ar2를 올린다 — 고르기 전엔 2.1 그대로(skin 없음)
-function setSkin(k){ S.skin = k || ''; if(S.skin) $('#cab').dataset.skin = S.skin; else delete $('#cab').dataset.skin; if(typeof B !== 'undefined') B.tkAt = -1e9; }
-setSkin((location.search.match(/[?&]skin=([ABC])/) || [])[1] || '');
+
 function togglePause(){
   if(!S.running || S.testing) return;
   S.paused = !S.paused; $('#pauseBtn').textContent = S.paused ? '계속' : '일시정지';

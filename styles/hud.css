@@ -14,10 +14,11 @@
 :root{
   --h2-route:#00e5ff;  --h2-go:#3ddc84;  --h2-warn:#ffb020;  --h2-danger:#ff4d4d;
   --h2-neutral:#e3ecf2;  --h2-idle:#9aa6b2;  --h2-core:#ffffff;
-  --h2-w1:1.4px;  --h2-w2:3.4px;  --h2-w3:6.5px;  --h2-arrow:8.5px;
+  --h2-w1:1.2px;  --h2-w2:3.4px;  --h2-w3:6.5px;  --h2-arrow:8.5px;   /* 2.2: w1 1.4 → 1.2 */
   --h2-r1:2px;  --h2-r2:4px;
-  --h2-op-fill:.62;  --h2-op-ctx:.5;  --h2-op-detect:.45;  --h2-op-edge:.9;  --h2-op-ego:1;
-  --h2-glow:2.2;
+  --h2-op-fill:.7;  --h2-op-ctx:.34;  --h2-op-detect:.45;  --h2-op-edge:.9;  --h2-op-ego:1;   /* 2.2: 채움 .62 → .7 · 윤곽 .5 → .34 */
+  --h2-glow:1.6;   /* 2.2: 2.2 → 1.6 */
+  --h2-ego-scale:1.05;  --h2-chev-y:-6;   /* 2.2: 실루엣(26 × 44) 크기 · 꺾쇠를 위로 */
   --h2-t-fast:.18s;  --h2-t-fade:.3s;
   /* 간격 단계 (HUD 상자 단위 = viewBox 520 × 270 기준, 2026-11-04): sp1 4 · sp2 8 · sp3 16. 갈 방향 화살표 ↔ 막대 사이는 sp3 */
   --h2-sp1:4;  --h2-sp2:8;  --h2-sp3:16;
@@ -27,30 +28,18 @@
   /* 06 해소 신호 색 · 세기 (2026-11-04). 초록은 해소 · 이동에만 */
   --h2-op-clear:.85;
 }
-.cab.night{ --h2-op-fill:.5; --h2-op-ctx:.32; --h2-op-detect:.4; --h2-op-edge:.6; --h2-op-ego:.85; --h2-glow:1.1; --h2-op-clear:.7; }
-/* ---------- 2차 HUD 그래픽 시안 (2026-11-07, 작업 7 — 사용자 선택 대기): #cab[data-skin] ----------
-   공통: 내 차 · 뒤차 아이콘을 위에서 본 실루엣으로(.b-ego-sil · .b-rear-sil), 2.1 모양(.b-*-v21)은 숨김. 정보 구조 · 색 뜻 · 자리는 그대로.
-   A 얇은 선 · 절제된 번짐: 양산 AR-HUD 참고 이미지처럼 가는 선(w1 1 · w2 2.6 · 화살표 6.5) · 번짐 1.2(밤 .6) · 채움 .5
-   B 면 중심 · 먼 곳 소실: 들어갈 차로 채움을 진하게(.7 → 먼 곳 .04) · 윤곽 더 흐리게 · 먼 곳 마스크 더 길게(roadMask2b)
-   C 2.1 그대로 + 실루엣만 교체 */
-#cab[data-skin] .b-ego-v21, #cab[data-skin] .b-rear-v21{ display:none; }
-#cab:not([data-skin]) .b-ego-sil, #cab:not([data-skin]) .b-rear-sil{ display:none; }
-#arHud2 .b-rear-sil .b-rear-glass{ fill:#0b0d10; fill-opacity:.5; }
-#cab[data-skin]{ --h2-ego-scale:1.05; --h2-chev-y:-6; }
-#cab[data-skin="A"]{ --h2-w1:1px; --h2-w2:2.6px; --h2-w3:5px; --h2-arrow:6.5px; --h2-icon-w:4px; --h2-op-fill:.5; --h2-op-ctx:.4; --h2-glow:1.2; --h2-op-edge:.8; }
-#cab[data-skin="A"].night{ --h2-op-fill:.42; --h2-op-ctx:.28; --h2-glow:.6; --h2-op-edge:.55; }
-#cab[data-skin="B"]{ --h2-w1:1.2px; --h2-op-fill:.7; --h2-op-ctx:.34; --h2-glow:1.6; }
-#cab[data-skin="B"].night{ --h2-op-fill:.55; --h2-op-ctx:.24; --h2-glow:.8; }
-#cab[data-skin="B"] #lg2C{ stop-opacity:.04; }
-#cab[data-skin="A"] #bLim, #cab[data-skin="B"] #bLim{ font-weight:600; }
+.cab.night{ --h2-op-fill:.55; --h2-op-ctx:.24; --h2-op-detect:.4; --h2-op-edge:.6; --h2-op-ego:.85; --h2-glow:.8; --h2-op-clear:.7; }   /* 2.2 밤: 채움 .5 → .55 · 윤곽 .32 → .24 · 번짐 1.1 → .8 */
+/* 2.2 (2026-11-07, D107 — 사용자 선택 시안 B '면 중심 · 먼 곳 소실'): 내 차 · 뒤차 아이콘은 위에서 본 실루엣(앞유리 · 뒤창), 들어갈 차로 채움을 진하게(.7 → 먼 곳 .04), 윤곽은 더 흐리게, 먼 곳 마스크를 y 80 → 128로 길게(index.html #roadMask2). 안 고른 시안 A · C 코드는 삭제 */
+#arHud2 .b-rear-glass{ fill:#0b0d10; fill-opacity:.5; }
+#arHud2 #bLim{ font-weight:600; }
 /* 마감은 B(선명) 하나 — 2026-11-04 사용자: 'A 절제'를 없애고 선명만. 위 토큰이 예전 B 값(1차의 채도 높은 청록 · 굵은 선 · 센 번짐). 기록의 HUD 버전은 '우리 2.1-B' 그대로 */
 
 /* 개선 후 HUD 요소 — 정적인 색 · 굵기 · 투명도만 여기서. 상태에 따라 바뀌는 값은 hud2.js가 토큰을 읽어 넣는다 */
 #arHud2 .b-surf{ fill:var(--h2-neutral); fill-opacity:.04; }
 #arHud2 .b-edges{ fill:var(--h2-neutral); fill-opacity:var(--h2-op-ctx); }
 #arHud2 .b-dash{ fill:var(--h2-neutral); fill-opacity:calc(var(--h2-op-ctx)*.6); }
-#lg2A{ stop-opacity:var(--h2-op-fill); } #lg2B{ stop-opacity:calc(var(--h2-op-fill)*.5); } #lg2C{ stop-opacity:.08; }
-#arHud2 .b-ego path:first-child{ fill:var(--h2-core); fill-opacity:var(--h2-op-ego); stroke:var(--h2-core); stroke-width:.6; stroke-opacity:.9; }   /* 내 차: 흰색 속 참 + 밝은 테 (2026-11-03 키움) */
+#lg2A{ stop-opacity:var(--h2-op-fill); } #lg2B{ stop-opacity:calc(var(--h2-op-fill)*.5); } #lg2C{ stop-opacity:.04; }   /* 2.2: 먼 곳 .08 → .04 */
+#arHud2 .b-ego path:first-child{ fill:var(--h2-core); fill-opacity:var(--h2-op-ego); stroke:var(--h2-core); stroke-width:.6; stroke-opacity:.9; }   /* 내 차: 흰색 속 참 + 밝은 테 (2026-11-03 키움 · 2026-11-07 위에서 본 실루엣) */
 #arHud2 .b-icon{ stroke:var(--h2-route); stroke-width:var(--h2-icon-w); transition:opacity var(--h2-t-fast) ease; }
 #arHud2 .b-move{ stroke-width:var(--h2-arrow); }
 #arHud2 .b-gapmark{ fill:none; stroke:var(--h2-go); stroke-width:var(--h2-w2); stroke-linecap:round; stroke-linejoin:round; }
@@ -61,7 +50,6 @@
 #arHud2 .b-clear{ fill:var(--h2-go); }   /* 06 해소 신호 (초록은 여기와 이동 화살표에만) */
 #arHud2 .b-bound{ fill:var(--h2-danger); }
 #arHud2 .b-boundcore{ fill:var(--h2-core); fill-opacity:.85; }
-#arHud2 .b-rear-glass{ fill:#0b0d10; fill-opacity:.45; }
 #arHud2 .b-chev path{ fill:none; stroke-width:var(--h2-w2); stroke-linecap:round; stroke-linejoin:round; }
 #arHud2 .b-flow{ fill:var(--h2-neutral); }   /* 뒤에 더 오는 차가 있을 때의 흐름 띠 (4-C) */
 /* 개선 후 HUD 야간: 토큰이 이미 낮춤 — 개선 전처럼 요소별 규칙 없음 */
