@@ -263,7 +263,7 @@ function buildCityScene(m){
   for(let z = CZ.far + .5; z < CZ.near - .4; z += 1){ q(white, cwE0, z, cwE0 + 4, z + .5); q(white, cwW1 - 4, z, cwW1, z + .5); }   // 가로 도로 동 · 서
   const xE = cwE0 + 6, xW = cwW1 - 6;
   for(const o of [-.3, .18]){ q(yellow, xE, CZ.mid + o, 900, CZ.mid + o + .12); q(yellow, -900, CZ.mid + o, xW, CZ.mid + o + .12); }
-  for(const s of [-1, 1]){ dashX(CZ.mid + s*LANE, xE, 900); dashX(CZ.mid + s*LANE, -900, xW); }   // 방향마다 2차로 (D71)
+  for(const s of [-1, 1]) for(let i = 1; i < CROSS.n; i++){ dashX(CZ.mid + s*i*LANE, xE, 900); dashX(CZ.mid + s*i*LANE, -900, xW); }   // 방향마다 CROSS.n차로 (D71 · D113: maps.js CROSS 한 곳에서)
   q(white, xW + 4.5, CZ.mid, xW + 4.05, CZ.near); q(white, xE - 4.5, CZ.far, xE - 4.05, CZ.mid);   // 가로 도로 정지선
   const geoOf = arr => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); return g; };
   addMesh(geoOf(white), paint); addMesh(geoOf(yellow), cityMats.yellow);

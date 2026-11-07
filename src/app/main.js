@@ -95,7 +95,7 @@ function setLight(l){
 }
 // HUD 세 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD 개선 전(1차 실험 v1.9, hud.js drawAr) · 'ar2' 우리 HUD 개선 후(2.1, hud2.js drawAr2). 'off' = 연습 주행(HUD 없음)
 // HUD_VER는 기록 식별용(엑셀 'HUD 버전' 칸). 개선 후는 마감(A · B)을 뒤에 붙인다(session.js). 1차 실험 기록은 이 칸이 비어 있음
-const HUD_VER = {nav:'현대 3.3', ar:'우리 1.9', ar2:'우리 2.2'};   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용. 2.2 (2026-11-07, D107): 그래픽만 바뀜(실루엣 아이콘 · 채움 · 먼 곳 소실)
+const HUD_VER = {nav:'현대 3.4', ar:'우리 1.9', ar2:'우리 2.3'};   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용. 2.2 (2026-11-07, D107): 그래픽만 바뀜(실루엣 아이콘 · 채움 · 먼 곳 소실). 3.4 · 2.3 (2026-11-07 저녁, D113 · D114): 상자 크기 · 자리를 각도로(10° × 5.2°, 둘 다 같음) + 2차 HUD 일반도로 갈림 뒤 도로 전체 폭
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
@@ -179,7 +179,7 @@ const laneProgInv = (I, sp) => sp <= 0 ? sp : sp < I.Ll ? sp*(I.e.L/I.Ll) : I.e.
 // 자리: 출구 구간 안이면 가운데 곡선 위 거리 d의 점에서 옆으로 off(동심원), 그 밖은 그 차로의 길(골목 · 램프 뒤)
 function laneTurnPos(m, lane, s){
   const I = laneInfo(m, lane), s0 = LANE_START - FORK_Z, d = s - s0;
-  if(d <= 0 || d >= I.e.L) return pathAt(lanePath(m, lane, 0), d <= 0 ? s : s0 + I.Ll + (d - I.e.L));
+  if(d <= 0 || d >= I.e.L){ const P = lanePath(m, lane, 0), sp = d <= 0 ? s : s0 + I.Ll + (d - I.e.L), [x, z] = pathAt(P, sp), [tx, tz] = pathDirAt(P, sp); return [x, z, tx, tz]; }   // 방향은 보간(D112)
   const q = I.e.curve.getPointAt(d/I.e.L), t = I.e.curve.getTangentAt(d/I.e.L), l = Math.hypot(t.x, t.z) || 1;
   return [q.x - t.z/l*I.off, q.z + t.x/l*I.off, t.x/l, t.z/l];
 }
@@ -312,8 +312,8 @@ function update(dt){
   }
 
   // 위치는 1m 간격 점 목록(path.P)으로 — 곡선 getPointAt은 점 간격이 고르지 않아(2m 경로 점 + 40 ~ 100m 점이 섞임) 같은 거리를 가도 8 ~ 24 m/s로 흔들렸음(2026-11-03)
-  const u = clamp(S.s/path.L), pa = pathAt(path.P, S.s), aa = pathAt(path.P, S.s + 22);
-  const p = {x:pa[0], z:pa[1]}, f = {x:pa[2], z:pa[3]};
+  const u = clamp(S.s/path.L), pa = pathAt(path.P, S.s), aa = pathAt(path.P, S.s + 22), pd = pathDirAt(path.P, S.s);
+  const p = {x:pa[0], z:pa[1]}, f = {x:pd[0], z:pd[1]};   // 방향은 점 사이 보간(D112) — 1m마다 뛰던 카메라 yaw 없앰
   const ahead = {x:aa[0], z:aa[1]};
   // 운전자 눈: 차 중심(p)에서 왼쪽으로 DRIVER_X (좌핸들). 보는 방향은 차 진행 방향과 나란히
   const lx = f.z*DRIVER_X, lz = -f.x*DRIVER_X;
@@ -394,16 +394,27 @@ function driveRoute(lane){ S.route = makeRoute(S.map, S.target, lane); path = bu
 function stopDrive(){ S.drive = false; S.running = false; driveClear(); S.rearActive = false; }
 // 주행은 고정 간격(1/60초)으로 나눠 계산 — 화면 프레임률(미러를 그리느라 느려져도)과 상관없이 조향 · 충돌 · 위험 판정이 같다
 const DRIVE_STEP = 1/60; let driveAcc = 0;
+// 그리기 보간 (D112, 2026-11-07 저녁): 판정 · 기록은 고정 간격 그대로. 카메라 · 다른 차 메시는 '마지막 스텝 직전 자세(RP)'와 '직후 자세(RC)' 사이를 driveAcc/DRIVE_STEP만큼 섞어 놓는다
+// → 프레임 간격이 흔들려 한 프레임에 스텝이 0번 · 2번 들어가도(60Hz 창에서 10% 안팎, 120Hz 화면은 번갈아) 화면의 이동량은 실제 시간에 비례. 섞어 놓은 메시는 다음 프레임 스텝 전에 RC로 되돌린다
+let RP = null, RC = null;
+const posesNow = () => ({x:D.x, z:D.z, psi:D.psi, cars:D.cars.map(c => [c.mesh.position.x, c.mesh.position.z, c.mesh.rotation.y])});
+const applyPoses = P => { if(P.cars.length === D.cars.length) D.cars.forEach((c, i) => { const q = P.cars[i]; c.mesh.position.x = q[0]; c.mesh.position.z = q[1]; c.mesh.rotation.y = q[2]; }); };
 function updateDrive(dt){
+  if(RC) applyPoses(RC);
   if(S.running && !S.paused && !D.frozen){
     driveAcc = Math.min(driveAcc + dt, .1);
-    while(driveAcc >= DRIVE_STEP - 1e-9 && S.running){ driveStep(DRIVE_STEP); driveAcc -= DRIVE_STEP; }
-  } else driveAcc = 0;
-  const f = {x:Math.sin(D.psi), z:-Math.cos(D.psi)}, p = {x:D.x, z:D.z};
+    while(driveAcc >= DRIVE_STEP - 1e-9 && S.running){ RP = posesNow(); driveStep(DRIVE_STEP); driveAcc -= DRIVE_STEP; RC = posesNow(); }
+  } else { driveAcc = 0; RP = RC = null; }
+  const a = RP ? clamp(driveAcc/DRIVE_STEP, 0, 1) : 1;
+  const ex = RP ? RP.x + (D.x - RP.x)*a : D.x, ez = RP ? RP.z + (D.z - RP.z)*a : D.z, epsi = RP ? RP.psi + wrapA(D.psi - RP.psi)*a : D.psi;
+  if(RP && RC && RP.cars.length === D.cars.length && RC.cars.length === D.cars.length) D.cars.forEach((c, i) => {
+    const [px, pz, pr] = RP.cars[i], [cx, cz, cr] = RC.cars[i]; if(Math.hypot(cx - px, cz - pz) > 5) return;   // 순간 이동(다시 놓인 차)은 섞지 않음
+    c.mesh.position.x = px + (cx - px)*a; c.mesh.position.z = pz + (cz - pz)*a; c.mesh.rotation.y = pr + wrapA(cr - pr)*a; });
+  const f = {x:Math.sin(epsi), z:-Math.cos(epsi)}, p = {x:ex, z:ez};   // 그리기 자세(카메라 · HUD 그림). 판정 입력(S.s · C · setEgo)은 고정 스텝 자세 D.x · D.z
   // 운전자 눈: 차 중심에서 왼쪽 DRIVER_X (좌핸들), 차가 보는 방향 그대로
   const lx = f.z*DRIVER_X, lz = -f.x*DRIVER_X;
   camera.position.set(p.x + lx, EYE_Y, p.z + lz); camera.lookAt(p.x + f.x*22 + lx, EYE_Y - .2, p.z + f.z*22 + lz);
-  const r = project(path.P, p.x, p.z, pathHint); pathHint = r.i; S.s = r.s; S.cityT = D.t;
+  const r = project(path.P, D.x, D.z, pathHint); pathHint = r.i; S.s = r.s; S.cityT = D.t;
   const C = navCtx(S.s), k = Math.min(1, dt*4), kmh = Math.round(D.v*3.6);
   showStage(C.st);
   setEgo(D.x, D.z, D.psi, D.v);
@@ -473,7 +484,6 @@ addEventListener('keydown', e => {
 
 /* ---------- 시작 ---------- */
 $$('[data-ico]').forEach(el => el.insertAdjacentHTML('afterbegin', ico(el.dataset.ico)));   // 버튼 아이콘 채우기
-$('#hudWrap').style.bottom = (cowlBottomPct() + 2.5).toFixed(1) + '%';   // HUD 아래끝 = 대시보드 윗선보다 화면 높이 2.5%만큼 위 (2026-10-29 사용자: 살짝 올림, 예전 +0.2%)
 setTone('B');
 setMode('ar2'); setLight('day'); prepDemo(); update(1); setScreen('home');
 requestAnimationFrame(frame);

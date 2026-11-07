@@ -118,7 +118,7 @@ function rearLevel2(G, needMove, t){
    폭 w: 본선 1.75 → 출구 차로 폭(1차로 출구 2.3)으로 갈림 뒤 20m에 걸쳐 부드럽게, 안내 끝 18m는 뾰족하게. offFn(w) → [안쪽, 바깥쪽] 옆 거리(채움 · 왼쪽 레일 · 오른쪽 레일이 같은 함수).
    toFork: 본선 구간만(해소 초록 채움) */
 function laneRibbon(zNear, onMain, offFn, proj, toFork = false){
-  const R = S.route, tx = R.tx, bc = R.afterCurve, L = R.afterL, bh = R.leaf.path[0].k === 1 ? 2.3 : 1.75;
+  const R = S.route, tx = R.tx, bc = R.afterCurve, L = R.afterL, bh = R.leaf.path[0].road ? 1.75 : R.leaf.path[0].k === 1 ? 2.3 : 1.75;   // 일반도로(road)는 갈림 뒤에도 내 차로 하나만(D113)
   const lastS = path.nodeS[path.nodeS.length - 1], bu = clamp((lastS + ROUTE_END - path.nodeS[0])/L), A = [], B = [];
   if(onMain) for(let z = zNear; z > FORK_Z; z -= 2){ const [o1, o2] = offFn(1.75); A.push(proj(tx + o1, z)); B.push(proj(tx + o2, z)); }
   if(!toFork){
@@ -194,10 +194,11 @@ function drawAr2(p, f, C, k){
   /* ① 들어갈 차로 · 경로 — 개선 전과 같음. 다른 점: 대기 중에도 흐려지지 않음(어디로는 그대로), 미니 도로가 내 차 뒤까지 */
   let surf = bandX(-m.edgeX, m.edgeX, zNear, -232, proj), edges = lineX(-m.edgeX, zNear, -228, .09, proj) + lineX(m.edgeX, zNear, -228, .09, proj), dash = '';
   m.segs.forEach(e => {
-    const c = e.curve, hw = e.k*LANE/2;
-    surf += strip(offsetPts(c, 0, 1, -e.half, proj, 40), offsetPts(c, 0, 1, e.half, proj, 40));
-    edges += lineC(c, 0, 1, -(hw + .15), .09, proj) + lineC(c, 0, 1, hw + .15, .09, proj);   // 2.2 (D108): 출구 가장자리 선을 본선과 같은 차로 끝 + .15에, 안쪽 선은 갈림부터(V자) — 예전 e.half(+.55) · 25m 뒤 시작은 3D 노면과 어긋나 두 겹으로 보였음
-    for(let i=1;i<e.k;i++) for(let s=8; s<e.L-3; s+=9) dash += strip(offsetPts(c, s/e.L, (s+3)/e.L, -hw+i*LANE-.075, proj, 2), offsetPts(c, s/e.L, (s+3)/e.L, -hw+i*LANE+.075, proj, 2));
+    // 2.3 (D113): 일반도로 출구는 갈림 뒤 도로의 같은 방향 차로 전부(e.road.n, maps.js CROSS) — 내 차로 묶음 곡선(e.curve)에서 도로 가운데까지 옆 거리 off. 마주 오는 차로는 안 그림. 고속도로(road 없음)는 2.2 그대로
+    const c = e.curve, rd = e.road, nL = rd ? rd.n : e.k, hw = rd && rd.w ? rd.w/2 - .15 : nL*LANE/2, half = rd ? (rd.w ? rd.w/2 : hw + .55) : e.half, off = rd ? ((rd.n - 1)/2 - rd.i - (e.k - 1)/2)*LANE : 0;
+    surf += strip(offsetPts(c, 0, 1, off - half, proj, 40), offsetPts(c, 0, 1, off + half, proj, 40));
+    edges += lineC(c, 0, 1, off - (hw + .15), .09, proj) + lineC(c, 0, 1, off + hw + .15, .09, proj);   // 2.2 (D108): 출구 가장자리 선을 본선과 같은 차로 끝 + .15에, 안쪽 선은 갈림부터(V자) — 예전 e.half(+.55) · 25m 뒤 시작은 3D 노면과 어긋나 두 겹으로 보였음
+    for(let i=1;i<nL;i++) for(let s=8; s<e.L-3; s+=9) dash += strip(offsetPts(c, s/e.L, (s+3)/e.L, off-hw+i*LANE-.075, proj, 2), offsetPts(c, s/e.L, (s+3)/e.L, off-hw+i*LANE+.075, proj, 2));
   });
   for(let i=1;i<m.lanes;i++) dash += dashX(m.laneX(i) - LANE/2, .075, zNear, proj);
   $('#bSurf').setAttribute('d', surf); $('#bEdges').setAttribute('d', edges); $('#bDash').setAttribute('d', dash);

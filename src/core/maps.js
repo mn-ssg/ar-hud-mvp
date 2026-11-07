@@ -15,7 +15,12 @@ const bendPts = (s, x0) => [[x0,-230],[x0+s*1.7,-262],[x0+s*8.5,-305],[x0+s*24.5
    가로 도로 동쪽(+x)으로 가는 차로는 가까운 쪽(-239.75 · -243.25), 서쪽(-x)으로 가는 차로는 먼 쪽(-246.75 · -250.25).
    D71: 4+4차로였을 때 ④ 좌회전 뒤 HUD는 2차로인데 실제 도로는 4차로라 3 · 4차로로 가면 판정이 어긋남(사용자) → 2+2차로로
    좌 · 우회전은 '90도로 꺾는 출구'로 그린다 → 고속도로 맵과 같은 갈림 · 경로 · 판정 코드를 그대로 씀 */
-const CZ = {near:-238, far:-252, mid:-245};
+const CZ = {mid:-245};
+// 가로 도로 (D113, 작업 I): 방향마다 차로 n개 — 3D 차선(city.js) · 미니 도로 폭(hud2.js) · 아래 출구 경로의 목표 z가 모두 여기서 읽는다. laneZ(dir, i): dir +1 = 동쪽(+x, 가까운 쪽) · −1 = 서쪽, i = 0 가운데선 쪽 … n−1 보도 쪽
+const CROSS = {n:2, laneZ:(dir, i) => CZ.mid + dir*(LANE/2 + i*LANE)};
+CZ.near = CZ.mid + CROSS.n*LANE; CZ.far = CZ.mid - CROSS.n*LANE;   // 보도 선 −238 · −252
+// 출구마다 road:{n, i}: 갈림 뒤 도로의 같은 방향 차로 수 n과 그 중 내 경로가 가는 차로 번호 i(0 = 가운데선 쪽). (w: 차선 없는 골목의 포장 폭) — 없으면(고속도로) 출구 차로 묶음 그대로
+const westPair = (CROSS.laneZ(-1, 0) + CROSS.laneZ(-1, 1))/2;
 // 원호 점: 중심 (cx, cz), 반지름 R, 각도 a0 → a1(도, x축 기준)
 const arcPts = (cx, cz, R, a0, a1, n = 12) => Array.from({length:n+1}, (_, i) => { const a = (a0 + (a1 - a0)*i/n)*Math.PI/180; return [cx + R*Math.cos(a), cz + R*Math.sin(a)]; });
 // 정지선 (x, FORK_Z)에서 출발해 반지름 R로 side(-1 왼쪽 · +1 오른쪽)로 꺾어 가로 도로 z = zEnd를 따라 len m
@@ -54,19 +59,19 @@ const MAPS = [
   { id:'CL2', no:'④', name:'이중 좌회전', city:true, lanes:4, start:[2,3], cruise:13.9, limit:50, sig:'left',
     changeEnd:-195, laneChange:[-95,-160], queue:{back:-198, lanes:[0,1]},
     exits:[
-      {key:'L', label:'좌회전', lanes:[0,1], pts:turnPts(-3.5, -1, -248.5, 12.5, 50),
+      {key:'L', label:'좌회전', lanes:[0,1], road:{n:CROSS.n, i:0}, pts:turnPts(-3.5, -1, westPair, 12.5, 50),
         node:{ exits:[
-          {key:'S', label:'좌회전→직진', lanes:[0], dest:'시청·광장', quiz:false, pts:[[-66,-246.75],[-110,-246.75],[-170,-246.75],[-240,-246.75],[-310,-246.75]]},
-          {key:'R', label:'좌회전→골목', lanes:[0], dest:'전통시장', pts:[[-66,-250.25], ...arcPts(-66, -258.25, 8, 90, 180).slice(1), [-74,-300],[-74,-360],[-74,-420],[-74,-480]]} ]}},
-      {key:'S', label:'직진', lanes:[2], dest:'역·터미널', quiz:false, pts:cityStraight(1.75)},
-      {key:'R', label:'우회전', lanes:[3], dest:'대학로', quiz:false, pts:turnPts(5.25, 1, -239.75, 9, 300)} ]},
+          {key:'S', label:'좌회전→직진', lanes:[0], dest:'시청·광장', quiz:false, road:{n:CROSS.n, i:0}, pts:[[-66,CROSS.laneZ(-1, 0)],[-110,CROSS.laneZ(-1, 0)],[-170,CROSS.laneZ(-1, 0)],[-240,CROSS.laneZ(-1, 0)],[-310,CROSS.laneZ(-1, 0)]]},
+          {key:'R', label:'좌회전→골목', lanes:[0], dest:'전통시장', road:{n:1, i:0, w:8}, pts:[[-66,CROSS.laneZ(-1, 1)], ...arcPts(-66, CROSS.laneZ(-1, 1) - 8, 8, 90, 180).slice(1), [-74,-300],[-74,-360],[-74,-420],[-74,-480]]} ]}},
+      {key:'S', label:'직진', lanes:[2], dest:'역·터미널', quiz:false, road:{n:4, i:2}, pts:cityStraight(1.75)},
+      {key:'R', label:'우회전', lanes:[3], dest:'대학로', quiz:false, road:{n:CROSS.n, i:CROSS.n - 1}, pts:turnPts(5.25, 1, CROSS.laneZ(1, CROSS.n - 1), 9, 300)} ]},
   // ⑤ 우회전 + 횡단보도 (D69): 맨 오른쪽 차로에 버스가 서 있고(정류장), 꺾자마자 횡단보도에 보행자 — 건너거나 건너려 하면 일시정지
   { id:'CRT', no:'⑤', name:'우회전 · 횡단보도', city:true, lanes:3, start:[1], cruise:13.9, limit:50, sig:'green',
     changeEnd:-195, laneChange:[-152,-186], bus:{lane:2, z:-140}, cw:{x0:16, x1:20},
     exits:[
-      {key:'L', label:'좌회전', lanes:[0], dest:'구청', quiz:false, pts:turnPts(-3.5, -1, -246.75, 10.75, 300)},
-      {key:'S', label:'직진', lanes:[1], dest:'시청', quiz:false, pts:cityStraight(0)},
-      {key:'R', label:'우회전', lanes:[2], dest:'종합병원', pts:turnPts(3.5, 1, -239.75, 9, 300)} ]}
+      {key:'L', label:'좌회전', lanes:[0], dest:'구청', quiz:false, road:{n:CROSS.n, i:0}, pts:turnPts(-3.5, -1, CROSS.laneZ(-1, 0), 10.75, 300)},
+      {key:'S', label:'직진', lanes:[1], dest:'시청', quiz:false, road:{n:3, i:1}, pts:cityStraight(0)},
+      {key:'R', label:'우회전', lanes:[2], dest:'종합병원', road:{n:CROSS.n, i:CROSS.n - 1}, pts:turnPts(3.5, 1, CROSS.laneZ(1, CROSS.n - 1), 9, 300)} ]}
 ];
 
 /* ---------- 맵 준비: 폭 · 곡선 · 구간(seg) · 목적지(leaf) ---------- */

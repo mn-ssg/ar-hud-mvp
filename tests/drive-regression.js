@@ -265,7 +265,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('세션: 연습 기록은 본 기록에 섞이지 않음 (따로 저장)', s.practiceN === 2 && !s.practiceInDrives && p1.prs === 1, `연습 ${s.practiceN}`);
     const first = (rows, a, b) => rows.slice(0, 3).every(r => r.hud === a) && rows.slice(3).every(r => r.hud === b);
     check('세션: 번호와 상관없이 늘 현대 → 2차 (2026-11-04 고정, 1차 HUD 없음)', first(p1.rows, 'nav', 'ar2') && first(p2.rows, 'nav', 'ar2') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'AB', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
-    check('세션: HUD 버전 칸 — 현대 3.3 · 우리 2.2-A/B', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.2-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.3'), JSON.stringify(p1.rows.map(r => r.ver)));
+    check('세션: HUD 버전 칸 — 현대 3.4 · 우리 2.3-A/B', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.3-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.4'), JSON.stringify(p1.rows.map(r => r.ver)));
     check('세션: 연습이 끝나면 결과 카드 없이 바로 첫 주행(연습 기록 1 · 카드에 결과 글 없음)', p1.prs === 1 && !s.practiceCard, JSON.stringify(s.practiceCard));
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
     check('세션: 같은 시나리오 ID를 두 HUD가 한 번씩 (교통 · 목적지 · 시간대 고정)', pairOk(p1.rows) && pairOk(p2.rows), JSON.stringify(p1.rows.map(r => r.scn)));
@@ -394,6 +394,34 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         out[mapId] = {n, bad}; }
       return out; });
     check('개선 후 들어갈 차로 띠 · 레일이 갈림(① · ③ 둘째 갈림 · ⑤ 우회전)을 지나는 내내 한 덩어리(채움 조각 1 · 레일 조각 2)', Object.values(seam).every(o => o.n > 100 && o.bad === 0), JSON.stringify(seam));
+  }
+
+  /* ---------- 8-5. 끊김 없는 움직임 (2026-11-07 저녁, D112) · 갈림 뒤 도로 차로 수 한 곳에서 (D113) ---------- */
+  {
+    // 꺾는 구간에서 그리기 방향이 1m마다 뛰지 않음: ④ 1차로 길을 0.25m 간격으로 훑으며 메시 방향(pathDirAt) 변화 최대 < 2°, 판정 방향(pathAt)은 예전처럼 점마다 뜀(그대로)
+    const dir = await E(() => { const m = mapById('CL2'), P = lanePath(m, 0, 0); let mx = 0, mxOld = 0, prev = null, prevOld = null;
+      for(let s = 640; s < 700; s += .25){ const [tx, tz] = pathDirAt(P, s), a = Math.atan2(-tx, -tz), [, , ox, oz] = pathAt(P, s), b = Math.atan2(-ox, -oz);
+        if(prev !== null){ mx = Math.max(mx, Math.abs(wrapA(a - prev))*180/Math.PI); mxOld = Math.max(mxOld, Math.abs(wrapA(b - prevOld))*180/Math.PI); } prev = a; prevOld = b; }
+      return {mx:+mx.toFixed(2), mxOld:+mxOld.toFixed(2)}; });
+    check('④ 좌회전 길 0.25m마다 그리기 방향 변화 < 2° (판정 방향은 점마다 뜀 그대로)', dir.mx < 2 && dir.mxOld > 3, JSON.stringify(dir));
+    // 프레임 간격이 흔들려도(1/60의 0.6 · 1.4배 번갈아 → 스텝 0 · 2번) 카메라 이동량은 실제 시간에 비례: 이동량/dt 비율 최대 < 1.3. 판정 자세(D.x)는 고정 스텝이라 그대로
+    const interp = await E(() => { const st = makeScenario('ICR', 'rear', 'day', 7), cfg = runCfg(st); setMode('ar2'); setLight('day'); S.testing = true; setScreen('drive'); $('#intro').hidden = true; $('#sess').hidden = true; startDrive(cfg); D.frozen = false;
+      KEYS.left = KEYS.right = KEYS.up = KEYS.down = false; for(let k = 0; k < 90; k++) updateDrive(1/60);
+      let worst = 0, prevV = null, px = camera.position.x, pz = camera.position.z, steps = {};
+      for(let k = 0; k < 120; k++){ const dt = (k % 2 ? 1.4 : .6)/60, x0 = D.x; updateDrive(dt); const n = Math.round((D.x - x0 === 0 && D.z === D.z) ? 0 : 0); void n;
+        const v = Math.hypot(camera.position.x - px, camera.position.z - pz)/dt; px = camera.position.x; pz = camera.position.z;
+        if(prevV !== null && prevV > 1 && v > 1) worst = Math.max(worst, Math.max(v/prevV, prevV/v)); prevV = v; }
+      stopDrive(); S.testing = false; return {worst:+worst.toFixed(3)}; });
+    check('프레임 간격이 0.6 · 1.4배로 흔들려도 카메라 이동량/dt 비율 변화 < 1.3 (고정 스텝 사이 보간)', interp.worst < 1.3, JSON.stringify(interp));
+    // 갈림 뒤 도로: 일반도로 출구마다 road{n, i}, 회전 목표 z = CROSS.laneZ, 보도 선 = 가운데선 ± n차로, HUD 미니 도로는 꺾은 뒤 차로 점선(2차로)을 그림
+    const road = await E(() => { const out = {}; for(const id of ['CL2', 'CRT']){ const m = mapById(id); out[id] = m.segs.map(e => e.road ? `${e.key}:${e.road.n}/${e.road.i}` : e.key + ':none'); }
+      const L = mapById('CRT').exits.find(e => e.key === 'L'), R = mapById('CRT').exits.find(e => e.key === 'R');
+      out.zL = L.pts[L.pts.length - 1][1]; out.zR = R.pts[R.pts.length - 1][1]; out.laneZ = [CROSS.laneZ(-1, 0), CROSS.laneZ(1, CROSS.n - 1)]; out.cz = [CZ.near, CZ.far, CZ.mid, CROSS.n];
+      return out; });
+    check('일반도로 출구마다 갈림 뒤 도로 차로 수 · 내 차로 번호(road), 회전 목표 z = CROSS.laneZ, 보도 선 = 가운데선 ± n차로', road.CL2.every(s => !/none/.test(s)) && road.CRT.every(s => !/none/.test(s)) && road.zL === road.laneZ[0] && road.zR === road.laneZ[1] && road.cz[0] === road.cz[2] + road.cz[3]*3.5 && road.cz[1] === road.cz[2] - road.cz[3]*3.5, JSON.stringify(road));
+    const dashes = await E(() => { const out = {}; for(const [id, leaf] of [['CRT', 0], ['CRT', 2], ['CL2', 2]]){ S.demoMap = id; S.demoTarget = leaf; S.demoJam = 0; setMode('ar2'); setLight('day'); openSetup(false); start(); $('#sess').hidden = true; S.paused = true;
+        S.s = path.nodeS[0] + 40; S.cityLim = Infinity; update(0); out[id + leaf] = ($('#bDash').getAttribute('d').match(/M/g) || []).length; S.running = false; S.paused = false; } return out; });
+    check('2차 HUD 미니 도로: ⑤ 좌 · 우회전 뒤(가로 도로 2차로) · ④ 직진 뒤(4차로) 차로 점선이 그려짐', Object.values(dashes).every(n => n > 0), JSON.stringify(dashes));
   }
 
   /* ---------- 9. 화면 · 에셋 · 콘솔 ---------- */

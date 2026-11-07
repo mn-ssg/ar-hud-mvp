@@ -66,7 +66,8 @@
 #cabinBase{ max-width:none; }
 #clusterCv, #infoCv{ z-index:1; }
 #cabinWheel{ z-index:3; transform-origin:50% 50%; filter:drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
-#cabinNight{ inset:0; z-index:2; opacity:0; transition:opacity .4s; background:
+/* 야간 덮개 (작업 F, 2026-11-07 저녁): 바탕 이미지의 알파로 마스크 → 실내에만 깔리고 앞유리(투명) 영역엔 걸리지 않음. 자리 · 크기는 cabin.js가 바탕과 같게 넣음 */
+#cabinNight{ inset:0; z-index:2; opacity:0; transition:opacity .4s; -webkit-mask-image:url(../assets/cabin/base.webp); mask-image:url(../assets/cabin/base.webp); -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; background:
   radial-gradient(22% 16% at var(--cl-x) var(--cl-y), rgba(140,170,230,.22), transparent 70%),
   radial-gradient(24% 18% at var(--in-x) var(--in-y), rgba(200,215,240,.18), transparent 70%),
   rgba(2,3,6,.62); mix-blend-mode:normal; }
@@ -84,7 +85,7 @@
 /* HUD 크기 (2026-10-29 세 번째): 운전석 폭의 19% (1366 화면 ≈ 255px, 1920 ≈ 360px) — 사용자: 16.5%에서 살짝 키움. 그 전(두 번째)은 '실제로 이렇게 크지 않다'로 28 → 16.5%.
    실제 순정 HUD 허상은 수평 약 5 ~ 10°(자료마다 다름 — 10_HUD_GUI_설계 0-7절)인데 이 화면의 카메라 수평 시야가 약 90°라
    각도 그대로면 폭 6 ~ 11%로 그림 · 숫자를 읽기 어렵다 → 그 사이 값. 두 HUD가 같은 상자를 써서 비교 조건은 같다 */
-#hudWrap{ position:absolute; left:50%; bottom:32.6%; transform:translateX(-50%); transform-origin:50% 100%; width:clamp(230px, 19%, 410px); pointer-events:none; transition:transform .35s ease; }
+#hudWrap{ position:absolute; left:50%; bottom:32.6%; transform:translateX(-50%); transform-origin:50% 100%; width:230px; pointer-events:none; transition:transform .35s ease; }   /* 폭 · bottom은 cabin.js layoutCabin이 각도(config.js HUD_DEG)로 매번 덮어씀 (D114). 예전 clamp(230px, 19%, 410px) · 대시보드 윗선 + 2.5% */
 #hudSvg{ display:block; width:100%; height:auto; overflow:hidden; mix-blend-mode:screen; filter:drop-shadow(0 0 3px rgba(255,255,255,.16)); }
 .tnum{ font-variant-numeric:tabular-nums; }
 /* 야간: HUD 전체 밝기 · 채도 · 빛 번짐을 낮춤 — 우리 HUD · 기존 HUD 똑같이 (실제 순정 HUD의 밤 자동 감광처럼).

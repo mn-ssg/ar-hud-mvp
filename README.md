@@ -18,8 +18,8 @@ src/
     maps.js           맵 5종 데이터 · 경로 계산
   scene/
     scene.js          three.js 장면 · 하늘 · 도로 · 차량 메시 · 3D 차량 모델(GLB) 읽기 · 주야 조명
-    cabin.js          운전석 실내 — Higgsfield 이미지 층(바탕 · 핸들 CSS 3D) + 계기판 · 센터 화면 캔버스 (2026-11-07 D111)
-    mirrors.js        룸미러
+    cabin.js          운전석 실내 — Higgsfield 이미지 층(바탕 · 핸들 CSS 3D) + 계기판 · 센터 화면 캔버스 (2026-11-07 D111). HUD 상자 크기 · 자리를 각도(config.js HUD_DEG 10° × 5.2°)로 px 환산 (D114), 야간 덮개는 바탕 알파 마스크
+    mirrors.js        룸미러 — 실내 이미지의 받침 자리 · 실제 거울 크기 각도 (2026-11-07 저녁 D115), 크기는 cabin.js layoutCabin이 다시 놓음
     props.js          가로수 · 건물 · 정류장 소품
     city.js           일반도로 교차로 장면 · 신호 · 보행자 · 버스(정류장 흐름)
   hud/

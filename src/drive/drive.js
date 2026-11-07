@@ -38,6 +38,12 @@ function pathAt(P, s){
   const f = clamp(s, 0, P.L - .001)/P.step, i = Math.floor(f), u = f - i, j = Math.min(P.n-1, i+1);
   return [P.x[i] + (P.x[j]-P.x[i])*u, P.z[i] + (P.z[j]-P.z[i])*u, P.tx[i], P.tz[i]];
 }
+// 그리기용 방향: 점 사이에서 보간 (D112, 2026-11-07 저녁). pathAt의 방향은 점 i의 것을 그대로 줘서(판정 · 경로 계산은 그대로 둠) 꺾는 구간에선 1m마다 4 ~ 6°씩 뛰었다 → 차 메시 · 시연 카메라는 이걸 쓴다
+function pathDirAt(P, s){
+  const f = clamp(s, 0, P.L - .001)/P.step, i = Math.floor(f), u = f - i, j = Math.min(P.n-1, i+1);
+  const tx = P.tx[i] + (P.tx[j]-P.tx[i])*u, tz = P.tz[i] + (P.tz[j]-P.tz[i])*u, l = Math.hypot(tx, tz) || 1;
+  return [tx/l, tz/l];
+}
 const wrapA = a => a - 2*Math.PI*Math.round(a/(2*Math.PI));
 const laneOf = (m, x) => clamp(Math.round(x/LANE + (m.lanes-1)/2), 0, m.lanes-1);
 const exitName = e => e.dest || e.label;
@@ -195,7 +201,8 @@ function driveClear(){ D.cars.forEach(c => c.mesh.visible = false); D.cars = [];
 function placeCars(){
   D.cars.forEach((c, i) => {
     const [x, z, tx, tz] = pathAt(c.P, c.s); c.x = x; c.z = z; c.tx = tx; c.tz = tz;
-    c.mesh.position.set(x, 0, z); c.mesh.rotation.y = Math.atan2(-tx, -tz);
+    const [dx, dz] = pathDirAt(c.P, c.s);   // 메시 방향만 보간(D112) — 판정용 c.tx · c.tz는 그대로
+    c.mesh.position.set(x, 0, z); c.mesh.rotation.y = Math.atan2(-dx, -dz);
     // AI 차 깜빡이 (D103): 꺾이는 출구로 나가는 차는 갈림 앞뒤에서 그쪽, 버스는 정류장 흐름(busSide)
     applyBlink(c.mesh, c.kind === 'bus' ? (c.busSide || 0) : laneBlink(S.map, c.lane, c.z), blinkOn(D.t, i));
   });
