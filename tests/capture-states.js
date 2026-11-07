@@ -40,7 +40,7 @@ const STATES = [
       return {x:r.left - 60, y:r.top - 40, w:r.width + 120, h:r.height + 70, lv:$('#arHud2').dataset.level, gate:S.G && S.G.gate, cab:[c.left, c.top, c.width, c.height]}; };
   });
   const shots = {};
-  const ROWS = [['ar', 'B', '', '개선 전 (1차 v1.9)'], ['ar2', 'B', '', '개선 후 (2.3)']];
+  const ROWS = [['ar', 'B', '', '개선 전 (1차 v1.9)'], ['ar2', 'B', '', '개선 후 (2.4)']];
   for(const light of ['day', 'night']) for(const [hud, tone, skin, label] of ROWS){
     for(const st of STATES){
       const box = await page.evaluate(([hud, light, tone, st]) => setupScene(hud, light, tone, st), [hud, light, tone, st]);

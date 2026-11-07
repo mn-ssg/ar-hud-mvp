@@ -71,6 +71,13 @@ button{ cursor:pointer; }
 .setup h2{ margin:0 0 2px; font-size:13px; font-weight:700; letter-spacing:.02em; }
 .setup .field{ margin:6px 0 0; font-size:12.5px; font-weight:600; color:var(--sub); display:flex; justify-content:space-between; gap:8px; }
 .field-note{ font-weight:500; }
+/* 화면 맞추기 (D116) */
+#calib summary{ cursor:pointer; list-style:none; }
+#calib summary::-webkit-details-marker{ display:none; }
+#calib summary::before{ content:'▸ '; color:var(--sub); }
+#calib[open] summary::before{ content:'▾ '; }
+#calib input[type=range]{ width:100%; margin:4px 0; }
+#calCard{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:60; border:3px solid #ff9f1c; border-radius:9px; background:rgba(255,159,28,.12); display:grid; place-items:center; color:#ff9f1c; font-size:13px; font-weight:700; pointer-events:none; }
 .setup .btn.primary{ margin-top:6px; }
 .setup.locked #scenario{ opacity:.45; pointer-events:none; }
 

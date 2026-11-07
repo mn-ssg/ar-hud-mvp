@@ -265,7 +265,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('세션: 연습 기록은 본 기록에 섞이지 않음 (따로 저장)', s.practiceN === 2 && !s.practiceInDrives && p1.prs === 1, `연습 ${s.practiceN}`);
     const first = (rows, a, b) => rows.slice(0, 3).every(r => r.hud === a) && rows.slice(3).every(r => r.hud === b);
     check('세션: 번호와 상관없이 늘 현대 → 2차 (2026-11-04 고정, 1차 HUD 없음)', first(p1.rows, 'nav', 'ar2') && first(p2.rows, 'nav', 'ar2') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'AB', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
-    check('세션: HUD 버전 칸 — 현대 3.4 · 우리 2.3-A/B', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.3-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.4'), JSON.stringify(p1.rows.map(r => r.ver)));
+    check('세션: HUD 버전 칸 — 현대 3.5 · 우리 2.4-A/B', p1.rows.filter(r => r.hud === 'ar2').every(r => /^우리 2\.4-[AB]$/.test(r.ver)) && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.5'), JSON.stringify(p1.rows.map(r => r.ver)));
     check('세션: 연습이 끝나면 결과 카드 없이 바로 첫 주행(연습 기록 1 · 카드에 결과 글 없음)', p1.prs === 1 && !s.practiceCard, JSON.stringify(s.practiceCard));
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
     check('세션: 같은 시나리오 ID를 두 HUD가 한 번씩 (교통 · 목적지 · 시간대 고정)', pairOk(p1.rows) && pairOk(p2.rows), JSON.stringify(p1.rows.map(r => r.scn)));
@@ -273,7 +273,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('세션: 예전 기록이 지워지거나 덮이지 않음', s.oldKept && s.storedN === 13, `저장 ${s.storedN}`);
     check('세션 끝: 질문 2블록 · HUD/테스트 상태 복원', p1.qs === 2 && !p2.testing, `질문 ${p1.qs}`);
     check('엑셀: 요약 · 기록 · 질문 · 이벤트 · 연습 · 설명 시트', s.sheets && ['요약','기록','질문','이벤트','연습','설명'].every(n => s.sheets.some(x => x[0] === n)), JSON.stringify(s.sheets));
-    check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에(연습 여부 · 정체 줄 합류 방식 · 끼어들기 · 깜빡이 3칸)', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 8] === '연습 여부' && s.head[s.head.length - 7] === '정체 줄 합류 방식' && s.head[s.head.length - 4] === '그때 닿기까지 (초)' && s.head[s.head.length - 1] === '옮길 차로 뒤차 반응' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
+    check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에(연습 여부 · 정체 줄 합류 방식 · 끼어들기 · 깜빡이 3칸 · 화면 맞추기 4칸)', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 12] === '연습 여부' && s.head[s.head.length - 11] === '정체 줄 합류 방식' && s.head[s.head.length - 8] === '그때 닿기까지 (초)' && s.head[s.head.length - 5] === '옮길 차로 뒤차 반응' && s.head[s.head.length - 4] === '화면 1cm당 px' && s.head[s.head.length - 1] === 'HUD 상자 (px)' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
   }
 
   {

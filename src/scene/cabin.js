@@ -44,12 +44,12 @@ function layoutCabin(){
   cabinNight.style.setProperty('-webkit-mask-size', `${iw}px ${ih}px`); cabinNight.style.setProperty('mask-size', `${iw}px ${ih}px`); cabinNight.style.setProperty('-webkit-mask-position', `${left}px ${top}px`); cabinNight.style.setProperty('mask-position', `${left}px ${top}px`);
   cabinNight.style.setProperty('--cl-x', `${left + (CAB.cluster.x0 + CAB.cluster.x1)/2*iw}px`); cabinNight.style.setProperty('--cl-y', `${top + (CAB.cluster.y0 + CAB.cluster.y1)/2*ih}px`);
   cabinNight.style.setProperty('--in-x', `${left + (CAB.info.x0 + CAB.info.x1)/2*iw}px`); cabinNight.style.setProperty('--in-y', `${top + (CAB.info.y0 + CAB.info.y1)/2*ih}px`);
-  // HUD 상자 (D114): 각도 → px. 화면 중심 = 시선, 세로 화각 58° → 1 tan 단위 = ppt px. 가로 폭은 시야각 HUD_DEG.w, 세로는 상자 비율(520:270)로 따라감
+  // HUD 상자 (D116, 2026-11-07 밤 사용자 결정): 장면 각도 가로 14° × 세로 7.3°(HUD_DEG, 세로 화각 58° → 1 tan 단위 = ppt px) — D114의 10°는 화면에서 너무 작았고(참가자 눈엔 3.5°), 참가자 눈 기준 10°(481px)는 너무 커서 그 사이. 창이 달라도 장면 속 각도 같음
+  // 자리: 아래끝 = 대시보드 윗선(CAB.cowl) − 2.5% H — 실제 하향각(3.4°)이 아니라 시뮬레이터 화면에 맞춘 조정(장면이 눈에 3배 작게 보여 실제 각도로 두면 대시보드에 묻힘)
   const ppt = H/(2*Math.tan(camera.fov*Math.PI/360)), hw = 2*Math.tan(HUD_DEG.w*Math.PI/360)*ppt, hh = hw*270/520;
-  let bottomY = H/2 + Math.tan((HUD_DEG.down + HUD_DEG.h/2)*Math.PI/180)*ppt;   // 아래끝(위에서 잰 y)
-  const cowlY = top + CAB.cowl*ih, lim = cowlY - .025*H; if(bottomY > lim) bottomY = lim;   // 넓은 창(가로 기준 확대)에서 대시보드가 올라오면 그 위로
+  const cowlY = top + CAB.cowl*ih, bottomY = cowlY - .025*H;
   hudWrap.style.width = hw.toFixed(1) + 'px'; hudWrap.style.bottom = (H - bottomY).toFixed(1) + 'px';
-  LAY.hud = {w:hw, h:hh, bottomY, cowlY, downBottom:Math.atan((bottomY - H/2)/ppt)*180/Math.PI, degH:2*Math.atan(hh/2/ppt)*180/Math.PI};
+  LAY.hud = {w:hw, h:hh, bottomY, cowlY, sceneDegW:HUD_DEG.w, sceneDegH:2*Math.atan(hh/2/ppt)*180/Math.PI, eyeDegW:SCR.degOfPx(hw), eyeDegH:SCR.degOfPx(hh), screenEyeDegH:SCR.degOfPx(H), ppc:SCR.ppc(), dist:SCR.distCm};   // eye*: 화면 맞추기 값으로 참가자 눈 기준 환산(기록용)
   if(typeof MIR !== 'undefined' && MIR.layout) MIR.layout();   // 룸미러는 이미지 받침 자리에 (mirrors.js)
 }
 new ResizeObserver(layoutCabin).observe(cab); layoutCabin();

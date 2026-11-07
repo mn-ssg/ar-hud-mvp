@@ -203,7 +203,8 @@ function onDriveEnd(){
     scn:st ? st.scn : 'practice-ICR', ver:practice ? '-' : hudVerOf(st.hud), env:envName(), order:SES.order, seq:practice ? 0 : ++SES.seq, practice:!!practice,
     waitSecs:es.waitSecs, waitMoves:es.waitMoves, goReact:es.goReact, hazards:es.hazards, lcN, riskyWith, events:ev,
     cutAhead:D.cutAhead, cutAheadGap:D.cutAheadGap, cutAheadTtc:D.cutAheadTtc,   // 2026-11-03 앞으로 끼어들기
-    blinkUsed:D.blinkUsed, blinkLead:D.blinkLead, blinkResp:D.blinkResp};   // 2026-11-07 깜빡이 (D103)
+    blinkUsed:D.blinkUsed, blinkLead:D.blinkLead, blinkResp:D.blinkResp,   // 2026-11-07 깜빡이 (D103)
+    ppc:+SCR.ppc().toFixed(2) + (SCR.calibrated() ? '' : ' (기본값)'), dist:SCR.distCm, vfov:camera.fov, hudPx:LAY && LAY.hud ? `${Math.round(LAY.hud.w)} × ${Math.round(LAY.hud.h)} (눈에서 ${LAY.hud.eyeDegW.toFixed(1)}°)` : ''};   // 2026-11-07 밤 화면 맞추기 (D116)
   if(practice){
     // 연습은 조작 익히기 — 판정 · 결과 카드 · 요약 없이 바로 다음으로 (2026-11-03). 기록은 '연습' 시트에만
     practices.push(row); saveArr(PKEY, practices); SES.prs.push(row);
@@ -260,13 +261,15 @@ function summaryHtml(rows){
 // 기록: 한 회 = 한 줄. 앞 11칸은 1차 실험 그대로(정의 · 순서 바꾸지 않음), 뒤는 2026-10-29 추가(시나리오 ~ 충돌 상대), 맨 뒤 '연습 여부'는 2026-11-03 추가
 const HEAD = ['참가자','HUD','시간대','맵','상황','결과','차로 옮긴 곳 (마감선 앞 m)','안전해진 뒤 옮기기까지 (초)','위험한 끼어들기 (번)','보행자 양보 안 함 (번)','도로 벗어남 (번)',
   '시나리오 ID','HUD 버전','환경 버전','제시 순서','판 순서','대기 판단 시간 (초)','대기 · 확인 중 옮기기 시작 (번)','이동 판단 뒤 옮기기까지 (초)','위험 발생 (번)','차로 변경 완료 (번)','위험한 끼어들기 상대','충돌 상대','연습 여부','정체 줄 합류 방식','앞으로 끼어들기 (번)','그때 뒤차 간격 (m)','그때 닿기까지 (초)',
-  '깜빡이 켬 (차로 변경 때)','깜빡이 → 차선 넘기 시작 (초)','옮길 차로 뒤차 반응'];   // 2026-11-07 깜빡이 (D103)
+  '깜빡이 켬 (차로 변경 때)','깜빡이 → 차선 넘기 시작 (초)','옮길 차로 뒤차 반응',   // 2026-11-07 깜빡이 (D103)
+  '화면 1cm당 px','보는 거리 (cm)','장면 세로 시야각 (°)','HUD 상자 (px)'];   // 2026-11-07 밤 화면 맞추기 (D116) — HUD가 참가자 눈에 몇 도로 보였는지 되짚을 수 있게
 // 정체 판 성공이 '줄 합류'였는지, 줄을 건너뛰고 갈림 뒤에 출구로 들어갔는지 (2026-11-03 — 자동 운전에서 후자가 '성공 · 옮긴 곳 빈칸 · 반응 빈칸'으로 남는 것을 확인, 결과 정의는 바꾸지 않고 칸만 추가)
 const jamJoinOf = r => r.type !== 'jam' ? '' : r.result !== 'ok' ? '' : /줄 합류$/.test(r.exit || '') ? '줄 합류' : '줄 건너뜀 (갈림 뒤 진입)';
 const rowCells = r => [r.p, modeName(r.hud), lightName(r.light), mapLabel(r.map), situName(r), resultName(r), marginOf(r) ?? '', r.react ?? '',
   r.risky, (mapById(r.map) || {}).cw ? (r.ped ?? '') : '', r.offroad,
   r.scn ?? '', r.ver ?? '', r.env ?? '', orderText(r.order), r.seq ?? '', r.waitSecs ?? '', r.waitMoves ?? '', r.goReact ?? '', r.hazards ?? '', r.lcN ?? '', r.riskyWith ?? '', r.crash ?? '', r.practice ? '연습' : r.scn ? '본 실험' : '', jamJoinOf(r), r.cutAhead ?? '', r.cutAheadGap ?? '', r.cutAheadTtc ?? '',
-  r.blinkUsed === undefined ? '' : r.blinkUsed === null ? '(안 옮김)' : r.blinkUsed ? '켬' : '안 켬', r.blinkLead ?? '', r.blinkResp ?? ''];
+  r.blinkUsed === undefined ? '' : r.blinkUsed === null ? '(안 옮김)' : r.blinkUsed ? '켬' : '안 켬', r.blinkLead ?? '', r.blinkResp ?? '',
+  r.ppc ?? '', r.dist ?? '', r.vfov ?? '', r.hudPx ?? ''];
 const SUM_HEAD = ['HUD','판 종류','판 수','성공률 (%)','다른 출구 (판)','충돌 (판)','위험한 끼어들기 (번)','신호 위반 (판)','보행자 양보 안 함 (번)','도로 벗어남 (번)','차로 옮긴 곳 평균 (마감선 앞 m, 위험 0인 판)','안전해진 뒤 옮기기까지 평균 (초)','확신 평균 (1~5)','대기 · 확인 중 옮기기 시작 (번)','대기 이해 정답 (A / 답한 수)'];
 const sumCells = (rows, qs) => HUDS_IN(rows).flatMap(h => [null, '고속도로 뒤차', '고속도로 정체', '일반도로'].map(k => { const s = summarize(rows, h, qs, k);
   return [modeName(h), k || '전체', s.n, s.rate ?? '', s.wrong, s.crash, s.risky, s.sig, s.ped, s.off, r1(s.margin), s.react === null ? '' : Math.round(s.react*100)/100, k ? '' : r1(s.sure), s.waitMoves ?? '', k ? '' : (summarize(rows, h, qs).waitOk || '')]; }));
@@ -297,6 +300,7 @@ const EXPLAIN = [['칸','뜻','어떻게 읽나'],
   ['도로 벗어남 (번)','도로 끝(가드레일 · 연석)에 닿은 횟수','적을수록 좋음'],
   ['시나리오 ID','맵-상황-시간대(D 주간 · N 야간)-교통 번호. 같은 ID = 같은 교통 · 시작 차로 · 목적지','두 HUD가 같은 ID끼리 짝'],
   ['HUD 버전 · 환경 버전','HUD 그림 버전 · 시뮬레이터 환경(그래픽 · 미러) 버전','환경 2.0(그래픽 · 미러 추가) 결과를 1차(환경 1.x)와 비교할 때 HUD만의 효과로 읽지 말 것'],
+  ['화면 1cm당 px · 보는 거리 · 장면 세로 시야각 · HUD 상자 (px)','연구자 설정 \'화면 맞추기\'(신용카드 크기 맞춤) 값과 보는 거리, 장면 카메라 세로 화각, 그때 HUD 상자의 CSS px. HUD는 참가자 눈에서 가로 10°가 되게 이 값으로 계산(D116)','\'(기본값)\'이 붙어 있으면 맞추지 않은 것 — 같은 기기 · 같은 값으로 고정해야 조건이 같음'],
   ['대기 판단 시간 (초)','옮겨야 하는데 목표 차로가 막혀 판단이 \'대기\'였던 시간 합. 판단은 어느 HUD에서든 같게 계산(화면엔 우리 HUD만 보임)','HUD끼리 같은 교통이면 비슷해야 함'],
   ['대기 · 확인 중 옮기기 시작 (번)','판단이 대기 · 확인일 때 목표 쪽으로 차로를 넘기 시작한 횟수','적을수록 \'기다려\'를 따른 것'],
   ['이동 판단 뒤 옮기기까지 (초)','판단이 \'이동\'이 된 뒤 목표 쪽으로 옮기기 시작하기까지 (우리 HUD에선 초록 꺾쇠가 보인 뒤)','짧을수록 바로 판단'],
@@ -365,3 +369,18 @@ addEventListener('blur', () => Object.keys(KEYS).forEach(k => KEYS[k] = false));
 
 try{ const np = localStorage.getItem(PID_KEY); if(np) $('#pid').value = np; }catch(e){}
 renderLog();
+
+/* ---------- 화면 맞추기 (D116, screen.js SCR) ---------- */
+{
+  const det = $('#calib'), card = $('#calCard'), range = $('#calRange'), dist = $('#calDist');
+  const show = () => { const ppc = SCR.ppc(), hp = LAY && LAY.hud ? LAY.hud : {w:0, h:0};
+    range.value = ppc.toFixed(1); dist.value = SCR.distCm;
+    card.style.width = (8.56*ppc).toFixed(1) + 'px'; card.style.height = (5.398*ppc).toFixed(1) + 'px';
+    $('#calSum').textContent = `1cm = ${ppc.toFixed(1)}px · ${SCR.distCm}cm${SCR.calibrated() ? '' : ' [기본값]'}`;
+    $('#calInfo').textContent = `${SCR.calibrated() ? '맞춘 값' : '기본값 [가정]: ' + SCR.model + ' 가로 ' + SCR.widthCm + 'cm'} → HUD 상자 ${Math.round(hp.w)} × ${Math.round(hp.h)}px는 눈에서 ${SCR.degOfPx(hp.w).toFixed(1)}° × ${SCR.degOfPx(hp.h).toFixed(1)}° (장면 각도 ${HUD_DEG.w}°), 화면 세로 ${SCR.degOfPx(cab.clientHeight).toFixed(1)}°. 기록에만 남음`; };
+  range.oninput = () => { SCR.pxPerCm = +range.value; SCR.save(); show(); };
+  dist.onchange = () => { SCR.distCm = Math.min(120, Math.max(30, +dist.value || 55)); SCR.save(); show(); };
+  $('#calReset').onclick = () => { SCR.pxPerCm = null; SCR.distCm = 55; try{ localStorage.removeItem(SCR.key); }catch(e){} show(); };
+  det.ontoggle = () => { card.hidden = !det.open; };
+  show();
+}

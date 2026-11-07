@@ -13,12 +13,13 @@ styles/
   hud.css             HUD 디자인 토큰(--h2-*) · 운전석 영역 · 카드 · HUD 애니메이션
 src/
   core/
+    screen.js         화면 맞추기(신용카드 · 보는 거리, 연구자 설정) — HUD가 참가자 눈에 몇 도로 보였는지 기록 4칸으로 남김 (D116). HUD 크기는 안 바꿈
     config.js         공용 헬퍼 · 상수(차로 · 갈림 · 난이도 HARD · 뒤차 단계 REAR2) · 곡선 생성
     guide.js          안내 판단 로직(대기 → 확인 → 이동, 안내 단계). DOM 없음 — 단위 테스트 대상
     maps.js           맵 5종 데이터 · 경로 계산
   scene/
     scene.js          three.js 장면 · 하늘 · 도로 · 차량 메시 · 3D 차량 모델(GLB) 읽기 · 주야 조명
-    cabin.js          운전석 실내 — Higgsfield 이미지 층(바탕 · 핸들 CSS 3D) + 계기판 · 센터 화면 캔버스 (2026-11-07 D111). HUD 상자 크기 · 자리를 각도(config.js HUD_DEG 10° × 5.2°)로 px 환산 (D114), 야간 덮개는 바탕 알파 마스크
+    cabin.js          운전석 실내 — Higgsfield 이미지 층(바탕 · 핸들 CSS 3D) + 계기판 · 센터 화면 캔버스 (2026-11-07 D111). HUD 상자 크기를 장면 각도(config.js HUD_DEG 14° × 7.3°, D116)로 px 환산, 아래끝은 대시보드 윗선 위, 야간 덮개는 바탕 알파 마스크
     mirrors.js        룸미러 — 실내 이미지의 받침 자리 · 실제 거울 크기 각도 (2026-11-07 저녁 D115), 크기는 cabin.js layoutCabin이 다시 놓음
     props.js          가로수 · 건물 · 정류장 소품
     city.js           일반도로 교차로 장면 · 신호 · 보행자 · 버스(정류장 흐름)
