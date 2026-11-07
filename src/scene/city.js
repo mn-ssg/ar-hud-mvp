@@ -110,12 +110,12 @@ function pedsAt(t){
 // 내가 들어갈 가까운 2개 차로(7m = 가로 도로 내 쪽 절반) + 보도 끝 1.5m 안에 건너려 하거나 건너는 사람이 있으면 일시정지
 const pedBlock = t => pedsAt(t).some(p => p.phase !== 'done' && p.z <= CZ.near + 1.5 && p.z >= CZ.near - 7);
 function pedFrame(t){
-  const ps = pedsAt(t);
+  const ps = pedsAt(t).concat(busMesh.visible && busMesh.userData.peds ? busMesh.userData.peds : []);   // 횡단보도 사람(0 ~ 2) + 정류장 승하차 사람(3 ~ 5, D104)
   pedMeshes.forEach((g, i) => {
     const p = ps.find(q => q.i === i); g.visible = !!p; if(!p) return;
     const u = g.userData, ph = t*6.2 + i*1.7, sw = p.walking ? Math.sin(ph) : 0;
     g.position.set(p.x, p.z > CZ.near || p.z < CZ.far ? .15 : 0, p.z);   // 보도 위면 보도 높이
-    g.rotation.y = p.phase === 'done' ? -Math.PI/2 : p.dir > 0 ? 0 : Math.PI;
+    g.rotation.y = p.dx !== undefined ? Math.atan2(-p.dx, -p.dz) : p.phase === 'done' ? -Math.PI/2 : p.dir > 0 ? 0 : Math.PI;
     u.legs[0].rotation.x = sw*.42; u.legs[1].rotation.x = -sw*.42;
     u.arms[0].rotation.x = -sw*.34; u.arms[1].rotation.x = sw*.34;
     u.body.position.y = p.walking ? Math.abs(Math.cos(ph))*.025 : 0;
@@ -134,8 +134,9 @@ const busMesh = (() => {
   add(B(2.5, .22, 11.3), body, 0, 3.0, .02);                                     // 지붕 테
   add(B(1.5, .32, 2.6), white, 0, 3.27, .8);                                     // 냉방기
   for(const sx of [-1, 1]) add(B(.03, 1.05, 9.2), carMats.glass, sx*1.255, 2.2, .55, false);   // 옆 창 띠
-  add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, -4.55, false);              // 앞문 (오른쪽)
-  add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, .6, false);                 // 뒷문
+  const doorF = add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, -4.55, false);   // 앞문 (오른쪽) — 열리면 뒤로 미끄러짐(busFrame)
+  const doorR = add(B(.035, 1.95, 1.05), carMats.glass, 1.255, 1.5, .6, false);      // 뒷문
+  g.userData.doors = [doorF, doorR];
   add(B(2.3, 1.55, .04), carMats.glass, 0, 1.95, -5.715, false);                  // 앞유리
   add(B(1.9, .26, .05), new THREE.MeshStandardMaterial({color:lin('#141414'), emissive:lin('#ffb347'), emissiveIntensity:.9}), 0, 2.9, -5.72, false);   // 행선지 표시
   for(const sx of [-1, 1]) add(B(.36, .16, .05), carMats.head, sx*.92, .72, -5.72, false);   // 전조등
@@ -153,6 +154,48 @@ const busMesh = (() => {
   g.userData.L = 11.4; g.userData.W = 2.5;
   g.visible = false; scene.add(g); return g;
 })();
+
+/* ---------- 버스 흐름 (D104, 값 config.js BUS) ----------
+   계획(plan)은 seed 난수(주행 테스트) 또는 고정값(시연)으로 한 번 정하고, 위치 · 속도 · 문 · 등 · 승하차는 시각 t의 함수(busStateAt) → 시연은 S.cityT, 주행 테스트는 D.t.
+   출발(departT)만 상태: 문을 닫은 뒤 같은 차로 뒤에서 오는 차가 없을 때 정한다(drive.js). 시연은 문 닫고 0.5초 뒤 */
+function busPlanOf(m, rr, ri){
+  const stopZ = m.bus.z, brake = BUS.v0*BUS.v0/(2*BUS.dec), lead = rr ? rr(BUS.lead) : 5, dwell = rr ? rr(BUS.dwell) : 5.5, n = ri ? ri(BUS.peds) : 2;
+  const tBrake = lead/BUS.v0, tStop = tBrake + BUS.v0/BUS.dec, tOpen = tStop + BUS.doorDelay, tClose = tOpen + BUS.doorT + dwell, tClosed = tClose + BUS.doorT;
+  // 승하차: 타는 사람은 정류장(보도)에서 앞문으로, 내리는 사람은 뒷문에서 정류장으로. 문이 다 열린 뒤 순서대로
+  const peds = Array.from({length:n}, (_, k) => ({board:rr ? rr([0, 1]) < .55 : k === 0, t0:tOpen + BUS.doorT + .3 + k*1.4 + (rr ? rr([0, .6]) : 0), zOff:(rr ? rr([-1.2, 1.2]) : (k - .5)*1.4)}));
+  return {stopZ, z0:stopZ + brake + lead, tBrake, tStop, tOpen, tClose, tClosed, dwell, peds, departT:null};
+}
+// 시각 t의 버스: z · v · 문 열림(0 ~ 1) · 깜빡이 쪽(1 오른쪽 · 2 비상등 · −1 왼쪽 · 0) · 단계
+function busStateAt(P, t){
+  let z, v, phase;
+  if(t < P.tBrake){ z = P.z0 - BUS.v0*t; v = BUS.v0; phase = 'approach'; }
+  else if(t < P.tStop){ const u = t - P.tBrake; z = P.z0 - BUS.v0*P.tBrake - (BUS.v0*u - BUS.dec*u*u/2); v = BUS.v0 - BUS.dec*u; phase = 'approach'; }
+  else if(P.departT === null || t < P.departT){ z = P.stopZ; v = 0; phase = t < P.tClosed ? 'stop' : 'ready'; }
+  else { const u = t - P.departT, vm = cruiseOf(S.map), tA = vm/BUS.acc; v = Math.min(vm, BUS.acc*u); z = P.stopZ - (u < tA ? BUS.acc*u*u/2 : vm*vm/(2*BUS.acc) + vm*(u - tA)); phase = 'depart'; }
+  const door = clamp((t - P.tOpen)/BUS.doorT) - clamp((t - P.tClose)/BUS.doorT);
+  const side = phase === 'approach' ? 1 : phase === 'stop' ? 2 : phase === 'ready' ? -1 : (P.departT !== null && t < P.departT + 3) ? -1 : 0;
+  return {z, v, door, side, phase};
+}
+// 승하차 사람: {i(메시 번호 3~5), x, z, dx, dz(걷는 방향), walking}. 타는 사람: 정류장 앞(보도) → 앞문 앞(연석) → 사라짐. 내리는 사람: 뒷문 앞(연석)에 나타나 정류장으로 → 보도를 따라 멀어짐
+function busPedsAt(P, t, m){
+  const out = [], xCurb = m.edgeX + .45, xShel = m.edgeX + 2.6, zF = P.stopZ - 4.55, zR = P.stopZ + .6;
+  P.peds.forEach((p, k) => {
+    if(k > 2 || t < p.t0 - 2.5) return;
+    const path = p.board ? [[xShel, P.stopZ + p.zOff], [xCurb, zF]] : [[xCurb, zR], [xShel + .3, P.stopZ + 1.5 + p.zOff], [xShel + .3, P.stopZ - 12]];
+    let d = Math.max(0, t - p.t0)*BUS.walk, i = 0;
+    if(!p.board && t < p.t0) return;   // 내리는 사람은 문이 열린 뒤 문 앞에서 나타남
+    while(i < path.length - 1){ const L = Math.hypot(path[i+1][0] - path[i][0], path[i+1][1] - path[i][1]); if(d <= L){ const u = d/L; out.push({i:3 + k, x:path[i][0] + (path[i+1][0] - path[i][0])*u, z:path[i][1] + (path[i+1][1] - path[i][1])*u, dx:(path[i+1][0] - path[i][0])/L, dz:(path[i+1][1] - path[i][1])/L, walking:t >= p.t0}); return; } d -= L; i++; }
+    // 길 끝: 타는 사람은 버스 안(사라짐), 내리는 사람은 멀어져 사라짐
+  });
+  return out;
+}
+// 메시에 반영: 자리 · 문 · 깜빡이 · 승하차 사람 (주행 테스트는 drive.js stepCars, 시연은 cityFrame)
+function busFrame(P, st, t, m, idx = 9){
+  busMesh.visible = true; busMesh.position.set(m.laneX(m.bus.lane), 0, st.z); busMesh.rotation.y = 0;
+  const [dF, dR] = busMesh.userData.doors; dF.position.z = -4.55 + st.door*.95; dR.position.z = .6 + st.door*.95;
+  applyBlink(busMesh, st.side, st.side === 2 ? blinkOn(t) : blinkOn(t, idx));
+  busMesh.userData.peds = busPedsAt(P, t, m);
+}
 
 /* ---------- 장면 ---------- */
 // 판(바닥) · 상자 · 흰/노란 칠 사각형
@@ -318,9 +361,10 @@ function buildCityScene(m){
 function cityFrame(t){
   const m = S.map;
   if(!m || !m.city){ pedMeshes.forEach(g => g.visible = false); busMesh.visible = false; return; }
-  updateSignalHead(m, t); pedFrame(t);
-  if(!S.drive){   // 시연: 버스는 정류장에 서 있음 (주행 테스트는 drive.js가 떠나게 함)
-    busMesh.visible = !!m.bus;
-    if(m.bus){ busMesh.position.set(m.laneX(m.bus.lane), 0, m.bus.z); busMesh.rotation.y = 0; }
+  updateSignalHead(m, t);
+  if(!S.drive){   // 시연: 버스 흐름은 시연 시간(t)의 함수 — 같은 시각이면 같은 장면 (주행 테스트는 drive.js stepCars가 busFrame을 부름)
+    if(m.bus){ if(!m._busDemo) m._busDemo = busPlanOf(m, null, null); const P = m._busDemo; if(P.departT === null) P.departT = P.tClosed + .5; busFrame(P, busStateAt(P, t), t, m); }
+    else busMesh.visible = false;
   }
+  pedFrame(t);
 }

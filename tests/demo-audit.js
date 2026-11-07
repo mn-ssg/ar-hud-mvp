@@ -107,7 +107,7 @@ const AUDIT = () => {
   await page.goto(url, {waitUntil:'networkidle'}); await page.waitForTimeout(800);
   await page.evaluate(`(${AUDIT})()`);
   const rows = [], ONLY_SHOTS = process.argv.includes('--shots-only');   // --shots-only: 캡처만 (SHOT_LIST 환경변수로 장면 · 시각을 바꿀 수 있음)
-  for(const mapId of ONLY_SHOTS ? [] : ['ICR', 'JC4', 'SEQ', 'CL2', 'CRT']) for(const jam of (mapId === 'CL2' || mapId === 'CRT') ? [0] : [0, 3]) for(const light of ['day', 'night']){
+  for(const mapId of ONLY_SHOTS ? [] : (process.env.ONLY ? [process.env.ONLY] : ['ICR', 'JC4', 'SEQ', 'CL2', 'CRT'])) for(const jam of (mapId === 'CL2' || mapId === 'CRT') ? [0] : [0, 3]) for(const light of ['day', 'night']){
     const r = await page.evaluate(([mapId, jam, light]) => { const o = auditDemo(mapId, jam, light); o.cars = [...o.cars]; return o; }, [mapId, jam, light]);
     rows.push({mapId, jam, light, ...r});
     const ov = r.overlaps.map(o => `${o.ak}(${o.a}) × ${o.bk}(${o.b}) ${o.t}~${o.tEnd}s 깊이 ${o.depth}m @(${o.x},${o.z})`).join(' | ');
@@ -122,13 +122,13 @@ const AUDIT = () => {
       await page.waitForTimeout(150); await page.screenshot({path:path.join(SHOTS, name + '.png')}); await page.evaluate(() => { S.paused = false; S.running = false; });
     } }
   // 주행 테스트 모드 (drive.js 교통)
-  for(const [mapId, type] of ONLY_SHOTS ? [] : [['ICR', 'rear'], ['JC4', 'rear'], ['SEQ', 'rear'], ['ICR', 'jam'], ['JC4', 'jam'], ['SEQ', 'jam'], ['CL2', 'city'], ['CRT', 'city']]) for(const seed of [1003, 1040, 1077]) for(const light of ['day', 'night']){
+  for(const [mapId, type] of ONLY_SHOTS ? [] : (process.env.ONLY ? [[process.env.ONLY, process.env.ONLY === 'CL2' || process.env.ONLY === 'CRT' ? 'city' : 'rear']] : [['ICR', 'rear'], ['JC4', 'rear'], ['SEQ', 'rear'], ['ICR', 'jam'], ['JC4', 'jam'], ['SEQ', 'jam'], ['CL2', 'city'], ['CRT', 'city']])) for(const seed of [1003, 1040, 1077]) for(const light of ['day', 'night']){
     const r = await page.evaluate(([mapId, type, light, seed]) => auditDrive(mapId, type, light, seed), [mapId, type, light, seed]);
     rows.push({mode:'drive', mapId, type, light, seed, ...r});
     const ov = r.overlaps.filter(o => !(o.a === 'ego' || o.b === 'ego') || r.result !== 'crash').map(o => `${o.ak}(${o.a}) × ${o.bk}(${o.b}) ${o.t}~${o.tEnd}s 깊이 ${o.depth}m @(${o.x},${o.z})`).join(' | ');
     console.log(`== [주행] ${mapId} ${type} ${light} ${seed}: ${r.result}${r.crash ? ' (' + r.crash + ')' : ''} ${r.secs}s · 겹침(내 차 충돌 제외) ${r.overlaps.filter(o => !(o.a === 'ego' || o.b === 'ego') || r.result !== 'crash').length} · 최소 간격 ${r.minGap === Infinity ? '-' : r.minGap.toFixed(2)}m ${r.minPair ? JSON.stringify(r.minPair) : ''}${ov ? '\n   겹침: ' + ov : ''}`);
   }
-  if(!ONLY_SHOTS) fs.writeFileSync(path.join(__dirname, 'demo-audit.json'), JSON.stringify(rows, null, 1));
+  if(!ONLY_SHOTS && !process.env.ONLY) fs.writeFileSync(path.join(__dirname, 'demo-audit.json'), JSON.stringify(rows, null, 1));
   console.log('\nerrors:', errors.length ? errors.join(' | ') : 'none');
   await browser.close(); srv.close();
 })().catch(e => { console.error(e); process.exit(2); });

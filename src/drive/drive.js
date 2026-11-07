@@ -149,7 +149,7 @@ function driveReset(cfg){
     const n = m.bus ? ri([1, 3]) : ri([0, 2]), dv = rr(m.bus ? [10, 20] : [5, 15])/3.6;
     let z = D.z + dv*rr(HARD.rearArrive) + (m.bus ? 0 : 10);
     for(let k=0;k<n;k++){ add(flowCars[fi++], tl, z, V0 + dv, 'rear', {T:.6, s0:2}); z += DRV.carL + rr([8, 20]); }
-    if(m.bus){ const bx = m.laneX(m.bus.lane); add(busMesh, m.bus.lane, m.bus.z, 0, 'bus', {len:11.4, w:2.5, departT:rr([4, 10]), P:resample([[bx, LANE_START], [bx, -900]], 1)}); }
+    if(m.bus){ const bx = m.laneX(m.bus.lane), plan = busPlanOf(m, rr, ri); add(busMesh, m.bus.lane, plan.z0, BUS.v0, 'bus', {len:11.4, w:2.5, plan, P:resample([[bx, LANE_START], [bx, -900]], 1)}); }   // 정류장 흐름 (D104): 앞에서 천천히 와서 서고 떠남
     const nO = ri([2, 4]);
     for(let k=0;k<nO && fi < flowCars.length;k++){
       const ol = Math.floor(R()*m.lanes), ox = -m.lanes*LANE/2 - (ol + .5)*LANE, oz = -560 + k*90 + R()*40, mesh = flowCars[fi++];
@@ -289,7 +289,16 @@ function stepCars(dt){
     if(c.kind === 'rear' && D.jamLanes.includes(c.lane) && ld.car && ld.car.kind === 'queue' && ld.gap < 12 && c.v < 7){
       Object.assign(c, {kind:'queue', base:D.qBase[c.lane], T:.5, s0:1.5, mean:false}); setBrake(c.mesh, true);
     }
-    if(c.kind === 'bus' && D.t < c.departT){ c.v = 0; return; }                                   // 정류장에 서 있음 (⑤)
+    if(c.kind === 'bus'){   // 정류장 흐름 (D104): 출발 전까지는 시각의 함수(city.js busStateAt), 문 닫은 뒤 같은 차로 뒤 gapBack m 안에서 오는 차(내 차 포함)가 없으면 출발. 출발 뒤엔 보통 차처럼(IDM, 느린 가속)
+      const P = c.plan, st = busStateAt(P, D.t);
+      if(st.phase === 'ready' && P.departT === null){ const fx = Math.sin(D.psi), fz = -Math.cos(D.psi);
+        const coming = D.cars.some(o => o !== c && o.lane === c.lane && o.z > c.z && o.z - c.z < BUS.gapBack + halfL(o) + halfL(c) && o.v > 1) || (laneOf(S.map, D.x) === c.lane && D.z > c.z && D.z - c.z < BUS.gapBack + DRV.carL/2 + halfL(c) && D.v > 1);
+        void fx; void fz; if(!coming) P.departT = D.t; }
+      if(st.phase !== 'depart'){ c.v = st.v; c.s = LANE_START - st.z; }
+      c.busSide = st.side; busFrame(P, {...st, z:LANE_START - c.s}, D.t, S.map, D.cars.indexOf(c));   // 출발 뒤 자리는 IDM이 적분한 c.s (문 · 등 · 사람만 시각 함수)
+      if(st.phase !== 'depart') return;
+      c.v0 = D.cruise;
+    }
     let v0 = c.v0, T = c.T, s0 = c.s0;
     if(c.kind === 'queue'){
       if(c.z < FORK_Z - 12){ v0 = D.cruise; T = 1.1; s0 = 2.5; }                                     // 갈림을 지나면 빠져나감
@@ -301,7 +310,7 @@ function stepCars(dt){
     }
     if(S.map.city) v0 = Math.min(v0, curveV(c));                                                   // 일반도로: 굽은 곳 앞에서 미리 부드럽게 줄임
     // block.rearMatch: 옮길 차로 뒤차(내 뒤 60m 안)는 내가 순항보다 빨리 달리면 그만큼 더 빨라져 간격을 유지 — 끼워 주지 않는 차처럼. 가속은 matchA까지. 양보 중인 차(D103)는 예외
-    let Aacc = 1.5; const decCap = -9;
+    let Aacc = c.kind === 'bus' ? BUS.acc : 1.5; const decCap = -9;
     if(HARD.block.rearMatch && !c.yielding && c.kind === 'rear' && c.lane === laneOf(S.map, S.route.tx) && c.z > D.z && c.z - D.z < 60 && D.v > D.cruise + .3){ v0 = Math.max(v0, c.base + (D.v - D.cruise)); Aacc = HARD.matchA; }
     // 깜빡이 반응 (D103): 양보 = 내 뒤 범퍼 간격이 yieldGap이 될 때까지 내 속도보다 yieldDv 느리게(감속은 yieldDec까지만 — 앞차가 가까우면 평소대로), 생기면 내 속도를 따라감 / 양보 안 함 = 기본 속도 + passDv로 지나가고, 지나가면 평소대로
     if(c.match && !c.yielding && !c.passing) v0 = Math.min(v0, D.v);   // 연습 판 뒤차: 내 속도에 맞춰 따라옴(깜빡이로 양보받기 전엔 틈이 안 생김)
