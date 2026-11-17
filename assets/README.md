@@ -29,3 +29,11 @@
 
 - 차선 · 정지선 · 횡단보도 · 차량 · 보행자 위치는 모두 맵 좌표로 코드가 그린다. 생성 이미지는 노면 · 벽 · 보도의 **재질**로만 쓴다(주행 가능 영역과 무관).
 - 텍스처를 못 불러오면 예전처럼 코드로 그린 텍스처가 그대로 쓰인다(`loadTex`). 3D 모델도 같다(`loadCarModels` — 코드 차량 메시가 그대로).
+
+## Blender로 만든 모델 (2026-11-17 ~)
+
+| 파일 | 쓰인 곳 | 만든 법 | 라이선스 |
+|---|---|---|---|
+| `models/hud_car.glb` (298KB, 삼각형 1.6만) | 리뉴얼 HUD 3차의 차 아이콘 — `src/hud/hud3.js` CAR3 층이 미니 도로와 같은 가상 카메라로 그림 | `blender/hud_car.py`(Blender 5.3 백그라운드 실행: 단면을 이어 붙이고 곡면 분할) → 원본 `blender/hud_car.blend`. 바깥에서 가져온 모양 · 텍스처 없음 | 직접 만든 것 |
+
+- 다시 만들기: `/Applications/Blender.app/Contents/MacOS/Blender -b --python assets/blender/hud_car.py`

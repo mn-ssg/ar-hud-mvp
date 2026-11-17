@@ -207,7 +207,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         if(cs.fill === c || cs.stroke === c) out.push(el.id || el.parentNode.id); }); $$('.eg3').forEach(st => { if(st.getAttribute('stop-color').toLowerCase() === hex && [...'LR'].some(k => +$('#cEdge' + k).getAttribute('opacity') > .01)) out.push('cEdge'); });
         return [...new Set(out)]; };
       const sm = () => { const H = S.H3, n = id => ($('#' + id).getAttribute('d') || '').length;
-        return {t:+D.t.toFixed(2), st:H.state, base:H.base, gate:S.G ? S.G.gate : '-', chev:[...document.querySelectorAll('#cChev path')].filter(q => q.getAttribute('d')).length, dots:n('cDots') > 0, gap:n('cGap') > 0 && +$('#cGap').getAttribute('opacity') > .5, gapFill:$('#cGap').getAttribute('fill'), gapDash:$('#cGap').getAttribute('stroke-dasharray'),
+        return {t:+D.t.toFixed(2), st:H.state, base:H.base, gate:S.G ? S.G.gate : '-', chev:[...document.querySelectorAll('#cChev path')].filter(q => q.getAttribute('d')).length, dots:n('cDots') > 0, gap:n('cGapLine') > 0 && +$('#cGapLine').getAttribute('opacity') > .5, gapFill:n('cGap') > 0 ? 'fill' : 'none', gapDash:$('#cGapLine').dataset.line === 'dash' ? 'dash' : 'none', cars:CAR3.ready ? CAR3.pool.filter(g => g.visible).length : -1,
           rear:n('cRear') > 0 ? +$('#cRear').getAttribute('opacity') : 0, rearCol:$('#cRear').getAttribute('fill'), ring:n('cRing1') > 0, trail:n('cTrail1') > 0, edgeR:+$('#cEdgeR').getAttribute('opacity'), edgeW:+$('#cEdgeR').getAttribute('width'), edgeL:+$('#cEdgeL').getAttribute('opacity'),
           warn:+$('#cWarn').getAttribute('opacity'), lead:n('cLead') > 0, fband:n('cFrontBand') > 0, lane:+$('#cLaneFill').getAttribute('opacity'), laneCol:getComputedStyle($('#lg3A')).stopColor, icon:+$('#cAct').getAttribute('opacity'), barRing:+$('#cCdRing').getAttribute('opacity'), barW:+$('#cCdBar').getAttribute('width'), barX:+$('#cCdBar').getAttribute('x'),
           red:using(RED), green:using(GRN), cue:$('#mirCue').hidden ? 'hidden' : ($('#mirCue').dataset.cue || '') + '/' + ($('#mirCue').dataset.lamp || ''), text:$$('#arHud3 text').length}; };
@@ -232,7 +232,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const d = await stage3(7, 4, 4, {jumpAt:1}), conf = d.samples.filter(s => s.st === 4), mv = d.samples.filter(s => s.st === 5), order = d.samples.map(s => s.st).filter((v, i, arr) => i === 0 || v !== arr[i-1]).join('');
     const confT = conf.length ? conf[conf.length - 1].t - conf[0].t : 0, cfT = await E(() => HUD3.confirmT);
     check(`3차 04 확인: 대기가 풀려도 바로 이동하지 않고 확인을 한 번(${confT.toFixed(2)}초 ≈ 설정 ${cfT}초) — 점 · 꺾쇠 없음 · 틈 흰 점선 상자 · 거울 표시 흰 테두리 · 빨강 · 초록 없음`, /34+5/.test(order) && Math.abs(confT - cfT) < .12 && conf.every(s => !s.dots && s.chev === 0 && s.red.length === 0 && s.green.length === 0) && conf.slice(6).every(s => s.gap && s.gapFill === 'none' && s.gapDash !== 'none' && s.cue.startsWith('check')), order + ' ' + JSON.stringify(conf[conf.length - 1]));
-    check('3차 05 이동: 확인 뒤 틈이 그대로면 상태 5 · 틈이 초록으로 채워지고 꺾쇠 3개 · 빨강 없음 · 초록은 꺾쇠와 틈뿐', mv.length > 20 && mv.slice(8).every(s => s.gap && s.gapFill.toLowerCase() === '#3ddc84' && s.chev === 3 && s.red.length === 0 && s.green.every(id => ['cChev', 'cGap'].includes(id))), JSON.stringify(mv[mv.length - 1]));
+    check('3차 05 이동: 확인 뒤 틈이 그대로면 상태 5 · 틈이 초록으로 채워지고 꺾쇠 3개 · 빨강 없음 · 초록은 꺾쇠와 틈뿐', mv.length > 20 && mv.slice(8).every(s => s.gap && s.gapFill === 'fill' && s.gapDash === 'none' && s.chev === 3 && s.red.length === 0 && s.green.every(id => ['cChev', 'cGap', 'cGapLine'].includes(id))), JSON.stringify(mv[mv.length - 1]));
     check('3차: 들어갈 차로는 어느 상태에서든 청록(길 안내 색은 안 바뀜)', [a, b, c, d].every(r => r.samples.every(s => s.laneCol === 'rgb(0, 229, 255)')), al.laneCol);
     check('3차: 남은 거리 막대는 왼쪽 고정(x = 200) · 색 없음', [a, c, d].every(r => r.samples.every(s => s.barX === 200)) && c.samples.every(s => !s.red.includes('cCdBar')), `${al.barX} · ${al.barW}`);
     const f = await stage3(80, 2, 1.2, {lead:[13, -6]}), fs = f.samples.filter(s => s.st === 6), fl = fs[fs.length - 1];
@@ -240,6 +240,12 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const g = await stage3(7, 4, 1.6, {lead:[13, -6]}), gs = g.samples.filter(s => s.st === 6 && s.base === 3), gl = gs[gs.length - 1];
     check('3차 06: 대기 중에도 앞쪽 위험이 먼저 — 삼각형이 뜨고 뒤차 · 기다려 점은 남되 깜빡임 · 가장자리 빛은 꺼짐', gs.length > 10 && gl.warn > .9 && gl.dots && !gl.ring && gl.edgeR < .05 && gl.rear > .2 && gl.rear < .7, JSON.stringify(gl));
     check('3차: HUD 안에 글자 없음', [al, cl, fl].every(s => s.text === 0), '');
+    // 왼쪽으로 옮기는 맵(④): 차로 선을 넘는 내내 꺾쇠 · 점이 들어갈 차로 쪽(왼쪽 = 내 차 아이콘보다 화면 왼쪽)에 있음
+    const lt = await E(() => { const m = mapById('CL2'), leaf = m.leaves.findIndex(l => l.dest === '전통시장'); let n = 0, bad = 0;
+      runDrive({map:m, leaf, lane:2, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', secs:9, ap:{}, sample:() => { const ch = [...document.querySelectorAll('#cChev path')].find(q => q.getAttribute('d')), dt = $('#cDots').getAttribute('d'), el = ch || (dt ? $('#cDots') : null);
+        if(!el || !S.H3.needMove || !$('#cEgo').getAttribute('d')) return; const a = el.getBBox(), e = $('#cEgo').getBBox(); n++; if(a.x + a.width/2 > e.x + e.width/2) bad++; }}); return {n, bad}; });
+    check('3차: 왼쪽으로 옮길 때 꺾쇠 · 점이 내 차 왼쪽(들어갈 차로 쪽)에 — 차로 선을 넘는 중에도', lt.n > 20 && lt.bad === 0, JSON.stringify(lt));
+    check('3차 차 아이콘: Blender 세단 모델(hud_car.glb)을 불러와 같은 가상 카메라로 그림 — 안전 1대(내 차) · 주의 4대(내 차 + 뒤차 + 지난 위치 2) · 앞쪽 위험 2대 이상(내 차 + 앞차)', al.cars === 1 && bl.cars === 4 && fl.cars >= 2, `${al.cars} · ${bl.cars} · ${fl.cars}`);
     // 현대 HUD로 달려도 같은 상태가 계산되고(화면엔 안 보임) 이벤트로 남음
     const nv = await stage3(7, 4, 4, {jumpAt:1, hud:'nav'});
     check('3차 상태는 현대 HUD로 달릴 때도 같게 계산 · 기록(이벤트 h3, 화면에 안 보임 표시)', nv.samples.map(s => s.st).filter((v, i, arr) => i === 0 || v !== arr[i-1]).join('') === order && nv.events.filter(e => e.type === 'h3').length >= 2 && nv.events.filter(e => e.type === 'h3').every(e => e.shown === false) && d.events.filter(e => e.type === 'h3').every(e => e.shown === true), JSON.stringify(nv.events.filter(e => e.type === 'h3')));

@@ -325,7 +325,7 @@
             <path id="cFlow" class="c-flow"/>
             <path id="cAhead" class="c-car c-ahead"/>
             <!-- 틈: 04 확인 = 흰 점선 상자, 05 이동 = 초록으로 채움 -->
-            <path id="cGap" class="c-gap"/>
+            <path id="cGap" class="c-gap"/><path id="cGapLine" class="c-gapline"/>
             <path id="cTrail1" class="c-car"/><path id="cTrail2" class="c-car"/>
             <path id="cRing1" class="c-ring"/><path id="cRing2" class="c-ring"/>
             <path id="cRear" class="c-car"/><path id="cRearGlass" class="c-glass"/>
@@ -333,8 +333,8 @@
             <!-- 내 차: 실제 자리 · 방향 그대로, 도로 면 위의 납작한 상자 -->
             <path id="cEgo" class="c-ego"/><path id="cEgoGlass" class="c-glass"/>
           </g>
-          <!-- 이동 화살표 = 초록 꺾쇠(흐름) / 기다려 = 빨간 점 세 개(멈춤) -->
-          <g id="cMoveGrp" filter="url(#glow2)">
+          <!-- 이동 화살표 = 초록 꺾쇠(흐름) / 기다려 = 빨간 점 세 개(멈춤). 도로 면에 그려진 표시처럼 같은 투영으로 눕힌다 -->
+          <g id="cMoveGrp" filter="url(#glow2)" mask="url(#roadMask3)">
             <g id="cChev" class="c-chev"><path/><path/><path/></g>
             <path id="cDots" class="c-dots"/>
           </g>
@@ -362,6 +362,8 @@
     <!-- ① 앞쪽 위험(리뉴얼 HUD 3차): 주황 삼각형 — HUD에서 가장 크게. 느낌표는 도형(글자 없음).
          HUD의 다른 층은 유리에 비친 빛처럼 screen 합성이라 밝은 배경(바로 앞의 흰 · 은색 차, 하늘) 위에서는 묻힌다(측정 대비 1.2:1). 앞쪽 경고는 바로 그 앞차 위에 겹치므로
          이 층만 따로 두어 불투명하게 그린다(같은 상자 · 같은 좌표). config.js HUD3.warnSolid = false면 다른 층처럼 screen 합성 -->
+    <!-- 차 아이콘 층 (리뉴얼 HUD 3차): Blender로 만든 세단 모델(assets/models/hud_car.glb)을 미니 도로와 같은 가상 카메라로 그린다 → 차로 · 띠와 같은 원근. 못 불러오면 SVG 상자 아이콘(#cEgo 등)이 그대로 보임 -->
+    <canvas id="hudCars" aria-hidden="true"></canvas>
     <svg id="hudSvgTop" viewBox="0 0 520 270" aria-hidden="true">
       <g id="cWarn" opacity="0">
         <path class="c-warn-tri" d="M0 -27 L31 25 H-31 Z"/>

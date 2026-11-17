@@ -100,7 +100,7 @@ function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
   $('#arHud2').style.display = m==='ar2' ? '' : 'none';
-  $('#arHud3').style.display = m==='ar3' ? '' : 'none'; if(m !== 'ar3'){ $('#mirCue').hidden = true; $('#cWarn').setAttribute('opacity', 0); }
+  $('#arHud3').style.display = m==='ar3' ? '' : 'none'; $('#hudCars').style.display = m==='ar3' ? '' : 'none'; if(m !== 'ar3'){ $('#mirCue').hidden = true; $('#cWarn').setAttribute('opacity', 0); }
   $('#navHud').style.display = m==='nav' ? '' : 'none';
   $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode===m)));
 }
