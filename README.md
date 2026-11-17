@@ -33,16 +33,17 @@ src/
     drive.js          주행 테스트: 내 차 조작 · 깜빡이(Q · E) · 교통 AI(양보) · 도로 판정 · 기록 값
   app/
     main.js           상태 · 매 프레임 루프 · 시연 흐름 · 화면 전환
-    intro.js          주행 테스트 안내 모션그래픽(TOUR) — 연습 주행 대신 맨 앞에: 조작 · 눌러 보기 · 할 일 · 기록 · 준비 (2026-11-17 밤). 스타일 styles/intro.css
+    intro.js          주행 테스트 안내 모션그래픽(TOUR) — 맨 앞에: 조작 · 눌러 보기 · 할 일 · 기록 · 준비 (2026-11-17 밤). Blender 3D 영상(assets/video/) 위에 자막을 얹음. 스타일 styles/intro.css
     session.js        참가자 진행 · 기록 · 엑셀 · 기록 서랍 · 방향키
 assets/
   tex/                노면 · 벽 · 잔디 · 금속 · 나무 재질 (코드가 읽음). 참고 시안은 ../04_리서치/assets/
   models/             차량 · 버스 GLB 5개(Higgsfield Tripo, 2026-11-07 · Draco 압축 2026-11-17) · 나무 · 가로등 · 가드레일 기둥(Blender) · 보행자 4명(Higgsfield + 리깅) · HUD 아이콘 2개. 못 불러오면 코드 메시
-  blender/            Blender 원본(.blend)과 만드는 스크립트(.py)
+  blender/            Blender 원본(.blend)과 만드는 스크립트(.py). 안내 모션그래픽: intro_mg.py(렌더) · intro_encode.sh(mp4 · webp)
+  video/              안내 모션그래픽 영상 3개 · 그림 8장(2.6MB) — 주행 테스트를 시작할 때만 받음
   cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
-  drive-regression.js 브라우저 자동 운전 회귀 141항목  node drive-regression.js (Chrome 필요)
+  drive-regression.js 브라우저 자동 운전 회귀 142항목  node drive-regression.js (Chrome 필요)
   capture-states.js   리뉴얼 HUD 3차 상태 6가지 캡처(주간 · 야간, 현대 HUD 줄 포함) + 대비 측정   node capture-states.js <폴더>
   handling-check.js   조작감 점검(보조 켬 → handling-check-assist.json · ASSIST=0 이면 실제 값 → handling-check.json) — 새 조작 모델을 키 입력으로 돌려 차로 변경 시간 · 우회전 핸들 각도 · 가속 · 제동을 실제 값과 견줌(결과 handling-check.json)
   perf-check.js       성능 재기 — 장면 4개 프레임 시간 · 삼각형 · 그리기 호출 · 로딩 용량   node perf-check.js after (결과 perf-after.json, 그래픽 작업 전 값 perf-before.json)
@@ -59,7 +60,8 @@ tests/
 - 테스트: `cd tests && npm i && npm test`
 - 조작: ← → 핸들 · ↑ 가속 · ↓ 브레이크 · Q E 깜빡이(차로 변경이 끝나면 자동으로 꺼짐). 차 움직임은 아반떼(CN7) 제원 · 실측 기준(`config.js VEH`): 키를 누르고 있는 동안 핸들이 점점 돌아가고(빠를수록 덜), 떼면 가운데로 돌아옴. ↓는 누르고 있을수록 세게. 키보드 운전이 어려운 부분은 조작 보조(`VEH.assist`)가 덜어 줌 — 2차 실험 때의 조작 느낌: 누르면 0.55초에 끝 각도, 떼면 0.33초에 가운데. 핸들이 스스로 움직이는 보정은 없음(2026-11-17 밤).
 - ⑤ 우회전 맵: 가운데 차로가 공사로 막혀 있음(`config.js CITY_WORK`, `maps.js` CRT `work`) — 미리 오른쪽 차로로 옮겨 버스 뒤에 섰다가 따라가 우회전. 공사 구간에 들어가면 충돌 '공사 구간'.
-- 주행 테스트 순서(3차): 안내 모션그래픽(연습 주행 대신, `session.js EXP.practice`) → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해). `session.js EXP.alternate`
+- 처음 화면 버튼은 '주행 테스트 시작' · '시연 보기' 둘뿐(연습 주행은 없앰).
+- 주행 테스트 순서(3차): 안내 모션그래픽 → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해). `session.js EXP.alternate`
 - 느린 기기: 화소 배율이 최대 1.5이고, 프레임이 자주 25ms를 넘으면 1.25 → 1로 내려가며 룸미러는 두 프레임에 한 번 갱신된다(`scene.js PERF`). 캡처처럼 선명하게 고정하려면 `?dpr=2`
 - WebGL 컨텍스트가 끊기면(사파리가 오래 둔 탭에서 거둬 감) 안내를 띄우고 복구, 4초 안에 안 되면 새로고침한다(`scene.js`)
 

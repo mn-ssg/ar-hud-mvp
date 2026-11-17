@@ -1,27 +1,27 @@
 {
  "name": "after",
- "at": "2026-11-17T11:51:51.041Z",
+ "at": "2026-11-17T12:41:42.064Z",
  "scenes": [
   {
    "label": "고속도로 ① 주간 뒤차",
-   "frames": 1337,
-   "avgMs": 5.98,
-   "fps": 167.3,
-   "p95Ms": 11.3,
-   "worstMs": 16.3,
+   "frames": 1828,
+   "avgMs": 4.38,
+   "fps": 228.5,
+   "p95Ms": 7.3,
+   "worstMs": 8.8,
    "tier": 0,
-   "tris": 1839246,
-   "calls": 531,
+   "tris": 1851546,
+   "calls": 536,
    "geos": 389,
    "tex": 38
   },
   {
    "label": "고속도로 ② 야간 정체",
-   "frames": 1250,
-   "avgMs": 6.39,
-   "fps": 156.4,
-   "p95Ms": 10.8,
-   "worstMs": 28,
+   "frames": 1737,
+   "avgMs": 4.6,
+   "fps": 217.3,
+   "p95Ms": 6.6,
+   "worstMs": 11.4,
    "tier": 0,
    "tris": 2414519,
    "calls": 717,
@@ -30,11 +30,11 @@
   },
   {
    "label": "일반도로 ④ 주간",
-   "frames": 1582,
-   "avgMs": 5.06,
-   "fps": 197.8,
-   "p95Ms": 5.9,
-   "worstMs": 8.1,
+   "frames": 1893,
+   "avgMs": 4.22,
+   "fps": 236.8,
+   "p95Ms": 4.7,
+   "worstMs": 10.4,
    "tier": 0,
    "tris": 1948240,
    "calls": 255,
@@ -43,11 +43,11 @@
   },
   {
    "label": "일반도로 ⑤ 야간",
-   "frames": 1644,
-   "avgMs": 4.86,
-   "fps": 205.6,
-   "p95Ms": 5.7,
-   "worstMs": 6.6,
+   "frames": 1917,
+   "avgMs": 4.17,
+   "fps": 239.7,
+   "p95Ms": 4.7,
+   "worstMs": 9.5,
    "tier": 0,
    "tris": 1597416,
    "calls": 358,
@@ -56,8 +56,8 @@
   }
  ],
  "bytes": {
-  "first": 7203048,
-  "all": 7203048,
+  "first": 7233675,
+  "all": 7233675,
   "files": [
    [
     "/assets/cabin/base.webp",
@@ -118,10 +118,10 @@
   ]
  },
  "byType": {
-  ".html": 36101,
-  ".css": 29487,
+  ".html": 36111,
+  ".css": 33054,
+  ".js": 487086,
   ".webp": 2452484,
-  ".js": 460036,
   ".glb": 3627848
  }
 }

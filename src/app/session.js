@@ -1,12 +1,12 @@
 /* ============================================================
    session.js — 주행 테스트 진행 · 기록 · 내보내기 (2026-10-29 개편, 예전 D60 · D64 · D65 · D68 · D70 위에)
-   흐름(3차, 2026-11-17 밤 ~): 참가자 정보 → 안내 모션그래픽(intro.js — 연습 주행 대신, EXP.practice) → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해) → 요약 + 엑셀 자동 저장
+   흐름(3차, 2026-11-17 밤 ~): 참가자 정보 → 안내 모션그래픽(intro.js — 연습 주행은 없앰) → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해) → 요약 + 엑셀 자동 저장
    흐름(2차까지): 참가자 정보 → (연습 주행) → HUD A 3회 → 질문 → HUD B 3회 → 질문 → 요약 + 엑셀 자동 저장
    · 비교 (2026-11-03 두 번째 개정, 2차 실험): 현대 HUD(nav, 1차 그대로) 3회 · 리뉴얼 HUD 2차(ar2, 2.1) 3회. 순서는 늘 현대 → 2차로 고정 (2026-11-04 사용자: 참가자 번호 홀수 · 짝수 교대를 없앰).
      1차 HUD(ar, v1.9)는 실험 조건에서 빠지고 시연에서만 열어 볼 수 있음. 'HUD 버전' 칸: 현대 3.3 · 리뉴얼 2.1-A/B (1차 기록의 '리뉴얼 HUD'는 빈칸 = v1.7~1.9)
    · 시나리오(맵 · 상황 · 시간대 · 교통 번호 · 시작 차로 · 목적지 · 신호 시각)는 짝마다 한 번 정해 두 HUD 블록이 그대로 다시 씀
      → HUD만 다르고 교통은 같다 (예전엔 블록마다 교통 번호 · 목적지를 새로 뽑았음)
-   · 연습 주행은 늘 하고(2026-11-07: 끄는 설정 삭제) HUD 없이, 본 기록(hud-drive-v1)과 따로(hud-drive-practice-v1) 저장 → 결과에 섞이지 않음
+   · 연습 주행은 2026-11-17 밤에 없앴다(사용자: 조작 · 내용은 안내 모션그래픽이 알려 주므로). 예전 연습 기록(hud-drive-practice-v1)은 지우지 않고, 남아 있으면 '엑셀 (전체)'의 '연습' 시트로만 나간다
    · 예전 기록 · 엑셀 칸은 그대로 두고 새 칸을 뒤에 붙임. 예전 기록의 새 칸은 빈칸
    방향키 · 기록 서랍도 여기. main.js 다음에 로드.
    ============================================================ */
@@ -38,16 +38,15 @@ const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(
 const envName = () => `환경 ${ENV_VER} · 미러 ${MIR.on ? '켬' : '끔'}`;
 
 /* ---------- 실험 설정 ---------- */
-// 비교 쌍 A = 현대 · B = 2차. 연습 주행은 늘 한다(2026-11-07: 연구자 설정의 '연습 주행' 체크박스 · localStorage 저장 삭제 — 순서는 늘 연습 → 블록 1 → 블록 2)
-// practice (2026-11-17 밤, 사용자: '쓸데없는 연습 주행보다 모션그래픽으로'): false면 맨 앞에 연습 주행 대신 안내 모션그래픽(intro.js TOUR — 조작 방법 · 직접 눌러 보기 · 할 일 · 기록하는 것). true면 예전처럼 연습 주행
-const EXP = {pair:['nav', 'ar3'], alternate:true, practice:false};   // 3차 실험(2026-11-17 ~): 현대 HUD 3회 · 리뉴얼 HUD(3.0) 3회
+// 비교 쌍 A = 현대 · B = 리뉴얼(3차). 맨 앞은 안내 모션그래픽(intro.js TOUR) — 연습 주행은 2026-11-17 밤에 없앰
+const EXP = {pair:['nav', 'ar3'], alternate:true};   // 3차 실험(2026-11-17 ~): 현대 HUD 3회 · 리뉴얼 HUD(3.0) 3회
 // 제시 순서: 늘 현대 먼저('AB'). 2026-11-03엔 참가자 번호 홀수 AB · 짝수 BA로 교대했으나 2026-11-04 사용자가 고정을 택함 (짝수 참가자에게 2차가 먼저 나와 혼란). 순서 효과는 상쇄되지 않으므로 분석 때 참고
 // 3차 실험(2026-11-17, 피그마 '3차 검증 계획'): **판마다 교대**('ALT') — 연습 → 현대 → 리뉴얼 → 현대 → 리뉴얼 → 현대 → 리뉴얼. 2차의 한계였던 '현대 3판 뒤 리뉴얼 3판'(익숙해진 효과가 리뉴얼에 몰림)을 없애려는 것.
 // 첫 판은 모든 참가자 현대 HUD [가정 — 참가자마다 첫 HUD를 바꿀지는 사용자 판단]. 예전 블록 방식은 EXP.alternate = false
 const orderFor = pid => { void pid; return EXP.alternate ? 'ALT' : 'AB'; };
 
 /* ---------- 진행 순서 ---------- */
-const SES = {on:false, pid:'', steps:[], i:-1, rows:[], qs:[], prs:[], order:'AB', cur:null, timer:0, seq:0};
+const SES = {on:false, pid:'', steps:[], i:-1, rows:[], qs:[], order:'AB', cur:null, timer:0, seq:0};
 const CITY_BAG = 'hud-drive-citybag';
 function takeMaps(n, pool, key){
   let bag = loadArr(key).filter(id => pool.some(m => m.id === id));
@@ -78,9 +77,9 @@ function buildSteps(order){
     // 판마다 교대. 두 HUD가 같은 장면 3개를 한 번씩 — 같은 장면이 연달아 나오지 않게 둘째 HUD의 순서는 첫째를 두 칸 민 것(X Z Y X Z Y)
     const a = shuffle(scns.slice()), b = [a[2], a[0], a[1]], runs = [];
     a.forEach((p, i) => { runs.push({kind:'run', hud:EXP.pair[0], block:1, no:i + 1, ...p}); runs.push({kind:'run', hud:EXP.pair[1], block:2, no:i + 1, ...b[i]}); });
-    return [{kind:EXP.practice ? 'practice' : 'tour'}, ...runs, {kind:'survey', hud:EXP.pair[0], block:1}, {kind:'survey', hud:EXP.pair[1], block:2}, {kind:'done'}];
+    return [{kind:'tour'}, ...runs, {kind:'survey', hud:EXP.pair[0], block:1}, {kind:'survey', hud:EXP.pair[1], block:2}, {kind:'done'}];
   }
-  return [{kind:EXP.practice ? 'practice' : 'tour'}, ...block(h1, 1), {kind:'survey', hud:h1, block:1}, ...block(h2, 2), {kind:'survey', hud:h2, block:2}, {kind:'done'}];
+  return [{kind:'tour'}, ...block(h1, 1), {kind:'survey', hud:h1, block:1}, ...block(h2, 2), {kind:'survey', hud:h2, block:2}, {kind:'done'}];
 }
 function runCfg(st){ return {map:mapById(st.map), leaf:st.leaf, lane:st.lane, type:st.type, jam:st.jam, seed:st.seed, sigT:st.sigT}; }
 
@@ -95,7 +94,7 @@ function sesCard({icon = '', tone = '', eyebrow = '', title, body = '', btn, btn
   const inp = $('#sesPid'); (inp ? inp : b1).focus();
 }
 const hideCard = () => { $('#sess').hidden = true; };
-const KEY_HINT = '<div class="keyrow"><span><kbd>←</kbd><kbd>→</kbd> 핸들</span><span><kbd>↑</kbd> 가속</span><span><kbd>↓</kbd> 브레이크</span><span><kbd>Q</kbd><kbd>E</kbd> 깜빡이</span></div>';
+
 function lockUi(on){
   $('#setup').classList.toggle('locked', on);
   $$('#scenario button, #modeSeg button, #lightSeg button').forEach(b => b.disabled = on);
@@ -104,22 +103,21 @@ function lockUi(on){
 
 /* ---------- 흐름 ---------- */
 function openSession(){
-  stopDemo(); openSetup(false); setScreen('prep');
+  stopDemo(); openSetup(false); setScreen('prep'); TOUR.preload();   // 안내 영상을 미리 받아 둔다(참가자 번호를 적는 동안)
   const pid = $('#pid').value || 'P1';
   sesCard({eyebrow:'주행 테스트', title:'참가자 정보', body:`<label class="pid">참가자 ID<input type="text" id="sesPid" value="${esc(pid)}" autocomplete="off"></label>
-    ${KEY_HINT}`,
+`,
     btn:['시작', beginSession], btn2:['뒤로', goHome]});
 }
 function beginSession(){
   SES.pid = ($('#sesPid').value || 'P1').trim(); $('#pid').value = SES.pid;
   SES.order = orderFor(SES.pid);
-  SES.on = true; S.testing = true; SES.prevMode = S.mode; SES.prevLight = S.light; SES.steps = buildSteps(SES.order); SES.i = -1; SES.rows = []; SES.qs = []; SES.prs = []; SES.seq = 0;
+  SES.on = true; S.testing = true; SES.prevMode = S.mode; SES.prevLight = S.light; SES.steps = buildSteps(SES.order); SES.i = -1; SES.rows = []; SES.qs = []; SES.seq = 0;
   lockUi(true); setScreen('drive'); nextStep();
 }
 function nextStep(){
   const st = SES.steps[++SES.i];
   if(st.kind === 'run') runStep(st);
-  else if(st.kind === 'practice') practiceCard();
   else if(st.kind === 'tour'){ hideCard(); $('#abortBtn').hidden = true; TOUR.show(nextStep); }   // 안내 모션그래픽 — 마지막 장면의 '주행 시작'에서 첫 판으로
   else if(st.kind === 'survey') surveyCard(st);
   else doneSession();
@@ -141,20 +139,7 @@ function runStep(st){
   const cfg = runCfg(st); SES.cur = {st, cfg};
   setMode(st.hud); setLight(st.light);
   startDrive(cfg);
-  countdown(!EXP.practice && SES.seq === 0);   // 키 안내: 연습 주행을 했으면 3 · 2 · 1 동안만. 연습 없이 안내 모션그래픽만 봤으면 첫 판은 끝까지 보여 준다
-}
-
-/* 연습 주행: HUD 없이 ① IC 오른쪽 진출, 앞차 · 옆 차로 차 + 옮길 차로 뒤차 2대(가까운 차는 깜빡이를 켜면 반드시 양보 — D103) (급정거 · 뒤차 무리 · 정체 없음). 기록은 따로 */
-function practiceCard(){
-  sesCard({eyebrow:'연습', title:'오른쪽 출구로 나가 보세요', body:'<p class="lead">차로를 옮기기 전에 깜빡이(<kbd>Q</kbd> 왼쪽 · <kbd>E</kbd> 오른쪽)를 켜 보세요. 옆 차로 뒤차가 틈을 내줍니다.</p>' + KEY_HINT, btn:['연습 시작', runPractice], btn2:SES.on ? null : ['처음으로', goHome]});
-}
-function runPractice(){
-  const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
-  SES.cur = {practice:true, cfg:{map:m, leaf, lane:1, type:'practice', jam:0, seed:4242, sigT:0}};
-  if(!SES.on){ if(S.mode !== 'off') SES.prevMode = S.mode; S.testing = true; setScreen('drive'); }
-  setMode('off'); setLight('day');
-  startDrive(SES.cur.cfg);
-  countdown(true);
+  countdown(SES.seq === 0);   // 키 안내: 첫 판은 끝까지 보여 준다(연습 주행이 없으므로), 그 뒤는 3 · 2 · 1 동안만
 }
 
 /* 질문: ① 확신 1~5(1차와 같음). 2차(2026-11-07 밤 ~)에는 ②를 뺐다(사용자: 뜻이 없어 삭제). 3차는 리뉴얼 HUD에만 ② 대기 표시 이해를 다시 묻는다(Q2_TEXT3).
@@ -211,7 +196,7 @@ function eventStats(ev, tEnd){
 // drive.js가 판이 끝나면 부름
 function onDriveEnd(){
   if(!SES.cur) return;
-  const {st, cfg, practice} = SES.cur; SES.cur = null;
+  const {st, cfg} = SES.cur, practice = false; SES.cur = null;   // practice: 연습 주행을 없앤 뒤로 늘 false(기록의 '연습 여부' 칸은 예전 기록과 맞추려고 남김)
   $('#keyHint').hidden = true; $('#abortBtn').hidden = true;
   const res = D.result, good = res === 'ok', ev = D.events || [], es = eventStats(ev, D.t);
   const lcN = ev.filter(e => e.type === 'lcDone').length, riskyWith = ev.filter(e => e.type === 'cutIn' && e.risky).map(e => e.with).join(' / ');
@@ -225,25 +210,19 @@ function onDriveEnd(){
     blinkUsed:D.blinkUsed, blinkLead:D.blinkLead, blinkResp:D.blinkResp,   // 2026-11-07 깜빡이 (D103)
     lcState:es.lcState,   // 2026-11-17 차로를 옮기기 시작한 순간의 리뉴얼 HUD 상태(1 ~ 6)
     ppc:+SCR.ppc().toFixed(2) + (SCR.calibrated() ? '' : ' (기본값)'), dist:SCR.distCm, vfov:camera.fov, hudPx:LAY && LAY.hud ? `${Math.round(LAY.hud.w)} × ${Math.round(LAY.hud.h)} (눈에서 ${LAY.hud.eyeDegW.toFixed(1)}°)` : ''};   // 2026-11-07 밤 화면 맞추기 (D116)
-  if(practice){
-    // 연습은 조작 익히기 — 판정 · 결과 카드 · 요약 없이 바로 다음으로 (2026-11-03). 기록은 '연습' 시트에만
-    practices.push(row); saveArr(PKEY, practices); SES.prs.push(row);
-    if(SES.on){ nextStep(); return; }
-    S.testing = false; stopDrive(); setMode(SES.prevMode || 'ar3'); goHome(); return;   // 처음 화면에서 한 연습: 잠금 풀고 처음으로
-  }
   drives.push(row); saveArr(DKEY, drives); SES.rows.push(row); renderLog();
   const runs = SES.steps.filter(x => x.kind === 'run'), idx = runs.indexOf(st) + 1;
   sesCard({icon:good ? 'check' : 'cross', tone:good ? 'ok' : 'bad', eyebrow:`${idx} / ${runs.length}`, title:RESULT[res], body:'', btn:['다음', nextStep]});
 }
 function doneSession(){
-  const name = `주행테스트_${SES.pid}_${today()}`, rows = SES.rows, qs = SES.qs, prs = SES.prs;
+  const name = `주행테스트_${SES.pid}_${today()}`, rows = SES.rows, qs = SES.qs;
   endSession();
   const m = SES.pid.match(/^(.*?)(\d+)$/);   // 다음 참가자 번호 (P7 → P8)
   if(m){ $('#pid').value = m[1] + (+m[2] + 1); try{ localStorage.setItem(PID_KEY, $('#pid').value); }catch(e){} }
-  const xl = exportBook(rows, name, qs, prs);
+  const xl = exportBook(rows, name, qs);
   setScreen('home');
   sesCard({icon:'check', tone:'ok', eyebrow:SES.pid, title:'끝', body:summaryHtml(rows) + `<p class="ses-meta">${esc(name)}.${xl ? 'xlsx' : 'csv'}</p>`,
-    btn:['다음 참가자', openSession], btn2:['엑셀 다시 저장', () => exportBook(rows, name, qs, prs)]});
+    btn:['다음 참가자', openSession], btn2:['엑셀 다시 저장', () => exportBook(rows, name, qs)]});
 }
 function endSession(){
   clearTimeout(SES.timer); SES.on = false; SES.cur = null; S.testing = false; TOUR.hide();
@@ -252,13 +231,11 @@ function endSession(){
 }
 function abortRun(){
   if(!S.testing) return;
-  if(!confirm(SES.on ? '주행 테스트를 그만둘까요? 지금까지 끝난 판의 기록은 남아요.' : '연습을 그만둘까요?')) return;
+  if(!confirm('주행 테스트를 그만둘까요? 지금까지 끝난 판의 기록은 남아요.')) return;
   if(SES.on) endSession(); else { clearTimeout(SES.timer); SES.cur = null; S.testing = false; stopDrive(); D.frozen = false; $('#count').hidden = true; $('#keyHint').hidden = true; $('#abortBtn').hidden = true; prepDemo(); update(1); }
   goHome();
 }
 $('#testBtn').onclick = openSession;
-$('#tourBtn').onclick = () => { stopDemo(); TOUR.show(null); };   // 처음 화면에서 미리 보기(기록 · 진행과 무관)
-$('#practiceBtn').onclick = () => { stopDemo(); SES.pid = $('#pid').value; SES.order = '-'; practiceCard(); };
 $('#abortBtn').onclick = abortRun;
 
 /* ---------- 요약 · 내보내기 (D70 — 디자이너가 읽을 칸만, 2026-10-29 새 칸은 뒤에) ---------- */
@@ -309,7 +286,7 @@ const EXPLAIN = [['칸','뜻','어떻게 읽나'],
   ['HUD','현대 HUD = 지금 차에 있는 HUD(1 · 2차와 같은 대조군) · 리뉴얼 HUD = 3차 실험의 실험군(3.0, 2026-11-17) · 리뉴얼 HUD (2차) = 2차 실험 때 HUD(2.4) · 리뉴얼 HUD (1차) = 1차 실험 때 HUD(1.9). \'HUD 버전\' 칸이 빈칸이면 1차 실험 기록, \'우리 2.4-B\'는 2차 실험 기록(그때 이름)','3차: 같은 사람이 현대 3회 · 리뉴얼 3회. 같은 시나리오 ID끼리 짝'],
   ['옮기기 시작 때 리뉴얼 HUD 상태','목표 쪽으로 차로를 처음 넘기 시작한 순간 리뉴얼 HUD가 어느 상태였나: 01 안전 · 02 주의 · 03 대기 · 04 확인 · 05 이동 · 06 앞쪽 위험. 현대 HUD로 달릴 때도 같은 계산을 해서 남김(화면엔 안 보임). (안 옮김) = 끝까지 안 옮김, 빈칸 = 2026-11-17 전 기록','03 대기 · 04 확인에서 옮겼으면 \'기다려\'를 따르지 않은 것. \'대기 · 확인 중 옮기기 시작\' 칸은 예전과 같은 기준(판단 게이트)으로 그대로 셈'],
   ['제시 순서','3차(2026-11-17 ~): 현대 · 리뉴얼 교대 — 연습 뒤 현대 → 리뉴얼 → 현대 → 리뉴얼 → 현대 → 리뉴얼(모든 참가자 현대 먼저). 2차: 현대 → 리뉴얼(현대 3판 뒤 리뉴얼 3판)','2차 기록의 리뉴얼 HUD 결과엔 익숙해진 효과가 섞일 수 있음. 2026-11-03 이전 기록은 짝수 번호가 2차 → 현대'],
-  ['연습 여부','본 실험 / 연습. 연습 주행은 \'연습\' 시트에만 있고 요약 · 기록에 들어가지 않음',''],
+  ['연습 여부','본 실험. (2026-11-17 밤부터 연습 주행 없음 — 그 전 기록의 연습 주행은 \'연습\' 시트에만)',''],
   ['정체 줄 합류 방식','정체 판 성공이 \'줄 합류\'(목표 차로 줄 뒤에 붙어 3초)였는지 \'줄 건너뜀\'(줄 옆을 지나 갈림 뒤에 출구로 들어감)이었는지. 건너뜀이면 차로 옮긴 곳 · 반응 시간이 빈칸으로 남음','정체 판 성공률을 읽을 때 둘을 나눠 볼 것. 1차 엑셀엔 이 칸이 없음'],
   ['앞으로 끼어들기 (번) · 그때 뒤차 간격 · 닿기까지','옮길 차로에서 내 뒤 60m 안에 차가 있는데 그 앞에 들어간 횟수, 그때 가장 가까운 뒤차와의 범퍼 간격(m)과 닿기까지 시간(초, 뒤차가 더 빠를 때만). 위험 여부와 상관없이 셈','2차 가설의 \'위험한 차로 변경\' 지표. 간격 · 시간이 작을수록 무리한 끼어들기'],
   ['깜빡이 켬 · 깜빡이 → 차선 넘기 시작 · 옮길 차로 뒤차 반응','목표 쪽으로 처음 옮기기 시작할 때 깜빡이(Q · E)가 켜져 있었나, 켠 뒤 몇 초 만에 차선을 넘기 시작했나, 깜빡이에 반응한 옮길 차로 뒤차가 양보했나(양보 · 양보 안 함, 반응한 차 없으면 빈칸). 양보 여부는 교통 번호로 정해져 두 HUD가 같음 (2026-11-07)','깜빡이를 켜야 양보받을 가능성이 생김. 안 켜고 옮긴 판은 \'안 켬\''],
@@ -330,16 +307,16 @@ const EXPLAIN = [['칸','뜻','어떻게 읽나'],
   ['위험 발생 (번)','옮겨야 하는 동안 목표 차로가 막힌(위험) 횟수','교통 난이도 확인용'],
   ['질문 2','블록 끝 \"기다리라는 표시를 어떻게 이해했나\" A 유지하고 기다림 · B 멈춤 · C 빨리 옮김 · D 못 봄','A가 의도한 이해. [가정] 문항 — 파일럿에서 확인'],
   ['이벤트 시트','판마다 판단 상태 전환 · 위험 발생/해소 · 차로 변경 시작/완료 · 옆 차로 진입 · 충돌 시각','장면별로 다시 볼 때'],
-  ['연습 시트','본 실험 전 연습 주행(HUD 없음). 요약 · 기록에는 들어가지 않음','']];
+  ['연습 시트','2026-11-17 밤 이전의 연습 주행 기록이 이 브라우저에 남아 있을 때만 \'엑셀 (전체)\'에 나옴. 요약 · 기록에는 들어가지 않음','']];
 const toCsv = rows => rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
 function download(text, name, type){
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
-// 엑셀(.xlsx): 요약 · 기록 · 질문 · 이벤트 · 연습 · 설명. SheetJS를 못 불러오면 CSV로
+// 엑셀(.xlsx): 요약 · 기록 · 질문 · 이벤트 · (예전 연습 기록이 있으면) 연습 · 설명. SheetJS를 못 불러오면 CSV로
 function exportBook(rows, name, qs = [], prs = []){
   const sheets = [['요약', [SUM_HEAD, ...sumCells(rows, qs)]], ['기록', [HEAD, ...rows.map(rowCells)]], ['질문', [Q_HEAD, ...qs.map(qCells)]],
-    ['이벤트', [EV_HEAD, ...evRows(rows)]], ['연습', [HEAD, ...prs.map(rowCells)]], ['설명', EXPLAIN]];
+    ['이벤트', [EV_HEAD, ...evRows(rows)]], ...(prs.length ? [['연습', [HEAD, ...prs.map(rowCells)]]] : []), ['설명', EXPLAIN]];
   if(window.XLSX){
     const wb = XLSX.utils.book_new();
     sheets.forEach(([n, aoa]) => { const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = aoa[0].map((_, c) => ({wch:Math.min(48, Math.max(8, ...aoa.map(r => String(r[c] ?? '').length*1.6)))})); XLSX.utils.book_append_sheet(wb, ws, n); });

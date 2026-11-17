@@ -1,7 +1,10 @@
 /* ============================================================
    intro.js — 주행 테스트 안내 모션그래픽 (2026-11-17 밤, 사용자: 맨 앞의 연습 주행 대신 '어떻게 조작하고 무엇을 수집하는지'를 모션그래픽으로)
    · 주행 테스트의 첫 단계(session.js buildSteps의 {kind:'tour'}). 장면 6개: 시작 → 조작 방법 → 직접 눌러 보기 → 할 일 → 기록하는 것 → 준비
-   · 영상 파일이 아니라 SVG를 시간(초)의 함수로 그린다 — 장면마다 build(g)가 draw(t)를 돌려주고, 같은 t면 같은 그림(멈춤 · 되감기 · 테스트가 쉬움)
+   · 그림: Blender로 렌더한 3D 영상 · 그림(assets/video/intro_*.mp4 · .webp — 만드는 법 assets/blender/intro_mg.py · intro_encode.sh).
+     처음엔 SVG 그림뿐이었는데 사용자가 '블렌더나 힉스필드로 고퀄리티 모션그래픽'을 원해 3D 장면으로 바꿨다. 글자 · 자막 · 속도 숫자는 영상에 굽지 않고 이 파일이 영상 시각에 맞춰 그 위에 그린다
+     (문장을 고쳐도 다시 렌더할 필요가 없다). 영상을 못 불러오면 예전 SVG 그림(각 장면의 ill 묶음)이 대신 나온다
+   · 조작 장면의 시간 식(T · 속도)은 intro_mg.py의 장면 b와 같은 값 — 한쪽을 고치면 다른 쪽도
    · HUD의 표시(색 · 꺾쇠 · 점 등)가 무슨 뜻인지는 **알려 주지 않는다** — 두 HUD를 비교하는 실험이라 한쪽 뜻을 미리 가르치면 결과가 흐려진다. 조작 · 할 일 · 기록 항목만
    · 방향키는 '직접 눌러 보기' 장면이 쓰므로 넘기기는 버튼 · Enter(다음) · Backspace(이전)
    · 문장은 [가정 — 사용자 확인 대기]. 기록 항목은 session.js HEAD(엑셀 '기록' 시트)와 맞춘다
@@ -68,23 +71,24 @@ const TOUR = (() => {
   /* ---------- 장면 ---------- */
   const KEYS6 = [['left', 'ArrowLeft', '핸들 왼쪽'], ['right', 'ArrowRight', '핸들 오른쪽'], ['up', 'ArrowUp', '가속'], ['down', 'ArrowDown', '브레이크'], ['q', 'KeyQ', '왼쪽 깜빡이'], ['e', 'KeyE', '오른쪽 깜빡이']];
   const scenes = [
-    { id:'start', name:'시작', dur:5.5, build(g){
+    { id:'start', name:'시작', dur:5.5, video:'assets/video/intro_a.mp4', build(g){
+        svg('rect', {x:0, y:0, width:1280, height:720, fill:'url(#tourShade)'}, g);
         const a = svg('g', {}, g), b = svg('g', {}, g), c = svg('g', {}, g);
         txt(a, 640, 268, '주행 테스트 안내', 't-hero', {'text-anchor':'middle'});
         txt(b, 640, 330, '키보드로 여섯 번 운전합니다 · 한 번에 1분 안팎', 't-lead', {'text-anchor':'middle'});
         const chips = ['조작 방법', '할 일', '기록하는 것'].map((s, i) => { const q = svg('g', {}, c), x = 640 + (i - 1)*220; svg('rect', {x:x - 96, y:392, width:192, height:54, rx:27, fill:C.panel, stroke:C.rule, 'stroke-width':1.5}, q);
           txt(q, x - 58, 427, String(i + 1), 't-num'); txt(q, x - 34, 427, s, 't-chip'); return q; });
-        const rd = svg('g', {}, g); svg('rect', {x:0, y:560, width:1280, height:96, fill:C.road}, rd); for(const y of [560, 656]) svg('rect', {x:0, y:y - 2, width:1280, height:4, fill:C.line, opacity:.7}, rd);
+        const rd = svg('g', {class:'ill'}, g); svg('rect', {x:0, y:560, width:1280, height:96, fill:C.road}, rd); for(const y of [560, 656]) svg('rect', {x:0, y:y - 2, width:1280, height:4, fill:C.line, opacity:.7}, rd);
         const dash = svg('line', {x1:-100, y1:608, x2:1400, y2:608, stroke:C.line, 'stroke-width':5, 'stroke-dasharray':'40 50', opacity:.75}, rd), cr = car(rd, C.car, .62);
         return t => { pop(a, t, .2, 26, .7); pop(b, t, .7); chips.forEach((q, i) => pop(q, t, 1.3 + i*.25)); dash.setAttribute('stroke-dashoffset', (t*220 % 90).toFixed(1)); cr.at(250 + 780*ss(t/5.5), 632 - 48*ss(seg(t, 2.2, 3.6)), 90 - 14*Math.sin(Math.PI*seg(t, 2.2, 3.6))); cr.blink(-1, t > 1.7 && t < 3.8 && Math.floor(t/.33) % 2 === 0); };
     }},
-    { id:'keys', name:'조작', dur:14.2, build(g){
-        const R = roadPanel(g, 'tourClipA'), cr = car(R.g), spd = svg('g', {}, g);
+    { id:'keys', name:'조작', dur:14.2, video:'assets/video/intro_b.mp4', build(g){
+        const ill = svg('g', {class:'ill'}, g), R = roadPanel(ill, 'tourClipA'), cr = car(R.g), spd = svg('g', {}, g);
         svg('rect', {x:R.x + 18, y:R.y + 18, width:150, height:58, rx:12, fill:'#0b0f14', opacity:.86}, spd); const num = txt(spd, R.x + 86, R.y + 59, '50', 't-speed', {'text-anchor':'end'}); txt(spd, R.x + 94, R.y + 59, 'km/h', 't-unit');
-        const head = svg('g', {}, g); txt(head, 600, 168, '이렇게 조작합니다', 't-title');
-        const kb = keyboard(g, 950, 282, 1), K = kb.K; txt(g, 726, 356, '깜빡이', 't-cap', {'text-anchor':'middle'});
-        const rows = [['← →', '핸들'], ['↑', '가속 — 누르는 동안 빨라집니다'], ['↓', '브레이크 — 길게 누를수록 세게'], ['손을 떼면', '정해진 속도로 스스로 갑니다'], ['Q E', '깜빡이 — 차로를 옮기기 전에 켭니다']].map(([k, s], i) => { const q = svg('g', {}, g), y = 432 + i*47;
-          const bar = svg('rect', {x:600, y:y - 26, width:5, height:34, rx:2.5, fill:C.cyan}, q), a = txt(q, 622, y, k, 't-rowk'), b = txt(q, 622 + (i === 3 ? 118 : 86), y, s, 't-row'); return {q, bar, a, b}; });
+        const head = svg('g', {}, g); txt(head, 790, 150, '이렇게 조작합니다', 't-title');
+        const kb = keyboard(ill, 1080, 275, .82), K = kb.K; txt(g, 868, 352, '깜빡이', 't-cap', {'text-anchor':'middle'});   // 3D 키 자리(intro_mg.py KEYPOS: Q 836 · E 901, 275)
+        const rows = [['← →', '핸들'], ['↑', '가속 — 누르는 동안 빨라집니다'], ['↓', '브레이크 — 길게 누를수록 세게'], ['손을 떼면', '정해진 속도로 스스로 갑니다'], ['Q E', '깜빡이 — 차로 옮기기 전에']].map(([k, s], i) => { const q = svg('g', {}, g), y = 432 + i*47;
+          const bar = svg('rect', {x:790, y:y - 26, width:5, height:34, rx:2.5, fill:C.cyan}, q), a = txt(q, 812, y, k, 't-rowk'), b = txt(q, 812 + (i === 3 ? 112 : 80), y, s, 't-row'); return {q, bar, a, b}; });
         const T = [.6, 3.0, 5.4, 7.8, 10.2, 13.4]; let last = 0, dist = 0;
         return t => { if(t < last) dist = 0; const dt = t - last; last = t;
           const step = t < T[0] ? -1 : t < T[1] ? 0 : t < T[2] ? 1 : t < T[3] ? 2 : t < T[4] ? 3 : 4;
@@ -100,23 +104,23 @@ const TOUR = (() => {
           cr.at(R.lanes[1] + sway*40 + (R.lanes[2] - R.lanes[1])*mv, R.y + 380, sway ? Math.cos(u*Math.PI*2)*7 : 9*Math.sin(Math.PI*mv)); cr.brake(kd); cr.blink(1, blinking && Math.floor(t/.32) % 2 === 0);
           K.left.set(kl ? 1 : 0); K.right.set(kr ? 1 : 0); K.up.set(ku ? 1 : 0); K.down.set(kd ? 1 : 0); K.e.set(ke ? 1 : 0, C.warn); K.q.set(0); };
     }},
-    { id:'try', name:'눌러 보기', dur:Infinity, hold:true, build(g, api){
-        const head = svg('g', {}, g); txt(head, 640, 150, '직접 눌러 보세요', 't-title', {'text-anchor':'middle'});
-        const sub = svg('g', {}, g); txt(sub, 640, 196, '여섯 개 키를 한 번씩 누르면 다음으로 넘어갑니다', 't-lead', {'text-anchor':'middle'});
-        const kb = keyboard(g, 760, 380, 1.5), K = kb.K, got = {}, at = {};
-        const pos = {left:[646, 520], right:[874, 520], up:[760, 262], down:[760, 520], q:[360, 464], e:[488, 464]};   // 키 아래(↑만 위) 이름표
+    { id:'try', name:'눌러 보기', dur:Infinity, hold:true, image:'assets/video/intro_keys_0.webp', lit:[1, 2, 3, 4, 5, 6].map(i => `assets/video/intro_keys_${i}.webp`), build(g, api){
+        const head = svg('g', {}, g); txt(head, 110, 150, '직접 눌러 보세요', 't-title');
+        const sub = svg('g', {}, g); txt(sub, 110, 196, '여섯 개 키를 한 번씩 누르면 다음으로 넘어갑니다', 't-lead');
+        const ill = svg('g', {class:'ill'}, g), kb = keyboard(ill, 822, 480, 1.9), K = kb.K, got = {}, at = {};
+        const pos = {left:[676, 628], right:[967, 628], up:[813, 356], down:[822, 628], q:[321, 572], e:[463, 572]};   // 키 아래(↑만 위) 이름표 — 3D 그림의 키 자리(intro_mg.py 장면 c의 KEYPOS)
         const labs = KEYS6.map(([k, , s]) => { const [x, y] = pos[k]; return txt(g, x, y, s, 't-cap', {'text-anchor':'middle'}); });
-        const cnt = txt(g, 640, 610, '0 / 6', 't-count', {'text-anchor':'middle'});
+        const cnt = txt(g, 1120, 196, '0 / 6', 't-count', {'text-anchor':'middle'});
         const onKey = e => { const k = KEYS6.find(q => q[1] === e.code); if(!k || !api.active('try')) return; e.preventDefault(); e.stopPropagation(); if(!got[k[0]]){ got[k[0]] = true; at[k[0]] = api.t(); } at['p_' + k[0]] = api.t(); };
         addEventListener('keydown', onKey, true);
         return Object.assign(t => { pop(head, t, .1); pop(sub, t, .35); const n = Object.keys(got).length;
           KEYS6.forEach(([k], i) => { const p = at['p_' + k], press = p !== undefined ? 1 - seg(t, p + .12, p + .3) : 0; K[k].set(got[k] ? Math.max(.35, press) : press, k === 'q' || k === 'e' ? C.warn : C.cyan); labs[i].style.fill = got[k] ? C.ink : C.sub; });
-          cnt.textContent = n + ' / 6'; cnt.style.fill = n === 6 ? C.go : C.sub;
+          cnt.textContent = n + ' / 6'; cnt.style.fill = n === 6 ? C.go : C.sub; api.lit(KEYS6.map(([k]) => !!got[k]));
           if(n === 6 && !got.done){ got.done = t; } if(got.done && t > got.done + .9) api.next(); },
           {reset(){ for(const k in got) delete got[k]; for(const k in at) delete at[k]; }, state:() => ({n:Object.keys(got).filter(k => k !== 'done').length})});
     }},
-    { id:'task', name:'할 일', dur:14, build(g){
-        const R = roadPanel(g, 'tourClipB'), L = R.lanes, y0 = R.y;
+    { id:'task', name:'할 일', dur:14, video:'assets/video/intro_d.mp4', build(g){
+        const ill = svg('g', {class:'ill'}, g), R = roadPanel(ill, 'tourClipB'), L = R.lanes, y0 = R.y;
         // 오른쪽 차로가 출구로 갈라짐: 갈림(yF) 위로는 본선이 두 차로, 셋째 차로는 오른쪽 위로 휘어 나간다 + 문형 표지(목적지 칸은 흰 테)
         const yF = y0 + 250, xe = R.x0 + 2*R.lw, P0 = [L[2], yF], P1 = [L[2], y0 + 110], P2 = [L[2] + 96, y0 - 30];
         svg('rect', {x:xe - 3, y:y0, width:R.lw + 60, height:yF - y0 - 12, fill:C.panel}, R.g);                                        // 갈림 위 셋째 차로 자리는 도로 밖
@@ -127,12 +131,12 @@ const TOUR = (() => {
         svg('rect', {x:R.x0 + 8, y:y0 + 150, width:2*R.lw - 16, height:44, rx:5, fill:'#1f7a4a'}, sign); txt(sign, R.x0 + R.lw, y0 + 180, '직진', 't-sign', {'text-anchor':'middle'});
         const dest = svg('rect', {x:R.x0 + 2*R.lw + 8, y:y0 + 150, width:R.lw - 16, height:44, rx:5, fill:'#1f7a4a', stroke:'#fff', 'stroke-width':0}, sign); txt(sign, R.x0 + 2.5*R.lw, y0 + 180, '목적지', 't-sign', {'text-anchor':'middle'});
         const rear = car(R.g, '#aeb7c0'), me = car(R.g);
-        const head = svg('g', {}, g); txt(head, 600, 168, '할 일은 하나입니다', 't-title'); const lead = svg('g', {}, g); txt(lead, 600, 214, '목적지 출구로, 안전하게 갑니다', 't-lead');
-        const rows = [['1', '판마다 목적지가 정해집니다', '표지판과 화면 안내를 보고 그 출구로 갑니다'], ['2', '차로는 안전할 때 옮깁니다', '옆 차로 뒤차를 보고, 깜빡이를 켜고 옮깁니다'], ['3', '앞도 살핍니다', '앞차 · 보행자 · 공사 구간에서는 속도를 줄입니다']].map(([n, a, b], i) => { const q = svg('g', {}, g), y = 290 + i*84;
-          svg('circle', {cx:618, cy:y - 9, r:17, fill:'none', stroke:C.cyan, 'stroke-width':2}, q); txt(q, 618, y - 2, n, 't-num', {'text-anchor':'middle'}); txt(q, 652, y - 2, a, 't-rowb'); txt(q, 652, y + 28, b, 't-rows'); return q; });
-        const strip = svg('g', {}, g); txt(strip, 600, 556, '화면 안내는 두 가지가 번갈아 나옵니다', 't-row');
-        const chips = Array.from({length:6}, (_, i) => { const q = svg('g', {}, strip), x = 600 + i*104, hy = i % 2 === 0; svg('rect', {x, y:576, width:94, height:44, rx:10, fill:hy ? '#1b2430' : '#10323a', stroke:hy ? '#3a4654' : '#1d6a78', 'stroke-width':1.5}, q);
-          txt(q, x + 47, 605, hy ? '현대' : '리뉴얼', 't-chip2', {'text-anchor':'middle'}); return q; });
+        const head = svg('g', {}, g); txt(head, 760, 150, '할 일은 하나입니다', 't-title'); const lead = svg('g', {}, g); txt(lead, 760, 196, '목적지 출구로, 안전하게 갑니다', 't-lead');
+        const rows = [['1', '판마다 목적지가 정해집니다', '표지판과 화면 안내를 보고 그 출구로'], ['2', '차로는 안전할 때 옮깁니다', '옆 차로 뒤차를 보고, 깜빡이를 켜고'], ['3', '앞도 살핍니다', '앞차 · 보행자 · 공사 구간에서는 천천히']].map(([n, a, b], i) => { const q = svg('g', {}, g), y = 276 + i*84;
+          svg('circle', {cx:778, cy:y - 9, r:17, fill:'none', stroke:C.cyan, 'stroke-width':2}, q); txt(q, 778, y - 2, n, 't-num', {'text-anchor':'middle'}); txt(q, 812, y - 2, a, 't-rowb'); txt(q, 812, y + 28, b, 't-rows'); return q; });
+        const strip = svg('g', {}, g); txt(strip, 760, 548, '화면 안내는 두 가지가 번갈아 나옵니다', 't-row');
+        const chips = Array.from({length:6}, (_, i) => { const q = svg('g', {}, strip), x = 760 + i*82, hy = i % 2 === 0; svg('rect', {x, y:568, width:74, height:42, rx:10, fill:hy ? '#1b2430' : '#10323a', stroke:hy ? '#3a4654' : '#1d6a78', 'stroke-width':1.5}, q);
+          txt(q, x + 37, 596, hy ? '현대' : '리뉴얼', 't-chip2', {'text-anchor':'middle'}); return q; });
         const rampPt = u => { const a = P0, b = P1, c = P2, v = 1 - u; return [v*v*a[0] + 2*v*u*b[0] + u*u*c[0], v*v*a[1] + 2*v*u*b[1] + u*u*c[1]]; };
         return t => { pop(head, t, .1); pop(lead, t, .4); rows.forEach((q, i) => pop(q, t, [1.0, 4.4, 8.6][i])); pop(strip, t, 11.0); chips.forEach((q, i) => pop(q, t, 11.4 + i*.14, 10, .4));
           R.scroll(t*150); dest.setAttribute('stroke-width', t > 1.2 ? (2 + 2*Math.abs(Math.sin(t*3))).toFixed(1) : 0);
@@ -143,7 +147,8 @@ const TOUR = (() => {
           if(ex <= 0) me.at(L[1] + (L[2] - L[1])*mv, my, 10*Math.sin(Math.PI*mv)); else { const p = rampPt(ss(ex)*.8), q0 = [L[2], y0 + 290], k = ss(seg(ex, 0, .3)); me.at(q0[0] + (p[0] - q0[0])*k, q0[1] + (p[1] - q0[1])*k, 30*ss(ex)); }
           me.blink(1, t > 5.6 && t < 8.6 && Math.floor(t/.32) % 2 === 0); };
     }},
-    { id:'data', name:'기록', dur:12.5, build(g){
+    { id:'data', name:'기록', dur:12.5, image:'assets/video/intro_bg.webp', build(g){
+        svg('rect', {x:0, y:0, width:1280, height:720, fill:'#0b0e12', opacity:.72}, g);
         const head = svg('g', {}, g); txt(head, 640, 132, '이런 것을 기록합니다', 't-title', {'text-anchor':'middle'});
         const items = [['exit', '목적지 출구', '안내된 출구로 갔는지', C.cyan], ['crash', '충돌', '차 · 보행자 · 공사 구간과 부딪혔는지', C.red], ['cut', '위험한 끼어들기', '뒤차 바로 앞으로 들어갔는지', C.warn],
           ['clock', '차로를 옮긴 때', '어디서, 얼마나 걸려 옮겼는지', C.cyan], ['ped', '보행자 양보 · 도로 벗어남', '멈춰서 기다렸는지, 길 밖으로 나갔는지', C.go], ['ask', '짧은 질문', '끝난 뒤 세 문항에 답합니다', C.ink]];
@@ -154,7 +159,8 @@ const TOUR = (() => {
         txt(f2, 640, 606, '운전 실력을 평가하는 것이 아니라, 두 화면 안내를 비교하는 실험입니다.', 't-row', {'text-anchor':'middle'});
         return t => { pop(head, t, .1); cards.forEach((q, i) => pop(q, t, .7 + i*.8, 22)); pop(f1, t, 6.4); pop(f2, t, 7.8); };
     }},
-    { id:'ready', name:'준비', dur:Infinity, hold:true, build(g){
+    { id:'ready', name:'준비', dur:Infinity, hold:true, image:'assets/video/intro_bg.webp', build(g){
+        svg('rect', {x:0, y:0, width:1280, height:720, fill:'#0b0e12', opacity:.6}, g);
         const a = svg('g', {}, g), b = svg('g', {}, g), c = svg('g', {}, g), d = svg('g', {}, g);
         txt(a, 640, 250, '준비되면 시작하세요', 't-hero', {'text-anchor':'middle'});
         txt(b, 640, 310, '첫 주행에는 키 안내가 화면 아래에 계속 보입니다', 't-lead', {'text-anchor':'middle'});
@@ -165,16 +171,27 @@ const TOUR = (() => {
     }}
   ];
 
-  /* ---------- 진행 ---------- */
-  let root = null, stage = null, bar = null, btnPrev = null, btnNext = null, layers = [], st = {i:0, t:0, on:false, last:0, raf:0, done:null};
-  const api = {active:id => st.on && scenes[st.i].id === id, t:() => st.t, next:() => go(st.i + 1)};
+  /* ---------- 진행 ----------
+     무대 = 영상 · 그림 층(#tour .tour-media) 위에 SVG 자막 층. 영상이 있는 장면은 영상의 시각(currentTime)이 곧 장면 시각 t — 자막 · 속도 숫자가 영상과 어긋나지 않는다.
+     영상 · 그림을 못 불러온 장면은 시계로 가고 SVG 그림(.ill)이 대신 보인다 */
+  let root = null, stage = null, media = null, bar = null, btnPrev = null, btnNext = null, layers = [], st = {i:0, t:0, on:false, last:0, raf:0, done:null};
+  const api = {active:id => st.on && scenes[st.i].id === id, t:() => st.t, next:() => go(st.i + 1), lit:on => { const s = scenes[st.i]; if(s.litEls) s.litEls.forEach((e, k) => e.style.opacity = on[k] ? 1 : 0); }};
   function mount(){
     if(root) return;
     root = document.createElement('div'); root.id = 'tour'; root.hidden = true; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', '주행 테스트 안내');
-    root.innerHTML = '<div class="tour-stage"></div><div class="tour-bar"><div class="tour-steps"></div><div class="tour-actions"><button class="tour-btn" id="tourPrev">이전</button><button class="tour-btn primary" id="tourNext">다음</button></div></div>';
+    root.innerHTML = '<div class="tour-stage"><div class="tour-frame"><div class="tour-media"></div></div></div><div class="tour-bar"><div class="tour-steps"></div><div class="tour-actions"><button class="tour-btn" id="tourPrev">이전</button><button class="tour-btn primary" id="tourNext">다음</button></div></div>';
     document.body.appendChild(root);
-    stage = svg('svg', {viewBox:'0 0 1280 720', 'aria-hidden':'true'}, root.querySelector('.tour-stage'));
-    layers = scenes.map(s => { const g = svg('g', {opacity:0}, stage); s.draw = s.build(g, api); return g; });
+    media = root.querySelector('.tour-media');
+    stage = svg('svg', {viewBox:'0 0 1280 720', 'aria-hidden':'true'}, root.querySelector('.tour-frame'));
+    const defs = svg('defs', {}, stage), sh = svg('radialGradient', {id:'tourShade', cx:.5, cy:.46, r:.62}, defs);   // 시작 장면: 글자 뒤만 어둡게
+    svg('stop', {offset:0, 'stop-color':'#05070a', 'stop-opacity':.78}, sh); svg('stop', {offset:1, 'stop-color':'#05070a', 'stop-opacity':.12}, sh);
+    scenes.forEach(s => {   // 영상 · 그림 층
+      s.ok = false;
+      if(s.video){ const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = s.video; v.addEventListener('loadeddata', () => { s.ok = true; paint(); }); v.addEventListener('error', () => { s.ok = false; }); media.appendChild(v); s.el = v; }
+      else if(s.image){ const im = new Image(); im.onload = () => { s.ok = true; paint(); }; im.src = s.image; media.appendChild(im); s.el = im;
+        if(s.lit) s.litEls = s.lit.map(u => { const e = new Image(); e.src = u; e.className = 'tour-lit'; media.appendChild(e); return e; }); }
+    });
+    layers = scenes.map(s => { const g = svg('g', {opacity:0}, stage); s.draw = s.build(g, api); s.g = g; return g; });
     bar = root.querySelector('.tour-steps'); bar.innerHTML = scenes.map((s, i) => `<span class="tour-step" data-i="${i}"><i></i><b>${s.name}</b></span>`).join('');
     btnPrev = root.querySelector('#tourPrev'); btnNext = root.querySelector('#tourNext');
     btnPrev.onclick = () => go(st.i - 1); btnNext.onclick = () => go(st.i + 1);
@@ -182,24 +199,32 @@ const TOUR = (() => {
       else if(/^Arrow|^Key[QE]$/.test(e.code) || e.key === ' '){ e.preventDefault(); e.stopPropagation(); } }, true);   // 방향키 · Q · E는 '눌러 보기' 장면 몫(다른 곳으로 새지 않게)
   }
   function paint(){
-    const s = scenes[st.i]; layers.forEach((g, i) => g.setAttribute('opacity', i === st.i ? 1 : 0)); s.draw(st.t);
+    const s = scenes[st.i]; layers.forEach((g, i) => g.setAttribute('opacity', i === st.i ? 1 : 0));
+    scenes.forEach((q, i) => { if(q.el) q.el.style.opacity = i === st.i && q.ok ? 1 : 0; if(q.litEls && i !== st.i) q.litEls.forEach(e => e.style.opacity = 0); });
+    s.g.classList.toggle('has-media', !!s.ok);   // 영상 · 그림이 있으면 SVG 그림(.ill)은 숨김
+    s.draw(st.t);
     bar.querySelectorAll('.tour-step').forEach((e, i) => { e.classList.toggle('on', i === st.i); e.classList.toggle('done', i < st.i); e.firstChild.style.width = (i < st.i ? 100 : i === st.i ? (s.hold ? 100 : cl(st.t/s.dur)*100) : 0) + '%'; });
     btnPrev.disabled = st.i === 0; btnNext.textContent = st.i === scenes.length - 1 ? '주행 시작' : '다음';
   }
+  function stopVideos(){ scenes.forEach(q => { if(q.video && q.el && !q.el.paused) q.el.pause(); }); }
   function go(i){
     if(i < 0) return; if(i >= scenes.length){ finish(); return; }
-    st.i = i; st.t = 0; const s = scenes[i]; if(s.draw.reset) s.draw.reset(); paint();
+    stopVideos(); st.i = i; st.t = 0; const s = scenes[i]; if(s.draw.reset) s.draw.reset();
+    if(s.video && s.el){ try{ s.el.currentTime = 0; const pr = s.el.play(); if(pr && pr.catch) pr.catch(() => {}); }catch(e){} }
+    paint();
   }
   function frame(now){
-    if(!st.on) return; const dt = Math.min(.1, (now - st.last)/1000); st.last = now; st.t += dt;
-    const s = scenes[st.i]; if(!s.hold && st.t >= s.dur) go(st.i + 1); else paint();
+    if(!st.on) return; const dt = Math.min(.1, (now - st.last)/1000); st.last = now;
+    const s = scenes[st.i], v = s.video && s.ok ? s.el : null;
+    if(v && !v.paused && !v.ended) st.t = v.currentTime; else st.t += dt;        // 영상이 돌고 있으면 영상 시각, 아니면 시계
+    if(!s.hold && (st.t >= s.dur || (v && v.ended))) go(st.i + 1); else paint();
     if(st.on) st.raf = requestAnimationFrame(frame);
   }
-  function finish(){ const f = st.done; st.on = false; st.done = null; cancelAnimationFrame(st.raf); root.hidden = true; if(f) f(); }
+  function finish(){ const f = st.done; st.on = false; st.done = null; cancelAnimationFrame(st.raf); stopVideos(); root.hidden = true; if(f) f(); }
   /* 보여 주기. done: 마지막 장면에서 '주행 시작'을 눌렀을 때 */
   function show(done){ mount(); st.on = true; st.done = done || null; root.hidden = false; go(0); st.last = performance.now(); cancelAnimationFrame(st.raf); st.raf = requestAnimationFrame(frame); btnNext.focus(); }
-  function hide(){ if(!root) return; st.on = false; st.done = null; cancelAnimationFrame(st.raf); root.hidden = true; }
-  // 테스트 · 캡처용: 장면 i를 t초 자리로
-  function seek(i, t){ mount(); st.i = i; st.t = t; const s = scenes[i]; if(s.draw.reset && t === 0) s.draw.reset(); paint(); }
-  return {show, hide, seek, go:i => go(i), scenes, state:() => ({on:st.on, i:st.i, t:st.t, id:scenes[st.i].id})};
+  function hide(){ if(!root) return; st.on = false; st.done = null; cancelAnimationFrame(st.raf); stopVideos(); root.hidden = true; }
+  // 테스트 · 캡처용: 장면 i를 t초 자리로(영상도 그 시각으로 옮기고 멈춤)
+  function seek(i, t){ mount(); stopVideos(); st.i = i; st.t = t; const s = scenes[i]; if(s.draw.reset && t === 0) s.draw.reset(); if(s.video && s.el){ try{ s.el.currentTime = Math.min(t, (s.el.duration || s.dur) - .04); }catch(e){} } paint(); }
+  return {show, hide, seek, preload:mount, go:i => go(i), scenes, state:() => ({on:st.on, i:st.i, t:st.t, id:scenes[st.i].id})};
 })();

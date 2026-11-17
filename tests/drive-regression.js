@@ -7,7 +7,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const SHOTS = process.argv.includes('--shots') ? process.argv[process.argv.indexOf('--shots') + 1] : null;
-const TYPES = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.jpg':'image/jpeg', '.png':'image/png', '.json':'application/json'};
+const TYPES = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.jpg':'image/jpeg', '.png':'image/png', '.json':'application/json', '.webp':'image/webp', '.mp4':'video/mp4', '.glb':'model/gltf-binary'};
 
 function serve(){
   return new Promise(res => {
@@ -356,7 +356,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
           for(let k = 0; k < 120*30 && S.running; k++) update(1/30);
           void st;
         }
-        sessions[pid] = {rows:SES.rows.map(r => ({hud:r.hud, scn:r.scn, seq:r.seq, order:r.order, ver:r.ver, env:r.env, ev:(r.events || []).length, practice:r.practice, lcState:r.lcState})), qs:SES.qs.length, qd:SES.qs.map(q => ({hud:q.hud, rate:q.rate, wait:q.wait, q2:!!q.q2})), prs:SES.prs.length, mode:S.mode, testing:S.testing};
+        sessions[pid] = {rows:SES.rows.map(r => ({hud:r.hud, scn:r.scn, seq:r.seq, order:r.order, ver:r.ver, env:r.env, ev:(r.events || []).length, practice:r.practice, lcState:r.lcState})), qs:SES.qs.length, qd:SES.qs.map(q => ({hud:q.hud, rate:q.rate, wait:q.wait, q2:!!q.q2})), mode:S.mode, testing:S.testing};
       }
       const stored = loadArr(DKEY);
       return {sessions, tours:window.__tours || [], step0:buildSteps('ALT')[0].kind, practiceCard:window.__practiceCard || null, storedN:stored.length, oldKept:stored.some(r => r.p === 'P_OLD'), practiceN:loadArr(PKEY).length, practiceInDrives:stored.some(r => r.practice),
@@ -364,7 +364,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     });
     const p1 = s.sessions.P1, p2 = s.sessions.P2;
     check('세션: 참가자마다 본 주행 6판 기록', p1.rows.length === 6 && p2.rows.length === 6, `P1 ${p1.rows.length} · P2 ${p2.rows.length}`);
-    check('세션(2026-11-17 밤): 맨 앞은 연습 주행이 아니라 안내 모션그래픽 — 참가자마다 한 번 뜨고(0번째 단계), 끝내면 바로 첫 주행. 연습 기록은 안 생김', s.step0 === 'tour' && JSON.stringify(s.tours) === JSON.stringify(['P1:0:start', 'P2:0:start']) && s.practiceN === 0 && !s.practiceInDrives && p1.prs === 0, JSON.stringify({tours:s.tours, practice:s.practiceN}));
+    check('세션(2026-11-17 밤): 맨 앞은 연습 주행이 아니라 안내 모션그래픽 — 참가자마다 한 번 뜨고(0번째 단계), 끝내면 바로 첫 주행. 연습 기록은 안 생김', s.step0 === 'tour' && JSON.stringify(s.tours) === JSON.stringify(['P1:0:start', 'P2:0:start']) && s.practiceN === 0 && !s.practiceInDrives, JSON.stringify({tours:s.tours, practice:s.practiceN}));
     const alt = rows => rows.map(r => r.hud).join(',') === 'nav,ar3,nav,ar3,nav,ar3' && rows.map(r => r.seq).join('') === '123456';
     check('세션(3차, 피그마 3차 검증 계획): 연습 뒤 현대 · 리뉴얼을 판마다 교대(현대 먼저, 번호와 상관없이) · 순서 칸 ALT', alt(p1.rows) && alt(p2.rows) && p1.rows[0].order === 'ALT' && p2.rows[0].order === 'ALT', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
     check('세션: 같은 장면이 연달아 나오지 않음(두 HUD의 같은 장면 사이에 다른 판이 낌)', [p1, p2].every(q => q.rows.every((r, i) => i === 0 || r.scn !== q.rows[i-1].scn)), JSON.stringify(p1.rows.map(r => r.scn)));
@@ -375,21 +375,16 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('세션: 모든 판에 \'옮기기 시작 때 리뉴얼 HUD 상태\'가 남음(1 ~ 6 또는 안 옮김 null) — 현대 HUD 판도', p1.rows.concat(p2.rows).every(r => r.lcState === null || (r.lcState >= 1 && r.lcState <= 6)) && p1.rows.concat(p2.rows).some(r => r.lcState >= 1), JSON.stringify(p1.rows.map(r => r.hud + ':' + r.lcState)));
     check('세션: 예전 기록이 지워지거나 덮이지 않음', s.oldKept && s.storedN === 13, `저장 ${s.storedN}`);
     check('세션 끝: 질문은 여섯 판 뒤에 현대(확신) → 리뉴얼(확신 + 대기 표시 이해) · HUD/테스트 상태 복원', p1.qs === 2 && !p2.testing && p1.qd[0].hud === 'nav' && p1.qd[0].wait === 0 && p1.qd[1].hud === 'ar3' && p1.qd[1].wait === 1 && p1.qd[1].q2 && p1.rows.length === 6, JSON.stringify(p1.qd));
-    check('엑셀: 요약 · 기록 · 질문 · 이벤트 · 연습 · 설명 시트', s.sheets && ['요약','기록','질문','이벤트','연습','설명'].every(n => s.sheets.some(x => x[0] === n)), JSON.stringify(s.sheets));
+    check('엑셀(참가자 한 명): 요약 · 기록 · 질문 · 이벤트 · 설명 시트 — 연습 시트는 없음(연습 주행을 없앰)', s.sheets && ['요약','기록','질문','이벤트','설명'].every(n => s.sheets.some(x => x[0] === n)) && !s.sheets.some(x => x[0] === '연습'), JSON.stringify(s.sheets));
     check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에(연습 여부 · 정체 줄 합류 방식 · 끼어들기 · 깜빡이 3칸 · 화면 맞추기 4칸 · 3차 상태 1칸)', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 13] === '연습 여부' && s.head[s.head.length - 12] === '정체 줄 합류 방식' && s.head[s.head.length - 9] === '그때 닿기까지 (초)' && s.head[s.head.length - 6] === '옮길 차로 뒤차 반응' && s.head[s.head.length - 5] === '화면 1cm당 px' && s.head[s.head.length - 2] === 'HUD 상자 (px)' && s.head[s.head.length - 1] === '옮기기 시작 때 리뉴얼 HUD 상태' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
   }
 
   {
-    // 처음 화면에서 연습만: 기록 분리 · 끝나면 잠금이 풀리고 처음으로 돌아갈 수 있음
-    const r = await E(() => {
-      goHome(); const before = loadArr(DKEY).length, pBefore = loadArr(PKEY).length, mode0 = S.mode;
-      $('#practiceBtn').click(); $('#sesBtn').click();   // 연습 시작
-      clearTimeout(SES.timer); $('#count').hidden = true; D.frozen = false;
-      for(let k = 0; k < 90*30 && S.running; k++) update(1/30);
-      const card = $('#sess').hidden ? '' : $('#sesTitle').textContent, testing = S.testing;   // 2026-11-03: 연습 끝엔 결과 카드 없이 바로 처음으로
-      return {card, testing, screen:$('#app').dataset.screen, drives:loadArr(DKEY).length - before, practices:loadArr(PKEY).length - pBefore, mode:S.mode, mode0};
-    });
-    check('처음 화면 연습: 끝나면 결과 카드 없이 잠금 해제 · 처음으로 · 본 기록 0 · 연습 기록 1 · HUD 되돌림', !r.testing && r.screen === 'home' && r.card === '' && r.drives === 0 && r.practices === 1 && r.mode === r.mode0, JSON.stringify(r));
+    // 처음 화면(2026-11-17 밤 정리): 버튼은 '주행 테스트 시작' · '시연 보기' 둘뿐 — 연습 주행 · 안내 보기 · 키 안내 줄 없음. 예전 연습 기록은 저장소에 그대로
+    const r = await E(() => { goHome(); const c = $('#intro .card'); practices = [{p:'P_OLDPRACTICE', hud:'off', light:'day', map:'ICR', type:'practice', result:'ok', practice:true}]; let book = null;
+      window.XLSX = {utils:{book_new:() => ({s:[]}), aoa_to_sheet:a => ({a}), book_append_sheet:(wb, ws, n) => wb.s.push([n, ws.a])}, writeFile:wb => { book = wb.s; }}; $('#allXlsx').click(); practices = [];
+      return {btns:[...c.querySelectorAll('button')].map(q => q.textContent.trim()), keyrow:!!c.querySelector('.keyrow'), practiceBtn:!!$('#practiceBtn'), tourBtn:!!$('#tourBtn'), fn:typeof practiceCard, allSheets:book && book.map(q => q[0])}; });
+    check('처음 화면: 버튼은 주행 테스트 시작 · 시연 보기 둘뿐(연습 주행 · 안내 보기 · 키 안내 줄 없음), 연습 주행 흐름은 코드에서도 없앰. 예전 연습 기록이 남아 있으면 엑셀 (전체)에만 연습 시트로 나감', JSON.stringify(r.btns) === JSON.stringify(['주행 테스트 시작', '시연 보기']) && !r.keyrow && !r.practiceBtn && !r.tourBtn && r.fn === 'undefined' && r.allSheets && r.allSheets.includes('연습'), JSON.stringify(r));
   }
 
   /* ---------- 8. 일시정지 · 재시작 · HUD 변경 뒤 상태 ---------- */
@@ -410,8 +405,8 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
 
   /* ---------- 7-1. 안내 모션그래픽 (intro.js TOUR, 2026-11-17 밤) ---------- */
   {
-    const t = await E(() => { const o = {}; let done = 0;
-      TOUR.show(() => done++); o.n = TOUR.scenes.length; o.ids = TOUR.scenes.map(q => q.id).join(',');
+    const t = await E(async () => { const o = {}; let done = 0;
+      TOUR.show(() => done++); await new Promise(r => setTimeout(r, 2500));   /* 영상 · 그림이 불러와질 시간 */ o.n = TOUR.scenes.length; o.ids = TOUR.scenes.map(q => q.id).join(',');
       const texts = () => [...document.querySelectorAll('#tour svg > g')].map(g => +g.getAttribute('opacity'));
       // 장면마다 끝 시각으로 옮겨 그려 보고(오류 없이), 보이는 장면은 하나뿐
       o.one = TOUR.scenes.every((q, i) => { TOUR.seek(i, q.hold ? 3 : q.dur - .05); const v = texts(); return v[i] === 1 && v.filter(x => x > 0).length === 1; });
@@ -423,12 +418,16 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       ['ArrowDown', 'KeyQ', 'KeyE'].forEach(press); TOUR.seek(2, 31); TOUR.seek(2, 32.5); o.full = {at:TOUR.state().id};
       // Enter로 다음 · 마지막 장면에서 Enter(= 주행 시작)면 닫히고 done 한 번
       TOUR.go(5); const before = done; dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', bubbles:true, cancelable:true})); o.end = {done:done - before, hidden:document.querySelector('#tour').hidden, on:TOUR.state().on};
+      // 3D 영상 · 그림: 영상 3개 · 그림(눌러 보기 바탕 + 켜진 키 6장 · 기록/준비 바탕)이 실제로 불러와졌고, 그 장면에선 예전 SVG 그림(.ill)이 숨음
+      o.media = {videos:TOUR.scenes.filter(q => q.video).map(q => q.ok && q.el.videoWidth === 1280 && Math.abs(q.el.duration - q.dur) < .2), images:TOUR.scenes.filter(q => q.image).map(q => q.ok && q.el.naturalWidth === 1280), lit:TOUR.scenes[2].litEls.every(e => e.naturalWidth === 1280)};
+      TOUR.show(null); TOUR.seek(1, 4); o.ill = getComputedStyle(document.querySelector('#tour g.has-media .ill') || document.body).display; TOUR.go(2); ['ArrowUp'].forEach(c => dispatchEvent(new KeyboardEvent('keydown', {code:c, bubbles:true, cancelable:true}))); TOUR.seek(2, 1); o.litOn = TOUR.scenes[2].litEls.map(e => +e.style.opacity); TOUR.hide();
       // HUD 표시의 뜻은 알려 주지 않음(대기 · 이동 같은 말 · HUD 색 설명이 없음)
       o.words = /기다려|대기|이동하세요|청록|빨간 점|꺾쇠/.test(document.querySelector('#tour').textContent);
       return o; });
     check('안내 모션그래픽: 장면 6개(시작 · 조작 · 눌러 보기 · 할 일 · 기록 · 준비)가 오류 없이 그려지고 한 번에 한 장면만 보임, 조작 장면의 속도가 50 → 가속 → 브레이크 → 50으로 바뀜', t.n === 6 && t.ids === 'start,keys,try,task,data,ready' && t.one && t.speed[0] === 50 && t.speed[1] > 70 && t.speed[2] < 35 && Math.abs(t.speed[3] - 50) < 6, JSON.stringify({n:t.n, one:t.one, speed:t.speed}));
     check('안내 모션그래픽: 눌러 보기는 여섯 키를 다 눌러야 넘어가고(3개만 누르면 그대로) 운전 입력으로 새지 않음, 마지막 장면에서 Enter면 닫히며 주행으로 넘어감(한 번만)', t.half.n === 3 && t.half.at === 'try' && !t.half.leak && t.full.at === 'task' && t.end.done === 1 && t.end.hidden && !t.end.on, JSON.stringify({half:t.half, full:t.full, end:t.end}));
     check('안내 모션그래픽: HUD 표시의 뜻(기다려 · 이동 · 색)은 알려 주지 않음 — 조작 · 할 일 · 기록 항목만', !t.words, '');
+    check('안내 모션그래픽: Blender 3D 영상 3개(1280 × 720, 길이가 장면 길이와 같음) · 그림이 불러와지고 그 위에 자막이 얹힘(예전 SVG 그림은 숨음), 눌러 보기에서 누른 키(↑)의 켜진 그림만 보임', t.media.videos.length === 3 && t.media.videos.every(Boolean) && t.media.images.every(Boolean) && t.media.lit && t.ill === 'none' && JSON.stringify(t.litOn) === JSON.stringify([0, 0, 1, 0, 0, 0]), JSON.stringify({media:t.media, ill:t.ill, lit:t.litOn}));
   }
 
   /* ---------- 8-1. 화면 구조: HUD 선택은 현대 · 우리 두 개 · 버전 선택 없음 · 리뉴얼 HUD에 설명 글자 없음 ---------- */

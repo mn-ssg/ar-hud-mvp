@@ -60,3 +60,13 @@
 - **모델 Draco 압축**: 직접 만든 모델 4개도 압축해 내보낸다(`blender/*.py`의 내보내기 옵션). `trees.glb` 819 → 171KB · `props.glb` 111 → 29KB · `hud_car.glb` 298 → 37KB · `hud_ped.glb` 57 → 11KB. 읽는 쪽은 모두 `scene.js`의 공용 로더(`GLTF`, DRACOLoader)
 - **저장소에서 뺀 것**: `blender/src/ped_N_rig.glb` 4개(5.2MB, 리깅 원본 — 같은 내용이 `blender/ped_N.blend`에 있음, git 기록 b8b16de) · 안 쓰는 코드(`modelLamps` · `grow3` · `WHEELBASE` · `KEY_ARROW` · `KEY_WORD`)
 - 페이지 로딩 용량은 `tests/perf-after.json`
+
+## 안내 모션그래픽 (2026-11-17 밤) — Blender 3D 렌더
+
+| 파일 | 쓰인 곳 | 만든 법 | 라이선스 |
+|---|---|---|---|
+| `video/intro_a.mp4`(시작 5.5초) · `intro_b.mp4`(조작 14.2초) · `intro_d.mp4`(할 일 14초) — 1280 × 720 · 30fps · 합 2.5MB | `src/app/intro.js` 장면 배경(자막은 페이지가 얹음) | `blender/intro_mg.py`(Blender 5.3 EEVEE, 밤 도로 · 가로등 · 3D 키 · 움직임을 스크립트로) → PNG → `blender/intro_encode.sh`(ffmpeg로 빛 번짐 · H.264) | 장면 · 키 · 도로는 직접 만든 것. 차는 `models/sedan.glb` · `suv.glb`(2026-11-07 Higgsfield Tripo), 가로등은 `blender/props.blend` |
+| `video/intro_keys_0.webp` ~ `_6.webp` | '직접 눌러 보기' — 바탕 + 키가 하나씩 켜진 그림 6장(밝은 쪽만 겹침) | 같은 스크립트의 장면 c | 직접 만든 것 |
+| `video/intro_bg.webp` | 기록 · 준비 장면의 흐린 배경 | 장면 a의 한 프레임을 흐리게 | 위와 같음 |
+
+- 다시 만들기: `for s in a b c d; do Blender -b --python assets/blender/intro_mg.py -- $s <프레임 폴더>; done` 다음 `assets/blender/intro_encode.sh <프레임 폴더>`(약 10분). 글자는 영상에 없으므로 문장만 고칠 때는 `src/app/intro.js`만 고치면 됨
