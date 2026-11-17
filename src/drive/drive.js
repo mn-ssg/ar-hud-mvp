@@ -81,7 +81,7 @@ const mulberry32 = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imu
 
 /* ---------- 상태 ---------- */
 const KEYS = {left:false, right:false, up:false, down:false};
-const D = {x:0, z:0, psi:0, v:SPEED, steer:0, wheel:0, t:0, frozen:false, cars:[], jamLanes:[], cfg:null,
+const D = {x:0, z:0, psi:0, v:SPEED, sw:0, r:0, wheel:0, holdT:0, holdDir:0, brakeT:0, thrT:0, autoSw:null, t:0, frozen:false, cars:[], jamLanes:[], cfg:null,
   blink:0, blinkT0:0, blinkOnAt:null, blinkPhase:false, responder:null, blinkUsed:null, blinkLead:null, blinkResp:''};   // 깜빡이 (D103)
 
 // IDM(지능형 운전자 모델): 원하는 속도 v0 · 앞차와 간격 gap · 속도 차 dv(+ = 내가 빠름) → 가속도. T 차간 시간 · s0 최소 간격
@@ -111,7 +111,7 @@ function leaderOf(x, z, fx, fz, self, meLat, carLat = DRV.carW + .3){
 function driveReset(cfg){
   const m = cfg.map, p0 = path.curve.getPointAt(clamp(path.sStart/path.L));
   D.cruise = cruiseOf(m);
-  Object.assign(D, {x:m.laneX(cfg.lane), z:p0.z, psi:0, v:D.cruise, steer:0, wheel:0, t:0, frozen:false, cfg, ped:0, pedIn:false, sigChecked:false,
+  Object.assign(D, {x:m.laneX(cfg.lane), z:p0.z, psi:0, v:D.cruise, sw:0, r:0, wheel:0, holdT:0, holdDir:0, brakeT:0, thrT:0, autoSw:null, t:0, frozen:false, cfg, ped:0, pedIn:false, sigChecked:false,
     seg:null, hint:-1, segS:0, cands:null, lane:cfg.lane, chosen:[], exitName:'',
     enterZ:null, changeDist:null, risky:0, enc:{}, lastCut:{}, offroad:0, lastTouch:-9, followT:0, crashWith:'', result:null, endT:0,
     safeOn:false, safeSince:0, reactT:null, moved:false, cutAhead:0, cutAheadGap:null, cutAheadTtc:null,   // 앞으로 끼어들기(2026-11-03): 옮길 차로의 뒤차 앞에 들어간 횟수 · 그때 뒤차 간격(m, 최소) · 닿기까지(초, 최소)
@@ -261,25 +261,51 @@ function driveStep(dt){
   if(D.result && D.t >= D.endT){ S.running = false; if(typeof onDriveEnd === 'function') onDriveEnd(); }
 }
 
-// 내 차: ← → 누르는 동안 핸들이 차오르고 떼면 돌아온다(차 방향은 남음). ↑ 가속 · ↓ 브레이크 · 손 떼면 65km/h 순항 + 앞차 따라감(SCC)
+/* ---------- 내 차 (2026-11-17, 값 · 근거 config.js VEH) ----------
+   ← →: 핸들 각도 D.sw(°)가 사람이 돌리는 속도 안에서 점점 커지고, 떼면 가운데로 돌아온다 → 기어비로 앞바퀴 각 D.wheel(rad) → 자전거 모델(언더스티어 포함)로 요 속도 D.r → 방향 · 위치.
+   ↑ 가속(속도에 따른 가속 곡선) · ↓ 브레이크(누르고 있을수록 세게) · 손 떼면 순항 속도(SCC처럼 앞차를 따라감, 예전 그대로) — 순항보다 빠르면 타력으로 천천히 줄어듦.
+   키 배치 · 입력 방식은 그대로. 자동 운전(tests)은 D.autoSw에 핸들 각도(°)를 넣는다 */
+const tabAt = (tab, x) => { for(let i = 1; i < tab.length; i++) if(x <= tab[i][0]){ const [x0, y0] = tab[i-1], [x1, y1] = tab[i]; return y0 + (y1 - y0)*clamp((x - x0)/(x1 - x0)); } return tab[tab.length-1][1]; };
+// 곡률 k(1/m, + = 오른쪽)로 돌려면 필요한 핸들 각도(°): 앞바퀴 각 = atan(L·k) + K·v²·k(언더스티어), 옆 가속은 ay까지만
+function swForCurv(k, v, ay = DRV.latMax){
+  const kk = clamp(k, -ay/Math.max(v*v, .01), ay/Math.max(v*v, .01));
+  return clamp((Math.atan(VEH.L*kk) + VEH.K*v*v*kk)*180/Math.PI*VEH.ratio, -VEH.lock, VEH.lock);
+}
+// 그 속도에서 키를 계속 누르면 닿는 핸들 각도(°): 보통 쓰는 옆 가속(VEH.ayHold)에 해당하는 각도, 저속은 핸들 끝
+const swHoldOf = v => swForCurv(Infinity, v, tabAt(VEH.ayHold, v));
+const swReturnTau = v => VEH.returnTau/clamp(v/VEH.returnSlowV, .08, 1);
+const brakeOf = t => { const B = VEH.brake; return t < B.firstT ? B.first*t/B.firstT : B.first + (B.max - B.first)*clamp((t - B.firstT)/(B.fullT - B.firstT)); };
 function stepPlayer(dt){
-  const want = (KEYS.right ? 1 : 0) - (KEYS.left ? 1 : 0), rate = want === 0 || D.steer*want < 0 ? DRV.steerBack : DRV.steerUp;
-  D.steer += clamp(want - D.steer, -rate*dt, rate*dt);
+  const V = VEH, v0 = D.v, want = (KEYS.right ? 1 : 0) - (KEYS.left ? 1 : 0);
+  // 1) 핸들 각도
+  if(D.autoSw !== null && D.autoSw !== undefined){ D.sw = clamp(D.autoSw, -V.lock, V.lock); D.autoSw = null; D.holdT = 0; D.holdDir = 0; }
+  else if(want){
+    D.holdT = D.holdDir === want ? D.holdT + dt : 0; D.holdDir = want;
+    const hold = swHoldOf(v0), rate = Math.min(V.swRate, hold/V.tFull)*(V.rampLo + (1 - V.rampLo)*clamp(D.holdT/V.rampT));
+    const back = D.sw*want < 0 ? Math.abs(D.sw)/swReturnTau(v0) : 0;   // 반대쪽으로 돌아가 있으면 복원되는 속도가 더해짐
+    D.sw += clamp(want*hold - D.sw, -(rate + back)*dt, (rate + back)*dt);
+  } else { D.holdT = 0; D.holdDir = 0; D.sw -= D.sw*Math.min(1, dt/swReturnTau(v0)); if(Math.abs(D.sw) < .02) D.sw = 0; }
+  D.wheel = D.sw/V.ratio*Math.PI/180;
+  // 2) 속도
   const fx = Math.sin(D.psi), fz = -Math.cos(D.psi);
   let a;
-  if(KEYS.down) a = -DRV.brake;
-  else if(KEYS.up) a = DRV.acc;
+  if(KEYS.down){ D.brakeT += dt; D.thrT = 0; a = -brakeOf(D.brakeT); }
   else {
-    a = D.v > D.cruise + .3 ? -DRV.coastDown : idm(D.v, D.cruise, Infinity, 0, DRV.coastUp);
-    const ld = leaderOf(D.x, D.z, fx, fz, null, 0, DRV.carW + Math.min(.55, D.v*.03));
-    if(ld.gap < Infinity) a = Math.min(a, idm(D.v, D.cruise, ld.gap, D.v - ld.v, DRV.coastUp));
-    a = Math.max(a, -HARD.accDec);   // SCC는 급정거를 못 함 — 앞차가 급히 서면 직접 ↓
+    D.brakeT = 0;
+    if(KEYS.up){ D.thrT += dt; a = tabAt(V.accel, v0)*clamp(D.thrT/V.throttleT); }
+    else {
+      D.thrT = 0;
+      a = v0 > D.cruise + .3 ? -(V.coast[0] + V.coast[1]*v0) : idm(v0, D.cruise, Infinity, 0, DRV.coastUp);
+      const ld = leaderOf(D.x, D.z, fx, fz, null, 0, DRV.carW + Math.min(.55, v0*.03));
+      if(ld.gap < Infinity) a = Math.min(a, idm(v0, D.cruise, ld.gap, v0 - ld.v, DRV.coastUp));
+      a = Math.max(a, -HARD.accDec);   // SCC는 급정거를 못 함 — 앞차가 급히 서면 직접 ↓
+    }
   }
-  D.v = clamp(D.v + a*dt, 0, DRV.vMax);
-  // 앞바퀴 각: 빠를수록 옆 가속 한도(latMax) 때문에 덜 꺾인다
-  const v = D.v, dMax = Math.min(DRV.wheelMax, Math.atan(DRV.latMax*WHEELBASE/Math.max(v*v, .01)));
-  D.wheel = D.steer*dMax;
-  D.psi += v/WHEELBASE*Math.tan(D.wheel)*dt;
+  D.v = clamp(v0 + a*dt, 0, DRV.vMax);
+  // 3) 자전거 모델: 요 속도 = v·tan(앞바퀴 각) ÷ (L + K·v²) — 빠를수록 같은 각도에 덜 꺾임. 타이어 한계(grip)를 넘지 않고, 차는 yawTau만큼 늦게 따라 돈다
+  const v = D.v, lim = V.grip/Math.max(v, .5), rT = clamp(v*Math.tan(D.wheel)/(V.L + V.K*v*v), -lim, lim);
+  D.r += (rT - D.r)*Math.min(1, dt/V.yawTau);
+  D.psi += D.r*dt;
   D.x += Math.sin(D.psi)*v*dt; D.z -= Math.cos(D.psi)*v*dt;
 }
 

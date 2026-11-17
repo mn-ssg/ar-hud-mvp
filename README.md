@@ -41,6 +41,7 @@ tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
   drive-regression.js 브라우저 자동 운전 회귀 116항목  node drive-regression.js (Chrome 필요)
   capture-states.js   리뉴얼 HUD 3차 상태 6가지 캡처(주간 · 야간, 현대 HUD 줄 포함) + 대비 측정   node capture-states.js <폴더>
+  handling-check.js   조작감 점검 — 새 조작 모델을 키 입력으로 돌려 차로 변경 시간 · 우회전 핸들 각도 · 가속 · 제동을 실제 값과 견줌(결과 handling-check.json)
   autodrive-batch.js  자동 운전 묶음(현대 · 리뉴얼 같은 시나리오의 기록 값이 같은지, 3차 상태 통계)
   demo-audit.js       시연 · 주행 교통 겹침 · 이상 움직임 점검 (ONLY=CRT 처럼 맵 하나만)
   cutin-batch.js      '앞질러 끼어들기' 막기 방법 비교(가속 끼어들기 vs HUD 따라가기 자동 운전)
@@ -52,7 +53,7 @@ tests/
 
 - 열기: `index.html`을 정적 서버로 연다 (파일로 직접 열면 재질 이미지가 막힐 수 있음). 예: `python3 -m http.server` 뒤 `http://localhost:8000/`
 - 테스트: `cd tests && npm i && npm test`
-- 조작: ← → 핸들 · ↑ 가속 · ↓ 브레이크 · Q E 깜빡이(차로 변경이 끝나면 자동으로 꺼짐).
+- 조작: ← → 핸들 · ↑ 가속 · ↓ 브레이크 · Q E 깜빡이(차로 변경이 끝나면 자동으로 꺼짐). 차 움직임은 아반떼(CN7) 제원 · 실측 기준(`config.js VEH`): 키를 누르고 있는 동안 핸들이 점점 돌아가고(빠를수록 덜), 떼면 가운데로 돌아옴. ↓는 누르고 있을수록 세게.
 - 느린 기기: 화소 배율이 최대 1.5이고, 프레임이 자주 25ms를 넘으면 1.25 → 1로 내려가며 룸미러는 두 프레임에 한 번 갱신된다(`scene.js PERF`). 캡처처럼 선명하게 고정하려면 `?dpr=2`
 - WebGL 컨텍스트가 끊기면(사파리가 오래 둔 탭에서 거둬 감) 안내를 띄우고 복구, 4초 안에 안 되면 새로고침한다(`scene.js`)
 

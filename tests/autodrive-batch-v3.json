@@ -14,24 +14,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 28.6,
+  "secs": 28.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "2→3@15.28(go)",
-  "cut": "3@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "2→3@15.5(go)",
+  "cut": "3@15.5"
  },
  {
   "hud": "ar3",
@@ -48,24 +48,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 28.6,
+  "secs": 28.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "2→3@15.28(go)",
-  "cut": "3@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "2→3@15.5(go)",
+  "cut": "3@15.5"
  },
  {
   "hud": "nav",
@@ -82,24 +82,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 28.6,
+  "secs": 28.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "2→3@15.28(go)",
-  "cut": "3@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "2→3@15.5(go)",
+  "cut": "3@15.5"
  },
  {
   "hud": "ar3",
@@ -116,24 +116,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 28.6,
+  "secs": 28.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "2→3@15.28(go)",
-  "cut": "3@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "2→3@15.5(go)",
+  "cut": "3@15.5"
  },
  {
   "hud": "nav",
@@ -148,26 +148,26 @@
   "result": "ok",
   "exit": "용인·기흥",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
   "secs": 29.1,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "ar3",
@@ -182,26 +182,26 @@
   "result": "ok",
   "exit": "용인·기흥",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
   "secs": 29.1,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "nav",
@@ -216,26 +216,26 @@
   "result": "ok",
   "exit": "용인·기흥",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
   "secs": 29.1,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "ar3",
@@ -250,26 +250,26 @@
   "result": "ok",
   "exit": "용인·기흥",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
   "secs": 29.1,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "nav",
@@ -284,9 +284,9 @@
   "result": "ok",
   "exit": "용인·기흥",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -302,8 +302,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "ar3",
@@ -318,9 +318,9 @@
   "result": "ok",
   "exit": "용인·기흥",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -336,8 +336,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "nav",
@@ -352,9 +352,9 @@
   "result": "ok",
   "exit": "용인·기흥",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -370,8 +370,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "ar3",
@@ -386,9 +386,9 @@
   "result": "ok",
   "exit": "용인·기흥",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -404,8 +404,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "nav",
@@ -422,24 +422,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 28.6,
+  "secs": 28.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "3→2@15.28(go)",
-  "cut": "2@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "3→2@15.5(go)",
+  "cut": "2@15.5"
  },
  {
   "hud": "ar3",
@@ -456,24 +456,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 28.6,
+  "secs": 28.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "3→2@15.28(go)",
-  "cut": "2@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "3→2@15.5(go)",
+  "cut": "2@15.5"
  },
  {
   "hud": "nav",
@@ -490,24 +490,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 28.6,
+  "secs": 28.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "3→2@15.28(go)",
-  "cut": "2@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "3→2@15.5(go)",
+  "cut": "2@15.5"
  },
  {
   "hud": "ar3",
@@ -524,24 +524,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 28.6,
+  "secs": 28.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "3→2@15.28(go)",
-  "cut": "2@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "3→2@15.5(go)",
+  "cut": "2@15.5"
  },
  {
   "hud": "nav",
@@ -556,26 +556,26 @@
   "result": "ok",
   "exit": "의정부·구리",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 29.1,
+  "secs": 29.2,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "ar3",
@@ -590,26 +590,26 @@
   "result": "ok",
   "exit": "의정부·구리",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 29.1,
+  "secs": 29.2,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "nav",
@@ -624,26 +624,26 @@
   "result": "ok",
   "exit": "의정부·구리",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 29.1,
+  "secs": 29.2,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "ar3",
@@ -658,26 +658,26 @@
   "result": "ok",
   "exit": "의정부·구리",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 29.1,
+  "secs": 29.2,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "nav",
@@ -692,9 +692,9 @@
   "result": "ok",
   "exit": "의정부·구리",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -710,8 +710,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "ar3",
@@ -726,9 +726,9 @@
   "result": "ok",
   "exit": "의정부·구리",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -744,8 +744,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "nav",
@@ -760,9 +760,9 @@
   "result": "ok",
   "exit": "의정부·구리",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -778,8 +778,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "ar3",
@@ -794,9 +794,9 @@
   "result": "ok",
   "exit": "의정부·구리",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -812,8 +812,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "nav",
@@ -830,24 +830,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 39.2,
+  "secs": 39.4,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "2→3@15.28(go)",
-  "cut": "3@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "2→3@15.5(go)",
+  "cut": "3@15.5"
  },
  {
   "hud": "ar3",
@@ -864,24 +864,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 39.2,
+  "secs": 39.4,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "2→3@15.28(go)",
-  "cut": "3@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "2→3@15.5(go)",
+  "cut": "3@15.5"
  },
  {
   "hud": "nav",
@@ -898,24 +898,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 39.2,
+  "secs": 39.4,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "2→3@15.28(go)",
-  "cut": "3@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "2→3@15.5(go)",
+  "cut": "3@15.5"
  },
  {
   "hud": "ar3",
@@ -932,24 +932,24 @@
   "crash": "",
   "change": 54,
   "margin": 29,
-  "react": 5.03,
+  "react": 5.25,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 39.2,
+  "secs": 39.4,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@9.52 5@12.07 1@17",
+  "h3": "3@0 6@9.52 5@12.2 1@17.07",
   "front": {
    "n": 1,
-   "secs": 2.55
+   "secs": 2.68
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@10.3 go@11.1 none@16.47",
-  "lc": "2→3@15.28(go)",
-  "cut": "3@15.28"
+  "gates": "wait@0 clearing@10.3 go@11.1 none@16.55",
+  "lc": "2→3@15.5(go)",
+  "cut": "3@15.5"
  },
  {
   "hud": "nav",
@@ -964,26 +964,26 @@
   "result": "ok",
   "exit": "청주·세종",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 39.4,
+  "secs": 39.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "ar3",
@@ -998,26 +998,26 @@
   "result": "ok",
   "exit": "청주·세종",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 39.4,
+  "secs": 39.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "nav",
@@ -1032,26 +1032,26 @@
   "result": "ok",
   "exit": "청주·세종",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 39.4,
+  "secs": 39.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "ar3",
@@ -1066,26 +1066,26 @@
   "result": "ok",
   "exit": "청주·세종",
   "crash": "",
-  "change": 108,
-  "margin": 83,
-  "react": 3.7,
+  "change": 109,
+  "margin": 84,
+  "react": 3.73,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 39.4,
+  "secs": 39.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@6.1 3@8.62 4@9.5 5@10.3 1@14.57",
+  "h3": "3@0 6@6.1 3@8.52 4@9.52 5@10.32 1@14.5",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@9.5 go@10.3 none@14.1",
-  "lc": "2→3@13.17(go)",
-  "cut": "3@13.17"
+  "gates": "wait@0 clearing@9.52 go@10.32 none@14.05",
+  "lc": "2→3@13.22(go)",
+  "cut": "3@13.22"
  },
  {
   "hud": "nav",
@@ -1100,9 +1100,9 @@
   "result": "ok",
   "exit": "청주·세종",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -1118,8 +1118,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "ar3",
@@ -1134,9 +1134,9 @@
   "result": "ok",
   "exit": "청주·세종",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -1152,8 +1152,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "nav",
@@ -1168,9 +1168,9 @@
   "result": "ok",
   "exit": "청주·세종",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -1186,8 +1186,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "ar3",
@@ -1202,9 +1202,9 @@
   "result": "ok",
   "exit": "청주·세종",
   "crash": "",
-  "change": 2,
-  "margin": -23,
-  "react": 0.9,
+  "change": 1,
+  "margin": -24,
+  "react": 1,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
@@ -1220,8 +1220,8 @@
   "waitMoves": 0,
   "lcState": 1,
   "gates": "wait@0 none@12.73",
-  "lc": "2→3@13.48(none)",
-  "cut": "3@13.48"
+  "lc": "2→3@13.58(none)",
+  "cut": "3@13.58"
  },
  {
   "hud": "nav",
@@ -1245,15 +1245,15 @@
   "secs": 29.7,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.5 5@12.52 3@17.13 4@20.53 3@20.7 1@21.53",
+  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.48 5@12.52 3@17.13 4@20.63 3@20.7 1@21.6",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -1279,15 +1279,15 @@
   "secs": 29.7,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.5 5@12.52 3@17.13 4@20.53 3@20.7 1@21.53",
+  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.48 5@12.52 3@17.13 4@20.63 3@20.7 1@21.6",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -1313,15 +1313,15 @@
   "secs": 29.7,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.5 5@12.52 3@17.13 4@20.53 3@20.7 1@21.53",
+  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.48 5@12.52 3@17.13 4@20.63 3@20.7 1@21.6",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -1347,15 +1347,15 @@
   "secs": 29.7,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.5 5@12.52 3@17.13 4@20.53 3@20.7 1@21.53",
+  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.48 5@12.52 3@17.13 4@20.63 3@20.7 1@21.6",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -1381,15 +1381,15 @@
   "secs": 30.4,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.05 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.17",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -1415,15 +1415,15 @@
   "secs": 30.4,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.05 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.17",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -1449,15 +1449,15 @@
   "secs": 30.4,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.05 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.17",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -1483,15 +1483,15 @@
   "secs": 30.4,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.05 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.17",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -1505,16 +1505,16 @@
   "rearN": 0,
   "brake": false,
   "lane": 2,
-  "result": "ok",
-  "exit": "용인·기흥",
-  "crash": "",
+  "result": "crash",
+  "exit": "",
+  "crash": "정체 줄 차 · 앞을 받음",
   "change": null,
   "margin": null,
   "react": null,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 26,
+  "secs": 15.5,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.37 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -1539,16 +1539,16 @@
   "rearN": 0,
   "brake": false,
   "lane": 2,
-  "result": "ok",
-  "exit": "용인·기흥",
-  "crash": "",
+  "result": "crash",
+  "exit": "",
+  "crash": "정체 줄 차 · 앞을 받음",
   "change": null,
   "margin": null,
   "react": null,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 26,
+  "secs": 15.5,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.37 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -1573,16 +1573,16 @@
   "rearN": 0,
   "brake": false,
   "lane": 2,
-  "result": "ok",
-  "exit": "용인·기흥",
-  "crash": "",
+  "result": "crash",
+  "exit": "",
+  "crash": "정체 줄 차 · 앞을 받음",
   "change": null,
   "margin": null,
   "react": null,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 26,
+  "secs": 15.5,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.37 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -1607,16 +1607,16 @@
   "rearN": 0,
   "brake": false,
   "lane": 2,
-  "result": "ok",
-  "exit": "용인·기흥",
-  "crash": "",
+  "result": "crash",
+  "exit": "",
+  "crash": "정체 줄 차 · 앞을 받음",
   "change": null,
   "margin": null,
   "react": null,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 26,
+  "secs": 15.5,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.37 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -1653,15 +1653,15 @@
   "secs": 29.8,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 2@8 5@8.92 3@8.93 4@9.4 6@9.52 3@12.5 4@13.2 5@14 3@16.47 4@20.57 3@21.3 1@21.53",
+  "h3": "3@0 2@8 5@8.92 3@8.93 4@9.4 6@9.52 3@12.48 4@13.2 5@14 3@16.47 4@20.67 3@21.3 1@21.6",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -1687,15 +1687,15 @@
   "secs": 29.8,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 2@8 5@8.92 3@8.93 4@9.4 6@9.52 3@12.5 4@13.2 5@14 3@16.47 4@20.57 3@21.3 1@21.53",
+  "h3": "3@0 2@8 5@8.92 3@8.93 4@9.4 6@9.52 3@12.48 4@13.2 5@14 3@16.47 4@20.67 3@21.3 1@21.6",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -1721,15 +1721,15 @@
   "secs": 29.8,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 2@8 5@8.92 3@8.93 4@9.4 6@9.52 3@12.5 4@13.2 5@14 3@16.47 4@20.57 3@21.3 1@21.53",
+  "h3": "3@0 2@8 5@8.92 3@8.93 4@9.4 6@9.52 3@12.48 4@13.2 5@14 3@16.47 4@20.67 3@21.3 1@21.6",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -1755,15 +1755,15 @@
   "secs": 29.8,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 2@8 5@8.92 3@8.93 4@9.4 6@9.52 3@12.5 4@13.2 5@14 3@16.47 4@20.57 3@21.3 1@21.53",
+  "h3": "3@0 2@8 5@8.92 3@8.93 4@9.4 6@9.52 3@12.48 4@13.2 5@14 3@16.47 4@20.67 3@21.3 1@21.6",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -1789,15 +1789,15 @@
   "secs": 30.5,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.05 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.17",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -1823,15 +1823,15 @@
   "secs": 30.5,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.05 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.17",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -1857,15 +1857,15 @@
   "secs": 30.5,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.05 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.17",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -1891,15 +1891,15 @@
   "secs": 30.5,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.05 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.62 5@13.42 3@14.45 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.17",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -1913,16 +1913,16 @@
   "rearN": 0,
   "brake": false,
   "lane": 2,
-  "result": "ok",
-  "exit": "의정부·구리",
-  "crash": "",
+  "result": "crash",
+  "exit": "",
+  "crash": "정체 줄 차 · 앞을 받음",
   "change": null,
   "margin": null,
   "react": null,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 26.1,
+  "secs": 15.5,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.37 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -1947,16 +1947,16 @@
   "rearN": 0,
   "brake": false,
   "lane": 2,
-  "result": "ok",
-  "exit": "의정부·구리",
-  "crash": "",
+  "result": "crash",
+  "exit": "",
+  "crash": "정체 줄 차 · 앞을 받음",
   "change": null,
   "margin": null,
   "react": null,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 26.1,
+  "secs": 15.5,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.37 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -1981,16 +1981,16 @@
   "rearN": 0,
   "brake": false,
   "lane": 2,
-  "result": "ok",
-  "exit": "의정부·구리",
-  "crash": "",
+  "result": "crash",
+  "exit": "",
+  "crash": "정체 줄 차 · 앞을 받음",
   "change": null,
   "margin": null,
   "react": null,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 26.1,
+  "secs": 15.5,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.37 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -2015,16 +2015,16 @@
   "rearN": 0,
   "brake": false,
   "lane": 2,
-  "result": "ok",
-  "exit": "의정부·구리",
-  "crash": "",
+  "result": "crash",
+  "exit": "",
+  "crash": "정체 줄 차 · 앞을 받음",
   "change": null,
   "margin": null,
   "react": null,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 26.1,
+  "secs": 15.5,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.37 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -2061,15 +2061,15 @@
   "secs": 41.7,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.5 5@12.52 3@17.13 4@20.55 3@20.7 1@21.53",
+  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.48 5@12.52 3@17.13 4@20.65 3@20.7 1@21.62",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -2095,15 +2095,15 @@
   "secs": 41.7,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.5 5@12.52 3@17.13 4@20.55 3@20.7 1@21.53",
+  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.48 5@12.52 3@17.13 4@20.65 3@20.7 1@21.62",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -2129,15 +2129,15 @@
   "secs": 41.7,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.5 5@12.52 3@17.13 4@20.55 3@20.7 1@21.53",
+  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.48 5@12.52 3@17.13 4@20.65 3@20.7 1@21.62",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -2163,15 +2163,15 @@
   "secs": 41.7,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.5 5@12.52 3@17.13 4@20.55 3@20.7 1@21.53",
+  "h3": "3@0 4@8.07 2@8.87 5@8.9 3@9.03 6@9.52 4@12.48 5@12.52 3@17.13 4@20.65 3@20.7 1@21.62",
   "front": {
    "n": 1,
-   "secs": 2.98
+   "secs": 2.96
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@21.53",
+  "gates": "wait@0 none@21.62",
   "lc": "",
   "cut": ""
  },
@@ -2194,18 +2194,18 @@
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 42.4,
+  "secs": 42.3,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.03 4@12.63 5@13.43 3@14.43 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.63 5@13.43 3@14.43 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.18",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -2228,18 +2228,18 @@
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 42.4,
+  "secs": 42.3,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.03 4@12.63 5@13.43 3@14.43 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.63 5@13.43 3@14.43 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.18",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -2262,18 +2262,18 @@
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 42.4,
+  "secs": 42.3,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.03 4@12.63 5@13.43 3@14.43 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.63 5@13.43 3@14.43 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.18",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -2296,18 +2296,18 @@
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 42.4,
+  "secs": 42.3,
   "moved": false,
   "safeOn": false,
-  "h3": "3@0 6@6.1 3@8.62 2@8.75 3@9.03 4@12.63 5@13.43 3@14.43 4@18.1 5@18.92 3@22.37 4@22.8 1@23.17",
+  "h3": "3@0 6@6.1 3@8.52 2@8.75 3@9.07 4@12.63 5@13.43 3@14.43 4@18.1 5@18.92 3@22.43 4@22.8 1@23.23",
   "front": {
    "n": 1,
-   "secs": 2.52
+   "secs": 2.42
   },
   "lcHs": "",
   "waitMoves": 0,
   "lcState": null,
-  "gates": "wait@0 none@23.18",
+  "gates": "wait@0 none@23.23",
   "lc": "",
   "cut": ""
  },
@@ -2330,7 +2330,7 @@
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 15.8,
+  "secs": 15.4,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.38 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -2364,7 +2364,7 @@
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 15.8,
+  "secs": 15.4,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.38 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -2398,7 +2398,7 @@
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 15.8,
+  "secs": 15.4,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.38 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -2432,7 +2432,7 @@
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 15.8,
+  "secs": 15.4,
   "moved": false,
   "safeOn": false,
   "h3": "3@0 2@7.88 5@8.38 3@8.75 4@10.8 3@11.28 4@12.18 1@12.73",
@@ -2462,14 +2462,14 @@
   "crash": "",
   "change": null,
   "margin": null,
-  "react": 0.75,
+  "react": 0.87,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 16.8,
+  "secs": 16.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@1.12 4@10.27 5@11.07 3@11.17 1@11.37",
+  "h3": "3@1.22 4@10.27 5@11.07 3@11.17 1@11.32",
   "front": {
    "n": 0,
    "secs": 0
@@ -2477,9 +2477,9 @@
   "lcHs": "1",
   "waitMoves": 0,
   "lcState": 1,
-  "gates": "go@0 wait@1.12 none@10.35",
-  "lc": "4→3@0.77(go)",
-  "cut": "3@0.77"
+  "gates": "go@0 wait@1.22 none@10.38",
+  "lc": "4→3@0.88(go)",
+  "cut": "3@0.88"
  },
  {
   "hud": "ar3",
@@ -2496,14 +2496,14 @@
   "crash": "",
   "change": null,
   "margin": null,
-  "react": 0.75,
+  "react": 0.87,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 16.8,
+  "secs": 16.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@1.12 4@10.27 5@11.07 3@11.17 1@11.37",
+  "h3": "3@1.22 4@10.27 5@11.07 3@11.17 1@11.32",
   "front": {
    "n": 0,
    "secs": 0
@@ -2511,9 +2511,9 @@
   "lcHs": "1",
   "waitMoves": 0,
   "lcState": 1,
-  "gates": "go@0 wait@1.12 none@10.35",
-  "lc": "4→3@0.77(go)",
-  "cut": "3@0.77"
+  "gates": "go@0 wait@1.22 none@10.38",
+  "lc": "4→3@0.88(go)",
+  "cut": "3@0.88"
  },
  {
   "hud": "nav",
@@ -2530,14 +2530,14 @@
   "crash": "",
   "change": null,
   "margin": null,
-  "react": 0.75,
+  "react": 0.87,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 16.8,
+  "secs": 16.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@1.12 4@10.27 5@11.07 3@11.17 1@11.37",
+  "h3": "3@1.22 4@10.27 5@11.07 3@11.17 1@11.32",
   "front": {
    "n": 0,
    "secs": 0
@@ -2545,9 +2545,9 @@
   "lcHs": "1",
   "waitMoves": 0,
   "lcState": 1,
-  "gates": "go@0 wait@1.12 none@10.35",
-  "lc": "4→3@0.77(go)",
-  "cut": "3@0.77"
+  "gates": "go@0 wait@1.22 none@10.38",
+  "lc": "4→3@0.88(go)",
+  "cut": "3@0.88"
  },
  {
   "hud": "ar3",
@@ -2564,14 +2564,14 @@
   "crash": "",
   "change": null,
   "margin": null,
-  "react": 0.75,
+  "react": 0.87,
   "risky": 0,
   "offroad": 0,
   "ped": 0,
-  "secs": 16.8,
+  "secs": 16.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@1.12 4@10.27 5@11.07 3@11.17 1@11.37",
+  "h3": "3@1.22 4@10.27 5@11.07 3@11.17 1@11.32",
   "front": {
    "n": 0,
    "secs": 0
@@ -2579,9 +2579,9 @@
   "lcHs": "1",
   "waitMoves": 0,
   "lcState": 1,
-  "gates": "go@0 wait@1.12 none@10.35",
-  "lc": "4→3@0.77(go)",
-  "cut": "3@0.77"
+  "gates": "go@0 wait@1.22 none@10.38",
+  "lc": "4→3@0.88(go)",
+  "cut": "3@0.88"
  },
  {
   "hud": "nav",
@@ -2598,24 +2598,24 @@
   "crash": "",
   "change": 77,
   "margin": 42,
-  "react": 3.77,
+  "react": 3.9,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 44.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@5.77 3@8.3 4@8.75 5@9.55 1@13.85 6@16.93 1@20.23",
+  "h3": "3@0 6@5.77 3@8.38 4@8.8 5@9.6 1@13.93 6@17.17 1@20.32",
   "front": {
    "n": 2,
-   "secs": 5.83
+   "secs": 5.76
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@8.75 go@9.55 none@13.38",
-  "lc": "3→2@12.47(go)",
-  "cut": "2@12.47"
+  "gates": "wait@0 clearing@8.8 go@9.6 none@13.48",
+  "lc": "3→2@12.63(go)",
+  "cut": "2@12.63"
  },
  {
   "hud": "ar3",
@@ -2632,24 +2632,24 @@
   "crash": "",
   "change": 77,
   "margin": 42,
-  "react": 3.77,
+  "react": 3.9,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 44.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@5.77 3@8.3 4@8.75 5@9.55 1@13.85 6@16.93 1@20.23",
+  "h3": "3@0 6@5.77 3@8.38 4@8.8 5@9.6 1@13.93 6@17.17 1@20.32",
   "front": {
    "n": 2,
-   "secs": 5.83
+   "secs": 5.76
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@8.75 go@9.55 none@13.38",
-  "lc": "3→2@12.47(go)",
-  "cut": "2@12.47"
+  "gates": "wait@0 clearing@8.8 go@9.6 none@13.48",
+  "lc": "3→2@12.63(go)",
+  "cut": "2@12.63"
  },
  {
   "hud": "nav",
@@ -2666,24 +2666,24 @@
   "crash": "",
   "change": 77,
   "margin": 42,
-  "react": 3.77,
+  "react": 3.9,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 44.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@5.77 3@8.3 4@8.75 5@9.55 1@13.85 6@16.93 1@20.23",
+  "h3": "3@0 6@5.77 3@8.38 4@8.8 5@9.6 1@13.93 6@17.17 1@20.32",
   "front": {
    "n": 2,
-   "secs": 5.83
+   "secs": 5.76
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@8.75 go@9.55 none@13.38",
-  "lc": "3→2@12.47(go)",
-  "cut": "2@12.47"
+  "gates": "wait@0 clearing@8.8 go@9.6 none@13.48",
+  "lc": "3→2@12.63(go)",
+  "cut": "2@12.63"
  },
  {
   "hud": "ar3",
@@ -2700,24 +2700,24 @@
   "crash": "",
   "change": 77,
   "margin": 42,
-  "react": 3.77,
+  "react": 3.9,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 44.7,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@5.77 3@8.3 4@8.75 5@9.55 1@13.85 6@16.93 1@20.23",
+  "h3": "3@0 6@5.77 3@8.38 4@8.8 5@9.6 1@13.93 6@17.17 1@20.32",
   "front": {
    "n": 2,
-   "secs": 5.83
+   "secs": 5.76
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@8.75 go@9.55 none@13.38",
-  "lc": "3→2@12.47(go)",
-  "cut": "2@12.47"
+  "gates": "wait@0 clearing@8.8 go@9.6 none@13.48",
+  "lc": "3→2@12.63(go)",
+  "cut": "2@12.63"
  },
  {
   "hud": "nav",
@@ -2734,24 +2734,24 @@
   "crash": "",
   "change": 152,
   "margin": 117,
-  "react": 0.75,
+  "react": 0.85,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 46.4,
   "moved": true,
   "safeOn": true,
-  "h3": "6@8.88 1@13.85",
+  "h3": "6@8.85 1@13.8",
   "front": {
    "n": 1,
-   "secs": 4.97
+   "secs": 4.95
   },
   "lcHs": "1",
   "waitMoves": 0,
   "lcState": 1,
-  "gates": "go@0 none@1.12",
-  "lc": "3→2@0.77(go)",
-  "cut": "2@0.77"
+  "gates": "go@0 none@1.22",
+  "lc": "3→2@0.87(go)",
+  "cut": "2@0.87"
  },
  {
   "hud": "ar3",
@@ -2768,24 +2768,24 @@
   "crash": "",
   "change": 152,
   "margin": 117,
-  "react": 0.75,
+  "react": 0.85,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 46.4,
   "moved": true,
   "safeOn": true,
-  "h3": "6@8.88 1@13.85",
+  "h3": "6@8.85 1@13.8",
   "front": {
    "n": 1,
-   "secs": 4.97
+   "secs": 4.95
   },
   "lcHs": "1",
   "waitMoves": 0,
   "lcState": 1,
-  "gates": "go@0 none@1.12",
-  "lc": "3→2@0.77(go)",
-  "cut": "2@0.77"
+  "gates": "go@0 none@1.22",
+  "lc": "3→2@0.87(go)",
+  "cut": "2@0.87"
  },
  {
   "hud": "nav",
@@ -2802,24 +2802,24 @@
   "crash": "",
   "change": 152,
   "margin": 117,
-  "react": 0.75,
+  "react": 0.85,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 46.4,
   "moved": true,
   "safeOn": true,
-  "h3": "6@8.88 1@13.85",
+  "h3": "6@8.85 1@13.8",
   "front": {
    "n": 1,
-   "secs": 4.97
+   "secs": 4.95
   },
   "lcHs": "1",
   "waitMoves": 0,
   "lcState": 1,
-  "gates": "go@0 none@1.12",
-  "lc": "3→2@0.77(go)",
-  "cut": "2@0.77"
+  "gates": "go@0 none@1.22",
+  "lc": "3→2@0.87(go)",
+  "cut": "2@0.87"
  },
  {
   "hud": "ar3",
@@ -2836,24 +2836,24 @@
   "crash": "",
   "change": 152,
   "margin": 117,
-  "react": 0.75,
+  "react": 0.85,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 46.4,
   "moved": true,
   "safeOn": true,
-  "h3": "6@8.88 1@13.85",
+  "h3": "6@8.85 1@13.8",
   "front": {
    "n": 1,
-   "secs": 4.97
+   "secs": 4.95
   },
   "lcHs": "1",
   "waitMoves": 0,
   "lcState": 1,
-  "gates": "go@0 none@1.12",
-  "lc": "3→2@0.77(go)",
-  "cut": "2@0.77"
+  "gates": "go@0 none@1.22",
+  "lc": "3→2@0.87(go)",
+  "cut": "2@0.87"
  },
  {
   "hud": "nav",
@@ -2870,24 +2870,24 @@
   "crash": "",
   "change": 46,
   "margin": 11,
-  "react": 1.72,
+  "react": 1.82,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 35.3,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 4@8.3 2@9.1 6@9.17 2@9.92 5@9.95 1@10.45 6@12.3 1@26.7",
+  "h3": "3@0 4@8.3 2@9.1 6@9.17 5@10.03 1@10.52 6@12.42 1@26.7",
   "front": {
    "n": 2,
-   "secs": 15.15
+   "secs": 15.14
   },
   "lcHs": "6",
   "waitMoves": 0,
   "lcState": 6,
-  "gates": "wait@0 clearing@8.3 go@9.1 none@10.23",
-  "lc": "2→3@9.87(go)",
-  "cut": "3@9.87"
+  "gates": "wait@0 clearing@8.3 go@9.1 none@10.32",
+  "lc": "2→3@9.97(go)",
+  "cut": "3@9.97"
  },
  {
   "hud": "ar3",
@@ -2904,24 +2904,24 @@
   "crash": "",
   "change": 46,
   "margin": 11,
-  "react": 1.72,
+  "react": 1.82,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 35.3,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 4@8.3 2@9.1 6@9.17 2@9.92 5@9.95 1@10.45 6@12.3 1@26.7",
+  "h3": "3@0 4@8.3 2@9.1 6@9.17 5@10.03 1@10.52 6@12.42 1@26.7",
   "front": {
    "n": 2,
-   "secs": 15.15
+   "secs": 15.14
   },
   "lcHs": "6",
   "waitMoves": 0,
   "lcState": 6,
-  "gates": "wait@0 clearing@8.3 go@9.1 none@10.23",
-  "lc": "2→3@9.87(go)",
-  "cut": "3@9.87"
+  "gates": "wait@0 clearing@8.3 go@9.1 none@10.32",
+  "lc": "2→3@9.97(go)",
+  "cut": "3@9.97"
  },
  {
   "hud": "nav",
@@ -2938,24 +2938,24 @@
   "crash": "",
   "change": 46,
   "margin": 11,
-  "react": 1.72,
+  "react": 1.82,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 35.3,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 4@8.3 2@9.1 6@9.17 2@9.92 5@9.95 1@10.45 6@12.3 1@26.7",
+  "h3": "3@0 4@8.3 2@9.1 6@9.17 5@10.03 1@10.52 6@12.42 1@26.7",
   "front": {
    "n": 2,
-   "secs": 15.15
+   "secs": 15.14
   },
   "lcHs": "6",
   "waitMoves": 0,
   "lcState": 6,
-  "gates": "wait@0 clearing@8.3 go@9.1 none@10.23",
-  "lc": "2→3@9.87(go)",
-  "cut": "3@9.87"
+  "gates": "wait@0 clearing@8.3 go@9.1 none@10.32",
+  "lc": "2→3@9.97(go)",
+  "cut": "3@9.97"
  },
  {
   "hud": "ar3",
@@ -2972,24 +2972,24 @@
   "crash": "",
   "change": 46,
   "margin": 11,
-  "react": 1.72,
+  "react": 1.82,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 35.3,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 4@8.3 2@9.1 6@9.17 2@9.92 5@9.95 1@10.45 6@12.3 1@26.7",
+  "h3": "3@0 4@8.3 2@9.1 6@9.17 5@10.03 1@10.52 6@12.42 1@26.7",
   "front": {
    "n": 2,
-   "secs": 15.15
+   "secs": 15.14
   },
   "lcHs": "6",
   "waitMoves": 0,
   "lcState": 6,
-  "gates": "wait@0 clearing@8.3 go@9.1 none@10.23",
-  "lc": "2→3@9.87(go)",
-  "cut": "3@9.87"
+  "gates": "wait@0 clearing@8.3 go@9.1 none@10.32",
+  "lc": "2→3@9.97(go)",
+  "cut": "3@9.97"
  },
  {
   "hud": "nav",
@@ -3006,24 +3006,24 @@
   "crash": "",
   "change": 47,
   "margin": 12,
-  "react": 2,
+  "react": 2.08,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 38.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@5.77 3@8.3 4@15.72 2@16.53 5@17.68 1@17.93 6@20.12 1@29.8",
+  "h3": "3@0 6@5.77 3@8.38 4@15.92 2@16.73 5@17.93 1@18.15 6@20.27 1@29.8",
   "front": {
    "n": 2,
-   "secs": 12.21
+   "secs": 12.14
   },
   "lcHs": "2",
   "waitMoves": 0,
   "lcState": 2,
-  "gates": "wait@0 clearing@15.72 go@16.53 none@17.68",
-  "lc": "2→3@17.28(go)",
-  "cut": "3@17.28"
+  "gates": "wait@0 clearing@15.92 go@16.73 none@17.93",
+  "lc": "2→3@17.57(go)",
+  "cut": "3@17.57"
  },
  {
   "hud": "ar3",
@@ -3040,24 +3040,24 @@
   "crash": "",
   "change": 47,
   "margin": 12,
-  "react": 2,
+  "react": 2.08,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 38.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@5.77 3@8.3 4@15.72 2@16.53 5@17.68 1@17.93 6@20.12 1@29.8",
+  "h3": "3@0 6@5.77 3@8.38 4@15.92 2@16.73 5@17.93 1@18.15 6@20.27 1@29.8",
   "front": {
    "n": 2,
-   "secs": 12.21
+   "secs": 12.14
   },
   "lcHs": "2",
   "waitMoves": 0,
   "lcState": 2,
-  "gates": "wait@0 clearing@15.72 go@16.53 none@17.68",
-  "lc": "2→3@17.28(go)",
-  "cut": "3@17.28"
+  "gates": "wait@0 clearing@15.92 go@16.73 none@17.93",
+  "lc": "2→3@17.57(go)",
+  "cut": "3@17.57"
  },
  {
   "hud": "nav",
@@ -3074,24 +3074,24 @@
   "crash": "",
   "change": 47,
   "margin": 12,
-  "react": 2,
+  "react": 2.08,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 38.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@5.77 3@8.3 4@15.72 2@16.53 5@17.68 1@17.93 6@20.12 1@29.8",
+  "h3": "3@0 6@5.77 3@8.38 4@15.92 2@16.73 5@17.93 1@18.15 6@20.27 1@29.8",
   "front": {
    "n": 2,
-   "secs": 12.21
+   "secs": 12.14
   },
   "lcHs": "2",
   "waitMoves": 0,
   "lcState": 2,
-  "gates": "wait@0 clearing@15.72 go@16.53 none@17.68",
-  "lc": "2→3@17.28(go)",
-  "cut": "3@17.28"
+  "gates": "wait@0 clearing@15.92 go@16.73 none@17.93",
+  "lc": "2→3@17.57(go)",
+  "cut": "3@17.57"
  },
  {
   "hud": "ar3",
@@ -3108,24 +3108,24 @@
   "crash": "",
   "change": 47,
   "margin": 12,
-  "react": 2,
+  "react": 2.08,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 38.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 6@5.77 3@8.3 4@15.72 2@16.53 5@17.68 1@17.93 6@20.12 1@29.8",
+  "h3": "3@0 6@5.77 3@8.38 4@15.92 2@16.73 5@17.93 1@18.15 6@20.27 1@29.8",
   "front": {
    "n": 2,
-   "secs": 12.21
+   "secs": 12.14
   },
   "lcHs": "2",
   "waitMoves": 0,
   "lcState": 2,
-  "gates": "wait@0 clearing@15.72 go@16.53 none@17.68",
-  "lc": "2→3@17.28(go)",
-  "cut": "3@17.28"
+  "gates": "wait@0 clearing@15.92 go@16.73 none@17.93",
+  "lc": "2→3@17.57(go)",
+  "cut": "3@17.57"
  },
  {
   "hud": "nav",
@@ -3140,26 +3140,26 @@
   "result": "ok",
   "exit": "종합병원",
   "crash": "",
-  "change": 43,
-  "margin": 8,
-  "react": 1.72,
+  "change": 42,
+  "margin": 7,
+  "react": 1.82,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 29.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 4@8.2 2@9 5@9.63 1@10.28 6@11.63 1@21.25",
+  "h3": "3@0 4@8.2 2@9 5@9.63 1@10.35 6@11.65 1@21.25",
   "front": {
    "n": 1,
-   "secs": 9.62
+   "secs": 9.6
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@8.2 go@9 none@10.1",
-  "lc": "2→3@9.75(go)",
-  "cut": "3@9.75"
+  "gates": "wait@0 clearing@8.2 go@9 none@10.18",
+  "lc": "2→3@9.85(go)",
+  "cut": "3@9.85"
  },
  {
   "hud": "ar3",
@@ -3174,26 +3174,26 @@
   "result": "ok",
   "exit": "종합병원",
   "crash": "",
-  "change": 43,
-  "margin": 8,
-  "react": 1.72,
+  "change": 42,
+  "margin": 7,
+  "react": 1.82,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 29.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 4@8.2 2@9 5@9.63 1@10.28 6@11.63 1@21.25",
+  "h3": "3@0 4@8.2 2@9 5@9.63 1@10.35 6@11.65 1@21.25",
   "front": {
    "n": 1,
-   "secs": 9.62
+   "secs": 9.6
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@8.2 go@9 none@10.1",
-  "lc": "2→3@9.75(go)",
-  "cut": "3@9.75"
+  "gates": "wait@0 clearing@8.2 go@9 none@10.18",
+  "lc": "2→3@9.85(go)",
+  "cut": "3@9.85"
  },
  {
   "hud": "nav",
@@ -3208,26 +3208,26 @@
   "result": "ok",
   "exit": "종합병원",
   "crash": "",
-  "change": 43,
-  "margin": 8,
-  "react": 1.72,
+  "change": 42,
+  "margin": 7,
+  "react": 1.82,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 29.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 4@8.2 2@9 5@9.63 1@10.28 6@11.63 1@21.25",
+  "h3": "3@0 4@8.2 2@9 5@9.63 1@10.35 6@11.65 1@21.25",
   "front": {
    "n": 1,
-   "secs": 9.62
+   "secs": 9.6
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@8.2 go@9 none@10.1",
-  "lc": "2→3@9.75(go)",
-  "cut": "3@9.75"
+  "gates": "wait@0 clearing@8.2 go@9 none@10.18",
+  "lc": "2→3@9.85(go)",
+  "cut": "3@9.85"
  },
  {
   "hud": "ar3",
@@ -3242,25 +3242,25 @@
   "result": "ok",
   "exit": "종합병원",
   "crash": "",
-  "change": 43,
-  "margin": 8,
-  "react": 1.72,
+  "change": 42,
+  "margin": 7,
+  "react": 1.82,
   "risky": 0,
   "offroad": 1,
   "ped": 0,
   "secs": 29.5,
   "moved": true,
   "safeOn": true,
-  "h3": "3@0 4@8.2 2@9 5@9.63 1@10.28 6@11.63 1@21.25",
+  "h3": "3@0 4@8.2 2@9 5@9.63 1@10.35 6@11.65 1@21.25",
   "front": {
    "n": 1,
-   "secs": 9.62
+   "secs": 9.6
   },
   "lcHs": "5",
   "waitMoves": 0,
   "lcState": 5,
-  "gates": "wait@0 clearing@8.2 go@9 none@10.1",
-  "lc": "2→3@9.75(go)",
-  "cut": "3@9.75"
+  "gates": "wait@0 clearing@8.2 go@9 none@10.18",
+  "lc": "2→3@9.85(go)",
+  "cut": "3@9.85"
  }
 ]

@@ -31,9 +31,9 @@ const SETUP = () => {
       const lead = leaderOf(D.x, D.z, fx, fz, null, 0, DRV.carW + .4); down = lead.gap < Infinity && (lead.gap < 6 || (D.v - lead.v > 0 && lead.gap/(D.v - lead.v) < 1.6));
       tx = m.laneX(lane); tz = D.z - ld;
     }
-    const dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1, sinA = (fx*dz - fz*dx)/l, dMax = Math.min(DRV.wheelMax, Math.atan(DRV.latMax*WHEELBASE/Math.max(D.v*D.v, .01)));
+    const dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1, sinA = (fx*dz - fz*dx)/l;
     KEYS.left = KEYS.right = false; KEYS.up = up && !down; KEYS.down = down;
-    _sp(dt); D.steer = clamp(Math.atan(2*WHEELBASE*sinA/l)/dMax, -1, 1); D.wheel = D.steer*dMax;
+    _sp(dt); D.autoSw = swForCurv(2*sinA/l, D.v);
   };
   window.runOne = (opt, driver, mapId, seed) => {
     Object.assign(HARD.block, {leadNear:false, rearMatch:false, stream:false}, opt); window.DRIVER = driver; window.__moved = false;

@@ -25,7 +25,7 @@ const STATES = [
   const page = await browser.newPage({viewport:{width:1366, height:768}, deviceScaleFactor:2});
   await page.goto(url, {waitUntil:'load'}); await page.waitForTimeout(3000);
   await page.evaluate(() => { const _sp = stepPlayer; window.__off = 0; stepPlayer = function(dt){ const tx = S.map.laneX(1) + window.__off, tz = D.z - 10, fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1;
-    const sinA = (fx*dz - fz*dx)/l, dMax = Math.min(DRV.wheelMax, Math.atan(DRV.latMax*WHEELBASE/Math.max(D.v*D.v, .01))); KEYS.left = KEYS.right = false; _sp(dt); D.steer = clamp(Math.atan(2*WHEELBASE*sinA/l)/dMax, -1, 1); D.wheel = D.steer*dMax; };
+    const sinA = (fx*dz - fz*dx)/l; KEYS.left = KEYS.right = false; _sp(dt); D.autoSw = swForCurv(2*sinA/l, D.v); };
     window.setupScene = (hud, light, tone, st) => {
       setTone(tone); setMode(hud); setLight(light); MIR.on = true; setScreen('drive'); $('#intro').hidden = true; $('#sess').hidden = true;
       const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');

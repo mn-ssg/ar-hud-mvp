@@ -220,12 +220,12 @@ function updateQueue(p, dt){
 
 /* ---------- 핸들 ----------
    곡률을 바로 쓰면 경로 제어점마다 각도가 튀어서, 1초 앞 지점을 겨누는 방식(pure pursuit)으로 부드럽게.
-   시연용. 주행 테스트는 참가자가 돌린 앞바퀴 각을 그대로(updateDrive). 핸들 그림(이미지, CSS 회전)은 cabin.js */
+   시연용. 주행 테스트는 참가자가 돌린 핸들 각도 D.sw를 그대로(updateDrive). 핸들 그림(이미지, CSS 회전)은 cabin.js */
 let steer = 0;
 function updateWheel(p, f, dt){
   const qq = pathAt(path.P, S.s + STEER_LOOK), q = {x:qq[0], z:qq[1]};
   const dx = q.x - p.x, dz = q.z - p.z, sinA = (f.x*dz - f.z*dx)/(Math.hypot(dx,dz)||1); // + = 오른쪽
-  const deg = Math.atan(2*WHEELBASE*sinA/STEER_LOOK)*STEER_RATIO*STEER_GAIN*180/Math.PI;
+  const deg = swForCurv(2*sinA/STEER_LOOK, cruiseOf(S.map)*(S.speedFactor ?? 1));   // 실제 핸들 각도(기어비 · 언더스티어 포함, config.js VEH)
   steer += (deg - steer)*Math.min(1, dt*4);
 }
 
@@ -428,7 +428,7 @@ function updateDrive(dt){
   // 깜빡이 (D103): 계기판 화살표 + 켜짐 · 꺼짐이 바뀔 때 똑딱 소리 (시계는 D.t — 일시정지 중엔 멈춤)
   const bOn = !!D.blink && blinkOn(D.t - D.blinkT0);
   if(bOn !== D.blinkPhase){ D.blinkPhase = bOn; if(D.blink) cabinTick(bOn); }
-  updateCabin(clamp(D.wheel*STEER_RATIO*STEER_GAIN*180/Math.PI, -360, 360), kmh, bOn ? D.blink : 0);
+  updateCabin(D.sw, kmh, bOn ? D.blink : 0);   // 화면 속 핸들 = 실제 핸들 각도 그대로(차로 변경 때 몇 도 ~ 수십 도, 교차로 회전 때 200° 안팎)
   cityFrame(D.t);
 }
 

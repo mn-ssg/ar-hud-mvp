@@ -18,7 +18,6 @@ const PILOT = () => {
     if(D.cands || D.seg || D.z < FORK_Z + 5){ const r = project(path.P, D.x, D.z, -1); [tx, tz] = pathAt(path.P, r.s + ld); }
     else { const lane = G && G.side && (G.need ? G.gate === 'go' : (G.A && G.A.safe && G.A.clear)) ? G.next : my; tx = m.laneX(lane); tz = D.z - ld; }   // 마감선 뒤에도 옆이 비었을 때만
     const fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1, sinA = (fx*dz - fz*dx)/l;
-    const dMax = Math.min(DRV.wheelMax, Math.atan(DRV.latMax*WHEELBASE/Math.max(D.v*D.v, .01)));
     KEYS.left = KEYS.right = false;
     // 서기: 앞차가 급정거하면 · 빨간불 · 보행자 · 정체 줄 뒤 (SCC 한도 3.5보다 세게 밟아야 할 때)
     const lead = leaderOf(D.x, D.z, fx, fz, null, 0, DRV.carW + .4);
@@ -26,7 +25,7 @@ const PILOT = () => {
     if(m.city && G && G.stop && (G.stop.kind === 'ped' || (G.stop.kind === 'signal' && D.z - FORK_Z < 45 && D.v > 3))) brake = true;
     { const r = project(path.P, D.x, D.z, -1), a = pathAt(path.P, r.s + 2), b = pathAt(path.P, r.s + 17), turnA = Math.acos(clamp(a[2]*b[2] + a[3]*b[3], -1, 1)); if(turnA > .35 && D.v > 7) brake = true; }
     KEYS.down = brake; KEYS.up = false;
-    _sp(dt); D.steer = clamp(Math.atan(2*WHEELBASE*sinA/l)/dMax, -1, 1); D.wheel = D.steer*dMax;
+    _sp(dt); D.autoSw = swForCurv(2*sinA/l, D.v);
   };
   window.runOne = (hud, light, mapId, type, seed) => {
     const st = makeScenario(mapId, type, light, seed), cfg = runCfg(st);

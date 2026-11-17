@@ -79,12 +79,12 @@ const AUDIT = () => {
       stepPlayer = function(dt){ const G = S.G, m = S.map, my = laneOf(m, D.x); let tx, tz; const ld = Math.max(8, D.v*.6);
         if(D.cands || D.seg || D.z < FORK_Z + 5){ const r = project(path.P, D.x, D.z, -1); [tx, tz] = pathAt(path.P, r.s + ld); }
         else { const lane = G && G.side && (G.need ? G.gate === 'go' : (G.A && G.A.safe && G.A.clear)) ? G.next : my; tx = m.laneX(lane); tz = D.z - ld; }
-        const fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1, sinA = (fx*dz - fz*dx)/l, dMax = Math.min(DRV.wheelMax, Math.atan(DRV.latMax*WHEELBASE/Math.max(D.v*D.v, .01)));
+        const fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1, sinA = (fx*dz - fz*dx)/l;
         KEYS.left = KEYS.right = false; const lead = leaderOf(D.x, D.z, fx, fz, null, 0, DRV.carW + .4);
         let brake = lead.gap < Infinity && (lead.gap < 6 || (D.v - lead.v > 0 && lead.gap/(D.v - lead.v) < 1.6));
         if(m.city && G && G.stop && (G.stop.kind === 'ped' || (G.stop.kind === 'signal' && D.z - FORK_Z < 45 && D.v > 3))) brake = true;
         { const r = project(path.P, D.x, D.z, -1), a = pathAt(path.P, r.s + 2), b = pathAt(path.P, r.s + 17), turnA = Math.acos(clamp(a[2]*b[2] + a[3]*b[3], -1, 1)); if(turnA > .35 && D.v > 7) brake = true; }
-        KEYS.down = brake; KEYS.up = false; _sp(dt); D.steer = clamp(Math.atan(2*WHEELBASE*sinA/l)/dMax, -1, 1); D.wheel = D.steer*dMax; }; }
+        KEYS.down = brake; KEYS.up = false; _sp(dt); D.autoSw = swForCurv(2*sinA/l, D.v); }; }
     const st = makeScenario(mapId, type, light, seed), cfg = runCfg(st);
     setMode('ar2'); setLight(light); startDrive(cfg); D.frozen = false;
     const out = {overlaps:[], minGap:Infinity, minPair:null, frames:0, secs:0, result:null, crash:''};

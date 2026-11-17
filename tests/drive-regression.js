@@ -21,7 +21,7 @@ function serve(){
 
 /* 페이지 안에서 쓰는 자동 운전 도구. 조향만 대신하고 속도는 시뮬레이터의 SCC(손 뗀 상태) 그대로, 필요하면 브레이크 */
 const AUTOPILOT = () => {
-  const _sp = stepPlayer;
+  const _sp = stepPlayer; window.__sp0 = _sp;   // 자동 운전을 거치지 않는 원래 조작 함수(10절 조작감 검사가 씀)
   window.AP = {mode:'route', lane:null, exit:null, brakeUntilS:null, brakeHold:0, held:0};
   stepPlayer = function(dt){
     const A = window.AP, ld = Math.max(8, D.v*.6);
@@ -30,15 +30,14 @@ const AUTOPILOT = () => {
     else if(A.mode === 'lane' && D.z > FORK_Z + 5){ tx = S.map.laneX(A.lane) + (A.offset || 0); tz = D.z - ld; }
     else { const r = project(path.P, D.x, D.z, -1); [tx, tz] = pathAt(path.P, r.s + ld); }
     const fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1;
-    const sinA = (fx*dz - fz*dx)/l, v = D.v, dMax = Math.min(DRV.wheelMax, Math.atan(DRV.latMax*WHEELBASE/Math.max(v*v, .01)));
-    const u = clamp(Math.atan(2*WHEELBASE*sinA/l)/dMax, -1, 1);
+    const sinA = (fx*dz - fz*dx)/l, u = swForCurv(2*sinA/l, D.v);   // 겨눈 점으로 가는 곡률 → 핸들 각도(°)
     KEYS.left = KEYS.right = false;
     KEYS.down = A.brakeUntilS !== null && S.s > A.brakeUntilS - 18 && (A.held < A.brakeHold);
     // 급한 굽은 길(일반도로 회전 · 골목) 앞에서는 사람처럼 줄임: 앞 15m 경로 방향 변화가 크면 시속 25km 아래로
     { const r = project(path.P, D.x, D.z, -1), a = pathAt(path.P, r.s + 2), b = pathAt(path.P, r.s + 17), turnA = Math.acos(clamp(a[2]*b[2] + a[3]*b[3], -1, 1));
       if(turnA > .35 && D.v > 7) KEYS.down = true; }
     if(KEYS.down && D.v < .2) A.held += dt;
-    _sp(dt); D.steer = u; D.wheel = u*dMax;
+    _sp(dt); D.autoSw = u;   // 다음 스텝의 핸들 각도 (2026-11-17: 예전엔 0 ~ 1 조향 입력과 앞바퀴 각을 직접 넣음)
   };
   // 한 판을 dt 간격으로 끝까지(또는 secs초) 돌리며 매 프레임 sample()을 모음
   window.runDrive = (cfg, opts = {}) => {
@@ -517,6 +516,47 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const tex = await E(() => ({asphalt:!!(asphalt.map && asphalt.map.image && asphalt.map.image.src && /asphalt\.jpg/.test(asphalt.map.image.src)), facade:/facade\.jpg/.test((facadeMat.map.image || {}).src || '')}));
     check('Higgsfield 재질(아스팔트 · 건물 벽)이 실제로 불러와짐', tex.asphalt && tex.facade, JSON.stringify(tex));
     check('콘솔 오류 · 깨진 경로 없음', errors.filter(e => !/favicon/.test(e)).length === 0, errors.slice(0, 5).join(' | '));
+  }
+
+  /* ---------- 10. 조작감 (2026-11-17, config.js VEH · drive.js stepPlayer): 키 → 핸들 각도 → 앞바퀴 각 → 자전거 모델. 실제 값과의 비교는 handling-check.js ---------- */
+  {
+    const h = await E(() => {
+      const dt = 1/60, stepPlayer = window.__sp0, keys = (l, r, u, d) => { KEYS.left = !!l; KEYS.right = !!r; KEYS.up = !!u; KEYS.down = !!d; };
+      const fresh = v => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥'); setMode('off'); setScreen('drive'); startDrive({map:m, leaf, lane:1, type:'practice', jam:0, seed:1, sigT:0}); D.frozen = false;
+        D.cars.forEach(c => c.mesh.visible = false); D.cars = []; Object.assign(D, {x:0, z:0, psi:0, v, sw:0, r:0, wheel:0, cruise:v, holdT:0, holdDir:0, brakeT:0, thrT:0, autoSw:null}); };
+      const press = (kmh, secs) => { fresh(kmh/3.6); const tr = []; for(let k = 0; k < secs*60; k++){ keys(0, 1); D.v = kmh/3.6; stepPlayer(dt); tr.push(D.sw); } return tr; };
+      const o = {};
+      const a100 = press(100, 1), a20 = press(20, 1), tap = press(100, .15);
+      o.sw100 = +a100[a100.length - 1].toFixed(1); o.sw20 = +a20[a20.length - 1].toFixed(0); o.tap100 = +tap[tap.length - 1].toFixed(2);
+      o.grows = a100.every((v, i) => i === 0 || v >= a100[i-1]) && a100[20] - a100[10] > a100[10] - a100[0];   // 점점 커지고, 누른 직후보다 나중이 빠름
+      o.wheelLink = Math.abs(D.wheel - D.sw/VEH.ratio*Math.PI/180) < 1e-9;
+      // 떼면 가운데로: 매 프레임 줄어들고 한 프레임에 크게 뛰지 않음, 2.5초 안에 10% 아래
+      const peak = D.sw; let maxStep = 0, mono = true, t10 = null, prev = D.sw;
+      for(let k = 0; k < 60*4; k++){ keys(); D.v = 20/3.6; stepPlayer(dt); if(D.sw > prev + 1e-9) mono = false; maxStep = Math.max(maxStep, prev - D.sw); prev = D.sw; if(t10 === null && D.sw < peak*.1) t10 = (k + 1)*dt; }
+      o.ret = {mono, maxStepPct:+(maxStep/peak*100).toFixed(1), t10:+t10.toFixed(2), end:+D.sw.toFixed(2)};
+      // 같은 핸들 각도(10°)에 빠를수록 덜 꺾임
+      const yaw = kmh => { fresh(kmh/3.6); for(let k = 0; k < 90; k++){ D.autoSw = 10; D.v = kmh/3.6; stepPlayer(dt); } return D.r/(kmh/3.6); };   // 곡률(1/m)
+      o.gain = +(yaw(100)/yaw(30)).toFixed(2);
+      // 화면 속 핸들 = 실제 핸들 각도
+      fresh(20/3.6); for(let k = 0; k < 40; k++){ keys(0, 1); stepPlayer(dt); } update(0);
+      o.wheelImg = +(/rotateZ\(([-\d.]+)deg\)/.exec($('#cabinWheel').style.transform) || [])[1]; o.swNow = +D.sw.toFixed(1);
+      // 가속 · 브레이크
+      fresh(0); D.cruise = 0; let t = 0; while(D.v < 100/3.6 - .01 && t < 30){ keys(0, 0, 1); stepPlayer(dt); t += dt; } o.t100 = +t.toFixed(1);
+      fresh(65/3.6); const z0 = D.z; t = 0; while(D.v > .01 && t < 10){ keys(0, 0, 0, 1); stepPlayer(dt); t += dt; } o.stop65 = +(z0 - D.z).toFixed(1);
+      fresh(65/3.6); for(let k = 0; k < 18; k++){ keys(0, 0, 0, 1); stepPlayer(dt); } o.tapBrake = +((65/3.6 - D.v)*3.6).toFixed(1);
+      keys(); stopDrive(); S.testing = false;
+      // 키 배치는 그대로: 방향키 4개 · Q · E
+      S.testing = true; S.drive = true; const ev = (type, key, code) => dispatchEvent(new KeyboardEvent(type, {key, code, bubbles:true, cancelable:true}));
+      ev('keydown', 'ArrowLeft'); ev('keydown', 'ArrowUp'); const dn = {...KEYS}; ev('keyup', 'ArrowLeft'); ev('keyup', 'ArrowUp'); ev('keydown', 'ArrowRight'); ev('keydown', 'ArrowDown'); const dn2 = {...KEYS}; ev('keyup', 'ArrowRight'); ev('keyup', 'ArrowDown');
+      o.keys = dn.left && dn.up && !dn.right && !dn.down && dn2.right && dn2.down && !dn2.left && !Object.values(KEYS).some(Boolean); S.testing = false; S.drive = false; setMode('ar3'); goHome();
+      o.veh = {L:VEH.L, ratio:VEH.ratio, lock:VEH.lock, wheelMax:+(VEH.lock/VEH.ratio).toFixed(1)};
+      return o; });
+    check('조작감: 핸들 각도와 앞바퀴 각을 따로 계산(앞바퀴 = 핸들 ÷ 기어비 12.7) · 화면 속 핸들이 실제 핸들 각도 그대로 돎', h.wheelLink && Math.abs(h.wheelImg - h.swNow) < .11 && h.swNow > 20 && h.veh.ratio === 12.7 && h.veh.lock === 446, JSON.stringify({img:h.wheelImg, sw:h.swNow, veh:h.veh}));
+    check('조작감: 키를 누르고 있는 동안 핸들이 점점 돌아가고(누른 직후는 느리게), 빠를수록 같은 입력에 덜 돎 — 1초 누름 100km/h 수 도 · 20km/h 150° 넘게, 톡 누르면(0.15초) 1° 안', h.grows && h.sw100 > 5 && h.sw100 < 14 && h.sw20 > 150 && h.tap100 < 1, JSON.stringify({sw100:h.sw100, sw20:h.sw20, tap100:h.tap100}));
+    check('조작감: 키를 떼면 핸들이 끊기지 않고 가운데로(매 프레임 줄어듦 · 한 프레임에 3% 넘게 안 뜀 · 2.5초 안에 10% 아래)', h.ret.mono && h.ret.maxStepPct < 3 && h.ret.t10 < 2.5 && h.ret.t10 > .8 && Math.abs(h.ret.end) < 2, JSON.stringify(h.ret));
+    check('조작감: 같은 핸들 각도에 100km/h는 30km/h보다 덜 꺾임(곡률 비 0.4 ~ 0.6, 언더스티어)', h.gain > .4 && h.gain < .6, `${h.gain}`);
+    check('조작감: ↑ 0 → 100km/h 10.3초 안팎(아반떼 1.6 실측 10.27초) · ↓ 계속 누르면 65km/h에서 20 ~ 25m에 섬(예전 7m/s² 고정 23m와 비슷) · 0.3초 톡 누르면 5km/h 안 줄어듦', Math.abs(h.t100 - 10.3) < .5 && h.stop65 > 20 && h.stop65 < 25 && h.tapBrake < 5, JSON.stringify({t100:h.t100, stop65:h.stop65, tapBrake:h.tapBrake}));
+    check('조작감: 키 배치 그대로(← → ↑ ↓)', h.keys, '');
   }
 
   if(SHOTS){
