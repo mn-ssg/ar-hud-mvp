@@ -108,11 +108,50 @@ def light(kind, name, energy, color, loc, rot=(0, 0, 0), size=1, parent=None, sp
 # ---------- 차: 교통 차량 모델(assets/models/<종류>.glb — 주행 화면과 같은 차, Higgsfield Tripo 2026-11-07)을 앞 = +Y · 실제 크기로 맞춰 가져온다 ----------
 # (처음엔 HUD 아이콘용 세단 hud_car.blend를 썼는데 가까이서는 찰흙 덩어리처럼 보였다 → 텍스처가 있는 주행용 모델로)
 CARS = {'sedan': dict(L=4.6, W=1.84, tail=.84, hy=.72), 'suv': dict(L=4.7, W=1.9, tail=1.02, hy=.84), 'hatch': dict(L=4.1, W=1.78, tail=.9, hy=.7)}
-def glow(name, size, loc, color, parent):
+def glow(name, size, loc, color, parent):          # 멀리 도시 불빛용 작은 빛 점
     bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, radius=.5, location=loc); o = bpy.context.active_object; o.name = name; o.scale = size
     for p in o.data.polygons: p.use_smooth = True
     m = mat(name + '_m', (0, 0, 0), .4, 0, color, 0); o.data.materials.append(m); o.parent = parent; return o, m
-def car(name, kind='sedan', tint=None, glows=True):     # glows=False: 가까이 잡는 장면 — 등 자리의 빛 조각이 떠 보이므로 빼고 노면에 비치는 빛만
+def lamp_nodes(m, T):
+    """등화: 텍스처에 그려진 등 자리가 스스로 빛난다(주행 화면 scene.js의 등화 셰이더와 같은 생각).
+    2026-11-17 밤: 처음엔 등 자리에 빛 조각을 따로 붙였는데 텍스처의 등과 어긋나 '등이 두 개씩'으로 보였다(사용자 지적) → 조각을 없애고 재질에서 고른다.
+      뒤 등 = 차 뒤쪽 · 높이 0.55m 위 · 텍스처가 빨간 곳 / 앞 등 = 차 앞쪽 · 등 높이 · 바깥쪽 · 텍스처가 어두운 곳(렌즈) / 깜빡이 = 그 등의 바깥 끝(주황)
+    돌려줌: 값 노드 {tail(미등 · 브레이크 세기), blL, blR(깜빡이 0 · 1)} — 프레임마다 키를 넣는다"""
+    nt = m.node_tree; b = nt.nodes.get('Principled BSDF'); link = b.inputs['Base Color'].links[0] if b.inputs['Base Color'].links else None
+    if not link: return None
+    tex = link.from_socket; N = nt.nodes.new; L = nt.links.new; Lh, Wh = T['L']/2, T['W']/2
+    def mr(sock, a, c):                  # a → 0, c → 1 (사이는 부드럽게, 밖은 잘라 냄)
+        n = N('ShaderNodeMapRange'); n.interpolation_type = 'SMOOTHSTEP'; n.inputs['From Min'].default_value = a; n.inputs['From Max'].default_value = c; L(sock, n.inputs['Value']); return n.outputs['Result']
+    def math_(op, x, y=None):
+        n = N('ShaderNodeMath'); n.operation = op
+        for i, v in enumerate((x, y)):
+            if v is None: continue
+            if isinstance(v, (int, float)): n.inputs[i].default_value = v
+            else: L(v, n.inputs[i])
+        return n.outputs[0]
+    tc = N('ShaderNodeTexCoord'); sx = N('ShaderNodeSeparateXYZ'); L(tc.outputs['Object'], sx.inputs[0]); X, Y, Z = sx.outputs
+    sc = N('ShaderNodeSeparateColor'); L(tex, sc.inputs[0]); R_, G_, B_ = sc.outputs
+    red = mr(math_('SUBTRACT', R_, math_('MAXIMUM', G_, B_)), .10, .26)
+    luma = math_('ADD', math_('ADD', math_('MULTIPLY', R_, .3), math_('MULTIPLY', G_, .59)), math_('MULTIPLY', B_, .11)); dark = mr(luma, .5, .3)
+    rear = mr(Y, -Lh + .62, -Lh + .32); front = mr(Y, Lh - .62, Lh - .32)
+    tailF = math_('MULTIPLY', math_('MULTIPLY', rear, red), mr(Z, .55, .65))
+    absx = math_('ABSOLUTE', X)
+    headF = math_('MULTIPLY', math_('MULTIPLY', front, dark), math_('MULTIPLY', math_('MULTIPLY', mr(Z, T['hy'] - .14, T['hy'] - .08), mr(Z, T['hy'] + .16, T['hy'] + .09)), mr(absx, .40, .50)))
+    vals = {}
+    for k, d in (('tail', 2.2), ('blL', 0.0), ('blR', 0.0)):
+        v = N('ShaderNodeValue'); v.outputs[0].default_value = d; vals[k] = v
+    lamp_any = math_('MAXIMUM', tailF, headF)
+    blR = math_('MULTIPLY', math_('MULTIPLY', lamp_any, mr(X, Wh - .46, Wh - .30)), vals['blR'].outputs[0])
+    blL = math_('MULTIPLY', math_('MULTIPLY', lamp_any, mr(math_('MULTIPLY', X, -1), Wh - .46, Wh - .30)), vals['blL'].outputs[0])
+    def scaled(col, fac):
+        n = N('ShaderNodeMix'); n.data_type = 'RGBA'; n.inputs['A'].default_value = (0, 0, 0, 1); n.inputs['B'].default_value = (*col, 1); n.clamp_factor = False; L(fac, n.inputs['Factor']); return n.outputs['Result']
+    def add(p, q):
+        n = N('ShaderNodeMix'); n.data_type = 'RGBA'; n.blend_type = 'ADD'; n.inputs['Factor'].default_value = 1; n.clamp_result = False; L(p, n.inputs['A']); L(q, n.inputs['B']); return n.outputs['Result']
+    em = add(add(scaled((1, .05, .03), math_('MULTIPLY', tailF, vals['tail'].outputs[0])), scaled((1, .93, .8), math_('MULTIPLY', headF, 16))),
+             scaled((1, .5, .04), math_('MULTIPLY', math_('ADD', blL, blR), 42)))
+    L(em, b.inputs['Emission Color']); b.inputs['Emission Strength'].default_value = 1
+    return vals
+def car(name, kind='sedan', tint=None):
     T = CARS[kind]; before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=os.path.join(HERE, '..', 'models', kind + '.glb'))
     parts = [o for o in bpy.data.objects if o not in before and o.type == 'MESH']
@@ -134,9 +173,11 @@ def car(name, kind='sedan', tint=None, glows=True):     # glows=False: 가까이
     sx, sy = T['W']/(max(xs) - min(xs)), T['L']/(max(ys) - min(ys)); o.location = (-(max(xs) + min(xs))/2*sx, -(max(ys) + min(ys))/2*sy, -min(zs)*math.sqrt(sx*sy)); o.scale = (sx, sy, math.sqrt(sx*sy))
     bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
     for p in o.data.polygons: p.use_smooth = True
+    vals = None
     for m in o.data.materials:
         b = m.node_tree.nodes.get('Principled BSDF')
         if not b: continue
+        vals = lamp_nodes(m, T) or vals           # 틴트를 곱하기 전에 — 등 자리는 원래 텍스처 색으로 고른다
         b.inputs['Roughness'].default_value = .34; b.inputs['Metallic'].default_value = 0
         for nm in ('Roughness', 'Metallic'):
             for l in list(b.inputs[nm].links): m.node_tree.links.remove(l)
@@ -147,24 +188,15 @@ def car(name, kind='sedan', tint=None, glows=True):     # glows=False: 가까이
                 mx_ = m.node_tree.nodes.new('ShaderNodeMix'); mx_.data_type = 'RGBA'; mx_.blend_type = 'MULTIPLY'; mx_.inputs['Factor'].default_value = 1; mx_.inputs['B'].default_value = (*tint, 1)
                 m.node_tree.links.new(link.from_socket, mx_.inputs['A']); m.node_tree.links.new(mx_.outputs['Result'], b.inputs['Base Color'])
     root = empty(name + '_root'); o.parent = root; L, Wd = T['L'], T['W']
-    # 등: 텍스처에 그려진 등 자리에 납작한 빛 조각(빛 번짐으로 등처럼 보임) + 노면에 비치는 빛. 깜빡이는 꺼지면 크기 0
-    tails = [glow(f'{name}_tl{sx}', (.44, .05, .1), (sx*(Wd/2 - .36), -L/2 + .015, T['tail']), (1, .04, .02), root) for sx in (-1, 1)] if glows else []
-    for sx in ((-1, 1) if glows else ()):
-        _, hm = glow(f'{name}_hl{sx}', (.36, .05, .1), (sx*(Wd/2 - .36), L/2 - .02, T['hy']), (1, .95, .8), root); emis(hm).default_value = 22
-    bl = {sx: [glow(f'{name}_bl{sx}{sy}', (.18, .14, .1), (sx*(Wd/2 - .12), sy*(L/2 - .1), T['tail'] if sy < 0 else T['hy']), (1, .5, .03), root) for sy in (-1, 1)] for sx in (-1, 1)}
-    for sx in (-1, 1):
-        for g_, m_ in bl[sx]: emis(m_).default_value = 45
-    light('SPOT', name + '_hl', 1500, (1, .95, .85), (0, L/2 - .2, .7), (math.radians(80), 0, 0), .15, root, (math.radians(70), .6))
-    br = light('POINT', name + '_brl', 0, (1, .08, .04), (0, -L/2 - .3, .75), size=.3, parent=root)
-    if not glows: light('POINT', name + '_tailglow', 55, (1, .06, .03), (0, -L/2 - .22, T['tail']), size=.5, parent=root)   # 미등이 켜진 느낌(뒤 범퍼 · 노면에 붉은 빛)
-    return {'root': root, 'mesh': o, 'tails': tails, 'blink': bl, 'brake_light': br, 'L': L, 'W': Wd}
+    light('SPOT', name + '_hl', 1500, (1, .95, .85), (0, L/2 - .2, .7), (math.radians(80), 0, 0), .15, root, (math.radians(70), .6))        # 전조등이 노면을 비춤
+    br = light('POINT', name + '_brl', 0, (1, .08, .04), (0, -L/2 - .3, .75), size=.3, parent=root)                                   # 브레이크등이 노면에 비치는 빛
+    return {'root': root, 'mesh': o, 'vals': vals, 'brake_light': br, 'L': L, 'W': Wd}
 
 def car_state(c, frame, brake=False, blink=0):
-    for g_, m_ in c['tails']: key_val(emis(m_), frame, 34 if brake else 2.4)
+    v = c['vals']
+    if v:
+        key_val(v['tail'].outputs[0], frame, 30 if brake else 2.2); key_val(v['blL'].outputs[0], frame, 1.0 if blink == -1 else 0.0); key_val(v['blR'].outputs[0], frame, 1.0 if blink == 1 else 0.0)
     c['brake_light'].data.energy = 300 if brake else 0; c['brake_light'].data.keyframe_insert('energy', frame=frame)
-    for sx in (-1, 1):
-        for g_, m_ in c['blink'][sx]:
-            k = 1.0 if blink == sx else 0.0; g_.scale = (.18*k, .14*k, .1*k); g_.keyframe_insert('scale', frame=frame)
 
 # ---------- 도로: 차로 n개 · 길이 length. 차선은 살짝 빛나는 흰 띠. parent에 붙여 통째로 뒤로 민다 ----------
 def road(parent, lanes=3, y0=-120, y1=520, extra=None):
@@ -206,8 +238,9 @@ def keyboard(parent, s=.2):
         leg = text_obj(ch, s*.5, lm, e, (0, 0, s*.252))
         keys[name] = {'e': e, 'mat': m, 'leg': lm, 's': s}
     return {'root': root, 'keys': keys}
-def key_state(k, frame, v, press=True):          # v: 0 ~ 1 눌림 · 빛남. press=False: 빛만(그림을 바탕 위에 겹쳐 쓰는 '눌러 보기'용 — 키가 내려가면 글자가 두 겹으로 보임)
-    k['e'].location.z = -k['s']*.16*v*(1 if press else 0); k['e'].keyframe_insert('location', frame=frame, index=2)
+KEY_TRAVEL = .3          # 눌린 깊이(키 한 변의 배수) — 2026-11-17 밤: .16은 화면에서 거의 안 보였다(사용자: 눌리는 애니메이션이 있어야)
+def key_state(k, frame, v, travel=None):          # v: 빛남 0 ~ 1 · travel: 눌린 깊이 0 ~ 1(안 주면 v와 같게)
+    k['e'].location.z = -k['s']*KEY_TRAVEL*(v if travel is None else travel); k['e'].keyframe_insert('location', frame=frame, index=2)
     key_val(emis(k['mat']), frame, 3.2*v); key_val(emis(k['leg']), frame, 2.2*(1 - v)); key_val(k['leg'].node_tree.nodes['Principled BSDF'].inputs['Base Color'], frame, (.9*(1 - v) + .01, .93*(1 - v) + .03, .96*(1 - v) + .05, 1))
 
 def camera(lens=35, shift=(0, 0), dof=None):
@@ -256,7 +289,7 @@ if SHOT == 'b':
 elif SHOT == 'a':
     DUR = 5.5; N = round(DUR*FPS); set_range(N)
     wr = empty('world'); wd = road(wr, 3, -200, 420); lamps(wr, wd, -180, 400, 30)
-    c = car('ego', 'sedan', None, False); cam = camera(32, (0, .12), (9, 1.6))
+    c = car('ego'); cam = camera(32, (0, .12), (9, 1.6))
     # 멀리 도시 불빛: 작은 빛 점들 — 초점 밖이라 둥근 빛망울로 번진다
     import random; R = random.Random(7); far = empty('far', wr)
     for i in range(110):
@@ -273,7 +306,7 @@ elif SHOT == 'a':
         car_state(c, f, False, 0)
 
 elif SHOT == 'c':
-    N = 7; set_range(N)
+    N = 49; set_range(N)
     cam = camera(50, (0, .1), (2.9, 2.8))
     look(cam, (0, -1.85, 2.25), (0, -.02, 0))
     kbr = empty('kbroot'); kb = keyboard(kbr, .2); kb['root'].location = (.29, 0, 0)
@@ -281,15 +314,28 @@ elif SHOT == 'c':
     light('AREA', 'k1', 190, (.85, .93, 1), (-1.4, -1.2, 2.2), (math.radians(35), math.radians(-28), 0), 2.4)
     light('AREA', 'k2', 120, (0, .8, 1), (1.6, 1.4, .8), (math.radians(-70), math.radians(40), 0), 1.6)
     order = ['left', 'right', 'up', 'down', 'q', 'e']
+    # 프레임 1 = 바탕(모두 꺼짐). 그 뒤 키마다 8프레임: 눌려 내려가며 켜짐 → 바닥 → 올라옴(켜진 채). 페이지가 키 자리만 잘라 낸 그림띠로 재생한다(intro_encode.sh)
+    PRESS = [(.45, .55), (.9, 1), (1, 1), (1, 1), (.72, 1), (.4, 1), (.14, 1), (0, 1)]          # (깊이, 빛)
+    N = 1 + len(order)*len(PRESS); set_range(N)
     for f in range(1, N + 1):
-        for i, name in enumerate(order): key_state(kb['keys'][name], f, 1.0 if f == i + 2 else 0.0, False)
+        for i, name in enumerate(order):
+            j = f - 2 - i*len(PRESS); tr, li = PRESS[j] if 0 <= j < len(PRESS) else (0, 0); key_state(kb['keys'][name], f, li, tr)
     for fc in [fc for a in bpy.data.actions for fc in getattr(a, 'fcurves', [])]:
         for kp in fc.keyframe_points: kp.interpolation = 'CONSTANT'
-    # 키가 화면 어디에 찍히는지(0 ~ 1280 · 0 ~ 720) — intro.js의 이름표 자리에 쓴다
+    # 키가 화면 어디에 찍히는지(0 ~ 1280 · 0 ~ 720): 가운데(이름표 자리) + 눌리기 전 · 후를 모두 덮는 네모(그림띠로 잘라 낼 자리) → c_rects.json
     from bpy_extras.object_utils import world_to_camera_view
-    bpy.context.view_layer.update(); scene.frame_set(1)
+    import json
+    scene.frame_set(1); bpy.context.view_layer.update(); rects = {}
     for name in order:
-        p = world_to_camera_view(scene, cam, kb['keys'][name]['e'].matrix_world.translation); print('KEYPOS', name, round(p.x*W), round((1 - p.y)*H))
+        k = kb['keys'][name]; s_ = k['s']; mw = k['e'].matrix_world; xs, ys = [], []
+        for dz in (0, -s_*KEY_TRAVEL):
+            for cx in (-.56, .56):
+                for cy in (-.56, .56):
+                    for cz in (-.3, .3):
+                        p = world_to_camera_view(scene, cam, mw @ Vector((cx*s_, cy*s_, cz*s_ + dz))); xs.append(p.x*W); ys.append((1 - p.y)*H)
+        c0 = world_to_camera_view(scene, cam, mw.translation); rects[name] = [round(min(xs)), round(min(ys)), round(max(xs)), round(max(ys))]
+        print('KEYPOS', name, round(c0.x*W), round((1 - c0.y)*H), 'RECT', rects[name])
+    os.makedirs(OUT, exist_ok=True); json.dump({'order': order, 'frames': len(PRESS), 'rects': rects}, open(os.path.join(OUT, 'c_rects.json'), 'w'))
 
 elif SHOT == 'd':
     DUR = 14.0; N = round(DUR*FPS); set_range(N)
@@ -322,14 +368,15 @@ elif SHOT == 'd':
         y = -150
         while y < y1: box('dash', (.15, 3, .012), (x, y + 1.5, .006), M['paint'], wr); y += 9
     # 갈림 코의 빗금 자리(짧은 흰 V)와 문형 표지: 초록 판 둘 — '직진'(1 · 2차로 위) · '목적지'(3차로 위, 흰 테가 빛남)
-    galv = mat('galv', (.42, .44, .47), .45, .8); green = mat('green', (.02, .22, .1), .5, 0, (.02, .5, .2), .55); white = mat('signw', (1, 1, 1), .4, 0, (1, 1, 1), 3.2)
+    galv = mat('gantry', (.42, .44, .47), .45, .8); green = mat('green', (.02, .22, .1), .5, 0, (.02, .5, .2), .55); white = mat('signw', (1, 1, 1), .4, 0, (1, 1, 1), 3.2)
     frame_m = mat('frame', (1, 1, 1), .3, 0, (1, 1, 1), 6); YS = YF - 26
+    GANTRY = [galv, green, white, frame_m]      # 차가 밑을 지나면 서서히 사라지게(안 그러면 뒤따르는 카메라 바로 앞을 지나며 화면을 가린다 — 2026-11-17 밤 훑어보다 찾음)
     for sx in (-1, 1): box('post', (.32, .32, 7.6), (sx*(1.5*LANE + 1.4), YS, 3.8), galv, wr)
     box('beam', (3*LANE + 3.2, .28, .34), (0, YS, 7.5), galv, wr)
     box('p1', (2*LANE - .5, .1, 1.9), (-LANE/2, YS - .12, 6.3), green, wr, .02); text_obj('직진', 1.0, white, wr, (-LANE/2, YS - .2, 6.3)).rotation_euler = (math.pi/2, 0, 0)
     box('p2', (LANE - .5, .1, 1.9), (LANE, YS - .12, 6.3), green, wr, .02); text_obj('목적지', .78, white, wr, (LANE, YS - .2, 6.3)).rotation_euler = (math.pi/2, 0, 0)
     for dx, dz, sx_, sz_ in ((0, .98, LANE - .4, .09), (0, -.98, LANE - .4, .09), (-(LANE - .5)/2, 0, .09, 2.0), ((LANE - .5)/2, 0, .09, 2.0)): box('pf', (sx_, .06, sz_), (LANE + dx, YS - .2, 6.3 + dz), frame_m, wr)
-    lamps(wr, 3*LANE, -120, YF - 40, 44)
+    lamps(wr, 3*LANE, -120, YF - 40, 40, (-1,))          # 가로등은 왼쪽에만(오른쪽 것은 카메라 옆을 스침)
     ego = car('ego'); rear = car('rear', 'suv', (.45, .5, .56)); cam = camera(36, (.2, .04), None)
     light('AREA', 'fill', 700, (.6, .75, 1), (-8, 60, 14), (math.radians(20), math.radians(-30), 0), 14)
     light('AREA', 'rim', 800, (0, .8, 1), (0, -8, 4), (math.radians(65), 0, 0), 5, ego['root'])
@@ -347,6 +394,8 @@ elif SHOT == 'd':
         else: ramp_follow(rear['root'], ry - YF)
         for c_ in (ego, rear): c_['root'].keyframe_insert('location', frame=f); c_['root'].keyframe_insert('rotation_euler', frame=f)
         car_state(ego, f, False, 1 if (5.6 < t < 8.8 and int(t/.32) % 2 == 0) else 0); car_state(rear, f, False, 0)
+        ga = 1 - ss(seg(t, 8.25, 8.85))
+        for gm in GANTRY: key_val(gm.node_tree.nodes['Principled BSDF'].inputs['Alpha'], f, ga)
         e = ego['root'].location; tgt = Vector((e.x*.55 + 3.4, e.y - 15.5, 10.5)); camp = tgt if camp is None else camp.lerp(tgt, .12)
         look(cam, camp, (e.x*.6 + 3.1, e.y + 9, 0)); cam.keyframe_insert('location', frame=f); cam.keyframe_insert('rotation_euler', frame=f)
 

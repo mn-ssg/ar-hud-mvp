@@ -104,20 +104,20 @@ const TOUR = (() => {
           cr.at(R.lanes[1] + sway*40 + (R.lanes[2] - R.lanes[1])*mv, R.y + 380, sway ? Math.cos(u*Math.PI*2)*7 : 9*Math.sin(Math.PI*mv)); cr.brake(kd); cr.blink(1, blinking && Math.floor(t/.32) % 2 === 0);
           K.left.set(kl ? 1 : 0); K.right.set(kr ? 1 : 0); K.up.set(ku ? 1 : 0); K.down.set(kd ? 1 : 0); K.e.set(ke ? 1 : 0, C.warn); K.q.set(0); };
     }},
-    { id:'try', name:'눌러 보기', dur:Infinity, hold:true, image:'assets/video/intro_keys_0.webp', lit:[1, 2, 3, 4, 5, 6].map(i => `assets/video/intro_keys_${i}.webp`), build(g, api){
+    { id:'try', name:'눌러 보기', dur:Infinity, hold:true, image:'assets/video/intro_keys_0.webp', keys:'assets/video/intro_keys.json', build(g, api){
         const head = svg('g', {}, g); txt(head, 110, 150, '직접 눌러 보세요', 't-title');
         const sub = svg('g', {}, g); txt(sub, 110, 196, '여섯 개 키를 한 번씩 누르면 다음으로 넘어갑니다', 't-lead');
         const ill = svg('g', {class:'ill'}, g), kb = keyboard(ill, 822, 480, 1.9), K = kb.K, got = {}, at = {};
         const pos = {left:[676, 628], right:[967, 628], up:[813, 356], down:[822, 628], q:[321, 572], e:[463, 572]};   // 키 아래(↑만 위) 이름표 — 3D 그림의 키 자리(intro_mg.py 장면 c의 KEYPOS)
         const labs = KEYS6.map(([k, , s]) => { const [x, y] = pos[k]; return txt(g, x, y, s, 't-cap', {'text-anchor':'middle'}); });
         const cnt = txt(g, 1120, 196, '0 / 6', 't-count', {'text-anchor':'middle'});
-        const onKey = e => { const k = KEYS6.find(q => q[1] === e.code); if(!k || !api.active('try')) return; e.preventDefault(); e.stopPropagation(); if(!got[k[0]]){ got[k[0]] = true; at[k[0]] = api.t(); } at['p_' + k[0]] = api.t(); };
+        const onKey = e => { const k = KEYS6.find(q => q[1] === e.code); if(!k || !api.active('try')) return; e.preventDefault(); e.stopPropagation(); if(!got[k[0]]){ got[k[0]] = true; at[k[0]] = api.t(); } at['p_' + k[0]] = api.t(); if(!e.repeat) api.press(k[0]); };   // 누를 때마다 3D 키가 눌렸다 올라옴
         addEventListener('keydown', onKey, true);
         return Object.assign(t => { pop(head, t, .1); pop(sub, t, .35); const n = Object.keys(got).length;
           KEYS6.forEach(([k], i) => { const p = at['p_' + k], press = p !== undefined ? 1 - seg(t, p + .12, p + .3) : 0; K[k].set(got[k] ? Math.max(.35, press) : press, k === 'q' || k === 'e' ? C.warn : C.cyan); labs[i].style.fill = got[k] ? C.ink : C.sub; });
-          cnt.textContent = n + ' / 6'; cnt.style.fill = n === 6 ? C.go : C.sub; api.lit(KEYS6.map(([k]) => !!got[k]));
+          cnt.textContent = n + ' / 6'; cnt.style.fill = n === 6 ? C.go : C.sub;
           if(n === 6 && !got.done){ got.done = t; } if(got.done && t > got.done + .9) api.next(); },
-          {reset(){ for(const k in got) delete got[k]; for(const k in at) delete at[k]; }, state:() => ({n:Object.keys(got).filter(k => k !== 'done').length})});
+          {reset(){ for(const k in got) delete got[k]; for(const k in at) delete at[k]; api.keysReset(); }, state:() => ({n:Object.keys(got).filter(k => k !== 'done').length})});
     }},
     { id:'task', name:'할 일', dur:14, video:'assets/video/intro_d.mp4', build(g){
         const ill = svg('g', {class:'ill'}, g), R = roadPanel(ill, 'tourClipB'), L = R.lanes, y0 = R.y;
@@ -175,7 +175,11 @@ const TOUR = (() => {
      무대 = 영상 · 그림 층(#tour .tour-media) 위에 SVG 자막 층. 영상이 있는 장면은 영상의 시각(currentTime)이 곧 장면 시각 t — 자막 · 속도 숫자가 영상과 어긋나지 않는다.
      영상 · 그림을 못 불러온 장면은 시계로 가고 SVG 그림(.ill)이 대신 보인다 */
   let root = null, stage = null, media = null, bar = null, btnPrev = null, btnNext = null, layers = [], st = {i:0, t:0, on:false, last:0, raf:0, done:null};
-  const api = {active:id => st.on && scenes[st.i].id === id, t:() => st.t, next:() => go(st.i + 1), lit:on => { const s = scenes[st.i]; if(s.litEls) s.litEls.forEach((e, k) => e.style.opacity = on[k] ? 1 : 0); }};
+  // press: '눌러 보기'의 3D 키 그림띠를 처음부터 다시 재생(눌려 내려갔다 켜진 채 올라옴). keysReset: 모두 끔
+  const keyEls = {};
+  const api = {active:id => st.on && scenes[st.i].id === id, t:() => st.t, next:() => go(st.i + 1),
+    press:k => { const e = keyEls[k]; if(!e) return; e.classList.remove('got'); void e.offsetWidth; e.classList.add('got'); },
+    keysReset:() => Object.values(keyEls).forEach(e => e.classList.remove('got'))};
   function mount(){
     if(root) return;
     root = document.createElement('div'); root.id = 'tour'; root.hidden = true; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', '주행 테스트 안내');
@@ -189,7 +193,10 @@ const TOUR = (() => {
       s.ok = false;
       if(s.video){ const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = s.video; v.addEventListener('loadeddata', () => { s.ok = true; paint(); }); v.addEventListener('error', () => { s.ok = false; }); media.appendChild(v); s.el = v; }
       else if(s.image){ const im = new Image(); im.onload = () => { s.ok = true; paint(); }; im.src = s.image; media.appendChild(im); s.el = im;
-        if(s.lit) s.litEls = s.lit.map(u => { const e = new Image(); e.src = u; e.className = 'tour-lit'; media.appendChild(e); return e; }); }
+        if(s.keys){   // 키마다 그림띠 한 장: 자리 · 프레임 수는 intro_keys.json(intro_encode.sh가 씀)
+          const box = document.createElement('div'); box.className = 'tour-keys'; media.appendChild(box); s.keyBox = box;
+          fetch(s.keys).then(r => r.json()).then(J => { const [W, H] = J.size; box.style.setProperty('--n', J.frames);
+            Object.entries(J.keys).forEach(([k, [x, y, w, h]]) => { const e = document.createElement('i'); e.className = 'tour-key'; e.dataset.k = k; e.style.cssText = `left:${x/W*100}%;top:${y/H*100}%;width:${w/W*100}%;height:${h/H*100}%;background-image:url(assets/video/intro_key_${k}.webp);background-size:${J.frames*100}% 100%`; box.appendChild(e); keyEls[k] = e; }); }).catch(() => {}); } }
     });
     layers = scenes.map(s => { const g = svg('g', {opacity:0}, stage); s.draw = s.build(g, api); s.g = g; return g; });
     bar = root.querySelector('.tour-steps'); bar.innerHTML = scenes.map((s, i) => `<span class="tour-step" data-i="${i}"><i></i><b>${s.name}</b></span>`).join('');
@@ -200,7 +207,7 @@ const TOUR = (() => {
   }
   function paint(){
     const s = scenes[st.i]; layers.forEach((g, i) => g.setAttribute('opacity', i === st.i ? 1 : 0));
-    scenes.forEach((q, i) => { if(q.el) q.el.style.opacity = i === st.i && q.ok ? 1 : 0; if(q.litEls && i !== st.i) q.litEls.forEach(e => e.style.opacity = 0); });
+    scenes.forEach((q, i) => { if(q.el) q.el.style.opacity = i === st.i && q.ok ? 1 : 0; if(q.keyBox) q.keyBox.style.opacity = i === st.i && q.ok ? 1 : 0; });
     s.g.classList.toggle('has-media', !!s.ok);   // 영상 · 그림이 있으면 SVG 그림(.ill)은 숨김
     s.draw(st.t);
     bar.querySelectorAll('.tour-step').forEach((e, i) => { e.classList.toggle('on', i === st.i); e.classList.toggle('done', i < st.i); e.firstChild.style.width = (i < st.i ? 100 : i === st.i ? (s.hold ? 100 : cl(st.t/s.dur)*100) : 0) + '%'; });

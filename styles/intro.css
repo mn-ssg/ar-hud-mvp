@@ -7,7 +7,11 @@
 .tour-frame{ position:relative; width:min(100%, calc((100vh - 112px)*16/9)); aspect-ratio:16/9; border-radius:14px; overflow:hidden; background:#07090c; }
 .tour-media, .tour-frame svg{ position:absolute; inset:0; width:100%; height:100%; display:block; }
 .tour-media video, .tour-media img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; opacity:0; transition:opacity .35s ease; }
-.tour-media img.tour-lit{ mix-blend-mode:lighten; transition:opacity .16s ease; }   /* 눌러 보기: 켜진 키 그림을 바탕 위에 밝은 쪽만 얹음 */
+/* 눌러 보기: 키마다 눌리는 3D 프레임을 옆으로 이은 그림띠 — 누르면 한 번 재생하고 마지막(켜진 채 올라온) 프레임에 머문다 */
+.tour-keys{ position:absolute; inset:0; opacity:0; transition:opacity .35s ease; }
+.tour-key{ position:absolute; background-repeat:no-repeat; background-position:0 0; opacity:0; }
+.tour-key.got{ opacity:1; animation:tourKey .34s steps(var(--n), jump-none) forwards; }
+@keyframes tourKey{ from{ background-position:0 0; } to{ background-position:100% 0; } }
 #tour g.has-media .ill{ display:none; }                                              /* 3D 영상 · 그림이 있으면 예전 SVG 그림은 숨김 */
 .tour-bar{ flex:none; height:80px; display:flex; align-items:center; justify-content:space-between; gap:24px; padding:0 32px; border-top:1px solid #1e2630; }
 .tour-steps{ display:flex; gap:10px; flex:1; max-width:860px; }
