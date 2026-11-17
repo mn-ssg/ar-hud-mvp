@@ -92,6 +92,39 @@ const pedMeshes = PED_STYLE.map(([coat, pants, shoe], i) => {
   g.userData = {legs, arms, body};
   g.visible = false; scene.add(g); return g;
 });
+/* ---------- 보행자 모델 (2026-11-17, 3회차 MVP 작업 3 — 사용자: '사람이 찰흙 같다') ----------
+   Higgsfield로 만든 사람 4명(사진 → Tripo H3.1 3D → Meshy 뼈대 + 걷는 동작, 가공 assets/blender/ped_process.py)을 위 코드 모양 대신 쓴다. 자리 · 판정은 그대로(pedsAt), 보이는 모양만 바뀜.
+   · 모델마다 뼈대(24개) · 걷는 동작 한 개. 같은 모델을 여러 자리에 쓰려면 뼈대째 복제(SkeletonUtils)
+   · 동작은 시각으로 정한다(같은 시각 = 같은 자세, 기록 재현): 걷는 중이면 걷는 빠르기에 맞춰 돌리고, 서 있으면 두 발이 가장 모인 순간의 자세로 멈춤
+   · 제자리 걷기: 동작에 들어 있는 엉덩이의 앞뒤 · 좌우 이동은 뺀다(자리는 코드가 옮김)
+   · 못 불러오면 코드 모양 그대로 */
+const PED_MODEL = {urls:['assets/models/ped_1.glb', 'assets/models/ped_2.glb', 'assets/models/ped_3.glb', 'assets/models/ped_4.glb'], slot:[0, 1, 2, 3, 1, 2], loaded:0};   // slot: 보행자 자리 6개(횡단보도 0 ~ 2 · 정류장 3 ~ 5)가 쓰는 모델
+if(typeof GLTF !== 'undefined' && GLTF && THREE.SkeletonUtils) PED_MODEL.urls.forEach((url, mi) => GLTF.load(url, g => {
+  const clip = g.animations[0]; if(!clip) return;
+  clip.tracks.forEach(tr => { if(/Hips\.position$/.test(tr.name)){ const v = tr.values; for(let k = 3; k < v.length; k += 3){ v[k] = v[0]; v[k + 2] = v[2]; } } });
+  g.scene.traverse(o => { if(o.isMesh){ o.castShadow = true; o.frustumCulled = false; o.material.roughness = .85; o.material.metalness = 0; } });
+  // 모델이 보는 쪽: 머리 뼈대 → 얼굴 앞 뼈대(headfront) 방향. 장면의 앞(-z)에 맞게 돌린다
+  // (2026-11-17: Tripo 모델은 옆(+x)을 보고 나오는데 리깅 도구는 정면(+z)이라고 가정 → 처음엔 다리가 옆으로 움직이는 게걸음이 됐다. 모델을 정면으로 돌려 다시 리깅함 — assets/blender/ped_process.py 머리말)
+  const mx = new THREE.AnimationMixer(g.scene); mx.clipAction(clip).play(); const bone = n => g.scene.getObjectByName(n), LF = bone('LeftFoot'), RF = bone('RightFoot'), HD = bone('Head'), HF = bone('headfront');
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), fwd = new THREE.Vector3(0, 0, 1), N = 240; let yaw = Math.PI, natural = 1.3, standT = 0;
+  mx.setTime(0); g.scene.updateMatrixWorld(true);
+  if(HD && HF){ HF.getWorldPosition(a); HD.getWorldPosition(b); a.sub(b); a.y = 0; if(a.length() > .01) fwd.copy(a).normalize(); }
+  yaw = Math.PI - Math.atan2(fwd.x, fwd.z);   // 이만큼 돌리면 모델의 앞이 -z (정면 +z를 보는 모델이면 180°)
+  if(LF && RF){
+    // 동작 재기: 두 발 사이 앞뒤 거리(앞 방향 성분)로 한 걸음 길이 · 걸음 수 → 동작이 원래 걷는 빠르기(m/s), 두 발이 가장 모인 시각(서 있는 자세)
+    let steps = 0, prev = 0, maxSep = 0, minAbs = Infinity;
+    for(let k = 0; k < N; k++){ mx.setTime(clip.duration*k/N); g.scene.updateMatrixWorld(true); LF.getWorldPosition(a); RF.getWorldPosition(b); const sep = a.sub(b).dot(fwd);
+      if(k && sep*prev < 0) steps++; if(sep) prev = sep; maxSep = Math.max(maxSep, Math.abs(sep)); if(Math.abs(sep) < minAbs){ minAbs = Math.abs(sep); standT = clip.duration*k/N; } }
+    if(steps && maxSep) natural = steps*maxSep/clip.duration;
+  }
+  mx.stopAllAction(); mx.uncacheRoot(g.scene);
+  PED_MODEL.slot.forEach((m, i) => { if(m !== mi) return;
+    const inst = THREE.SkeletonUtils.clone(g.scene), grp = pedMeshes[i], mixer = new THREE.AnimationMixer(inst); mixer.clipAction(clip).play();
+    inst.rotation.y = yaw;
+    grp.userData.body.visible = false; grp.add(inst); Object.assign(grp.userData, {mixer, dur:clip.duration, natural, standT, model:inst}); });
+  PED_MODEL.loaded++;
+}, undefined, () => console.warn('보행자 모델을 못 불러옴 → 코드 모양:', url)));
+
 /* 지금 보이는 보행자: {i, x, z, phase, walking}
    phase: 'wait'(보도 끝에서 건너려 함 — 건너기 3초 전부터) · 'cross'(건너는 중, 다 건너고 1m 몫 서 있는 것까지 = 예전과 같은 양보 판정 구간)
    · 'done'(건넌 뒤 보도를 따라 멀어짐 4초 — 횡단보도 밖이라 양보 판정 없음, 예전엔 그 자리에서 사라졌음) */
@@ -102,9 +135,9 @@ function pedsAt(t){
     const z0 = p.dir > 0 ? CZ.near + 1 : CZ.far - 1, z1 = p.dir > 0 ? CZ.far - 1 : CZ.near + 1, len = Math.abs(z1 - z0);
     if(t < p.t0 - 3) return;
     const d = Math.max(0, t - p.t0)*p.v;
-    if(d <= len + 1){ out.push({i, x:p.x, z:z0 - p.dir*Math.min(d, len), phase:t < p.t0 ? 'wait' : 'cross', walking:t >= p.t0 && d < len, dir:p.dir}); return; }
+    if(d <= len + 1){ out.push({i, x:p.x, z:z0 - p.dir*Math.min(d, len), phase:t < p.t0 ? 'wait' : 'cross', walking:t >= p.t0 && d < len, dir:p.dir, v:p.v}); return; }
     const w = (d - len - 1)/p.v;
-    if(w < 4) out.push({i, x:p.x + w*p.v, z:z1, phase:'done', walking:true, dir:p.dir});
+    if(w < 4) out.push({i, x:p.x + w*p.v, z:z1, phase:'done', walking:true, dir:p.dir, v:p.v});
   });
   return out;
 }
@@ -115,6 +148,7 @@ function pedFrame(t){
   pedMeshes.forEach((g, i) => {
     const p = ps.find(q => q.i === i); g.visible = !!p; if(!p) return;
     const u = g.userData, ph = t*6.2 + i*1.7, sw = p.walking ? Math.sin(ph) : 0;
+    if(u.mixer){ u.mixer.setTime(p.walking ? ((t*(p.v || 1.3)/u.natural + i*.41) % u.dur + u.dur) % u.dur : u.standT); }   // 모델: 걷는 빠르기에 맞춘 자세 · 서 있으면 멈춘 자세
     g.position.set(p.x, p.z > CZ.near || p.z < CZ.far ? .15 : 0, p.z);   // 보도 위면 보도 높이
     g.rotation.y = p.dx !== undefined ? Math.atan2(-p.dx, -p.dz) : p.phase === 'done' ? -Math.PI/2 : p.dir > 0 ? 0 : Math.PI;
     u.legs[0].rotation.x = sw*.42; u.legs[1].rotation.x = -sw*.42;
@@ -316,11 +350,9 @@ function buildCityScene(m){
 
   /* 가로등 · 가로수 (보도 위) */
   const lamp = (x, z, s) => {   // s: 팔이 뻗는 쪽(도로 쪽) — x 방향 ±1
-    const p = addMesh(lampGeo.pole, galv); p.position.set(x, 5, z);
-    const a = addMesh(lampGeo.arm, galv, ''); a.rotation.z = Math.PI/2; a.position.set(x + s*1.2, 9.95, z);
-    const h = addMesh(lampGeo.head, lampMat, ''); h.position.set(x + s*2.35, 9.9, z);
+    PROPM.place(MG, 'lamp_city', x, .15, z, s > 0 ? 0 : Math.PI);   // 도심 가로등(Blender 모델): 차도 쪽 팔 + 보도 쪽 낮은 보행등. 보도(높이 0.15) 위에 섬
     const pool = new THREE.Mesh(poolGeo, poolMat); pool.position.set(x + s*3.2, .03, z); pool.renderOrder = 1;
-    const glow = new THREE.Sprite(glowMat); glow.scale.set(2.6, 2.6, 1); glow.position.set(x + s*2.35, 9.78, z);
+    const glow = new THREE.Sprite(glowMat); glow.scale.set(2.6, 2.6, 1); glow.position.set(x + s*2.0, 9.02, z);
     for(const o of [pool, glow]){ o.visible = NIGHT; nightOnly.push(o); MG.add(o); }
   };
   for(let z = 40; z > CZ.near + 10; z -= 34){ lamp(xR + 1, z, -1); lamp(xL - 1, z - 17, 1); }
@@ -331,8 +363,8 @@ function buildCityScene(m){
   for(let z = CZ.far - 10; z > -560; z -= 11){ trees.push([xR + 2.8, z]); trees.push([xL - 2.8, z - 5]); }
   for(let x = cwE0 + 10; x < 320; x += 12){ trees.push([x, CZ.near + 2.8]); trees.push([x + 5, CZ.far - 2.8]); }
   for(let x = cwW1 - 10; x > -320; x -= 12){ if(!alley || x > alley[1] + 4 || x < alley[0] - 4) trees.push([x, CZ.far - 2.8]); trees.push([x - 5, CZ.near + 2.8]); }
-  // 입체 가로수(props.js): 자리 · 크기 · 방향을 흔들고 10%는 비워 줄이 기계적으로 보이지 않게
-  PROPS.plantTrees(MG, trees.filter(() => rnd() > .1).map(([x, z]) => [x + (rnd() - .5)*.6, .15, z + (rnd() - .5)*2.4, .85 + rnd()*.4, rnd()*6.3]), rnd);
+  // 가로수 = 느티나무 모델(trees.js): 자리 · 크기 · 방향을 흔들고 10%는 비워 줄이 기계적으로 보이지 않게
+  TREES.plant(MG, trees.filter(() => rnd() > .1).map(([x, z]) => [x + (rnd() - .5)*.6, .15, z + (rnd() - .5)*2.4, .85 + rnd()*.4, rnd()*6.3]), rnd);
 
   /* 방향 표지 (일반도로 = 파랑): 오른쪽 보도에서 뻗은 팔에 판, 정지선 80m 앞 */
   (() => {

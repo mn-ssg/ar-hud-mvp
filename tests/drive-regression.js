@@ -566,6 +566,34 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('조작감: 키 배치 그대로(← → ↑ ↓)', h.keys, '');
   }
 
+  /* ---------- 11. 그래픽 에셋 (2026-11-17, 3회차 MVP 작업 3): 나무 · 가로등 · 가드레일 기둥(Blender) · 보행자(Higgsfield + 리깅) · 차량 압축 ---------- */
+  {
+    await page.waitForTimeout(1500);
+    const g = await E(() => { const o = {};
+      o.trees = {ready:TREES.isReady(), models:Object.keys(TREES.models).sort().join(','), cards:Object.keys(TREES.cards).length, mapOk:Object.values(TREES.M).every(m => !!m.map)};
+      o.props = {ready:PROPM.isReady(), models:Object.keys(PROPM.models).sort().join(',')};
+      // 고속도로 맵: 나무 인스턴스(모델 + 판) · 가로등 · 가드레일 기둥이 놓였나
+      const count = (grp, f) => { let n = 0; grp.traverse(q => { if(q.isInstancedMesh && f(q)) n += q.count; }); return n; };
+      const hw = builtMaps.ICR, city = builtMaps.CRT; const isLeaf = q => q.userData.tree === 'leaf', isFar = q => q.userData.tree === 'far';
+      o.hw = hw ? {near:count(hw, isLeaf), far:count(hw, isFar), culled:(() => { let ok = true; hw.traverse(q => { if(q.userData.tree && q.userData.tree !== 'far' && (!q.frustumCulled || !q.geometry.boundingSphere)) ok = false; }); return ok; })(), lamps:count(hw, q => PROPM.models.lamp_hw.some(p => p.geo === q.geometry))/PROPM.models.lamp_hw.length, posts:count(hw, q => PROPM.models.rail_post.some(p => p.geo === q.geometry))/PROPM.models.rail_post.length} : null;
+      o.city = city ? {trees:count(city, isLeaf), lamps:count(city, q => PROPM.models.lamp_city.some(p => p.geo === q.geometry))/PROPM.models.lamp_city.length} : null;
+      // 보행자: 모델 4개 · 자리 6개 모두 뼈대 동작, 걷는 방향을 보고 섬(머리 → 얼굴 앞 뼈대가 진행 방향)
+      const m = mapById('CRT'), leaf = m.leaves.findIndex(l => l.dest === '종합병원');
+      runDrive({map:m, leaf, lane:2, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', secs:1, keep:true, ap:{}});
+      S.pedPlan = [{x:16.6, dir:1, v:1.3, t0:.2}, {x:18, dir:-1, v:1.4, t0:.1}]; cityFrame(3); scene.updateMatrixWorld(true);
+      const a = new THREE.Vector3(), b = new THREE.Vector3(), face = i => { const u = pedMeshes[i].userData; if(!u.model) return null; u.model.getObjectByName('headfront').getWorldPosition(a); u.model.getObjectByName('Head').getWorldPosition(b); return +(a.z - b.z).toFixed(2); };
+      const pose = i => { const u = pedMeshes[i].userData; if(!u.model) return null; const f = u.model.getObjectByName('LeftFoot').getWorldPosition(new THREE.Vector3()); return f.toArray().map(v => +v.toFixed(2)).join(','); };
+      const p3 = pose(0); cityFrame(3.3); scene.updateMatrixWorld(true); const p33 = pose(0); cityFrame(3); scene.updateMatrixWorld(true);
+      o.peds = {loaded:PED_MODEL.loaded, mixers:pedMeshes.filter(q => q.userData.mixer).length, codeHidden:pedMeshes.every(q => !q.userData.body.visible), face0:face(0), face1:face(1), moves:p3 !== p33, same:pose(0) === p3, nat:pedMeshes.map(q => +(q.userData.natural || 0).toFixed(2))};
+      stopDrive(); S.testing = false; goHome();
+      o.cars = {draco:!!THREE.DRACOLoader, n:Object.keys(CAR_MODELS).length};
+      return o; });
+    check('그래픽: 나무 모델 6그루(느티나무 3 · 소나무 3)와 텍스처를 불러와, 고속도로에 가까운 나무는 모델 · 먼 나무는 그 모델을 찍은 판으로 심김(같은 나무), 도심 가로수도 같은 모델. 가까운 나무는 구역별로 묶여 화면 밖 구역은 안 그림', g.trees.ready && g.trees.models === 'pine_a,pine_b,pine_c,zelkova_a,zelkova_b,zelkova_c' && g.trees.cards === 6 && g.trees.mapOk && g.hw && g.hw.near >= 300 && g.hw.far > 3000 && g.hw.culled && g.city && g.city.trees > 40, JSON.stringify({t:g.trees, hw:g.hw, city:g.city}));
+      check('그래픽: 가로등 2종 · 가드레일 기둥(Blender 모델)이 인스턴스로 놓임', g.props.ready && g.props.models === 'lamp_city,lamp_hw,rail_post' && g.hw.lamps >= 8 && g.hw.posts >= 100 && g.city.lamps >= 10, JSON.stringify({p:g.props, hw:g.hw, city:g.city}));
+      check('그래픽: 보행자 모델 4명이 자리 6개에 모두 들어가 뼈대로 걷고(시각에 따라 자세가 바뀌고 같은 시각이면 같은 자세), 걷는 방향을 보고 섬. 코드 모양은 숨김', g.peds.loaded === 4 && g.peds.mixers === 6 && g.peds.codeHidden && g.peds.face0 < -.05 && g.peds.face1 > .05 && g.peds.moves && g.peds.same && g.peds.nat.every(v => v > .4 && v < 1.6), JSON.stringify(g.peds));
+      check('그래픽: 차량 모델 5종은 Draco 압축본을 읽음', g.cars.draco && g.cars.n === 5, JSON.stringify(g.cars));
+  }
+
   if(SHOTS){
     fs.mkdirSync(SHOTS, {recursive:true});
     for(const [w, h] of [[1366, 768], [1920, 1080]]){

@@ -1,0 +1,129 @@
+{
+ "name": "before",
+ "at": "2026-11-17T07:49:38.228Z",
+ "scenes": [
+  {
+   "label": "고속도로 ① 주간 뒤차",
+   "frames": 3194,
+   "avgMs": 2.61,
+   "fps": 383,
+   "p95Ms": 3.9,
+   "worstMs": 7.1,
+   "tier": 0,
+   "tris": 743616,
+   "calls": 216,
+   "geos": 125,
+   "tex": 32
+  },
+  {
+   "label": "고속도로 ② 야간 정체",
+   "frames": 2410,
+   "avgMs": 3.32,
+   "fps": 301.3,
+   "p95Ms": 5.8,
+   "worstMs": 52.1,
+   "tier": 0,
+   "tris": 1378237,
+   "calls": 382,
+   "geos": 230,
+   "tex": 38
+  },
+  {
+   "label": "일반도로 ④ 주간",
+   "frames": 2482,
+   "avgMs": 3.22,
+   "fps": 310.3,
+   "p95Ms": 3.6,
+   "worstMs": 178.3,
+   "tier": 0,
+   "tris": 463737,
+   "calls": 244,
+   "geos": 288,
+   "tex": 49
+  },
+  {
+   "label": "일반도로 ⑤ 야간",
+   "frames": 3046,
+   "avgMs": 2.63,
+   "fps": 380.9,
+   "p95Ms": 3.2,
+   "worstMs": 9.1,
+   "tier": 0,
+   "tris": 367652,
+   "calls": 464,
+   "geos": 424,
+   "tex": 55
+  }
+ ],
+ "bytes": {
+  "first": 13021358,
+  "all": 13021358,
+  "files": [
+   [
+    "/assets/tex/tree_zelkova.png",
+    1346165
+   ],
+   [
+    "/assets/models/bus.glb",
+    1333760
+   ],
+   [
+    "/assets/models/suv.glb",
+    1272788
+   ],
+   [
+    "/assets/models/sedan.glb",
+    1262384
+   ],
+   [
+    "/assets/models/truck.glb",
+    1172904
+   ],
+   [
+    "/assets/models/hatch.glb",
+    1139012
+   ],
+   [
+    "/assets/tex/tree_pine.png",
+    1036294
+   ],
+   [
+    "/assets/cabin/base.webp",
+    597092
+   ],
+   [
+    "/assets/tex/leaves.png",
+    468509
+   ],
+   [
+    "/assets/tex/grass.jpg",
+    436886
+   ],
+   [
+    "/assets/tex/verge.jpg",
+    399765
+   ],
+   [
+    "/assets/tex/asphalt.jpg",
+    376313
+   ],
+   [
+    "/assets/models/hud_car.glb",
+    298268
+   ],
+   [
+    "/assets/cabin/wheel.webp",
+    207022
+   ]
+  ]
+ },
+ "byType": {
+  ".html": 35464,
+  ".css": 29347,
+  ".webp": 804114,
+  ".js": 424166,
+  ".glb": 6535688,
+  ".jpg": 1744519,
+  ".png": 2850968
+ }
+}

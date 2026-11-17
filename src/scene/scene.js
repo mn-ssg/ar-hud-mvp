@@ -42,6 +42,9 @@ function canvasTex(w, h, draw, repeat){
 }
 // 파일 텍스처(Higgsfield 생성 재질 등, assets/README.md): 불러오면 apply로 바꿔 끼움. 못 불러오면 코드 텍스처 그대로
 const texLoader = new THREE.TextureLoader();
+// GLB 읽기 공용 (2026-11-17): Draco로 압축한 메시도 읽는다(디코더는 three r128과 같은 CDN). GLTFLoader가 없으면 null → 부르는 쪽이 코드 모양을 그대로 씀
+const GLTF = (() => { if(!THREE.GLTFLoader) return null; const l = new THREE.GLTFLoader();
+  if(THREE.DRACOLoader){ const d = new THREE.DRACOLoader(); d.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/gltf/'); l.setDRACOLoader(d); } return l; })();
 function loadTex(url, apply){
   texLoader.load(url, t => { t.encoding = THREE.sRGBEncoding; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.RepeatWrapping; apply(t); },
     undefined, () => console.warn('텍스처를 못 불러와 코드 텍스처로 둠:', url));
@@ -209,13 +212,7 @@ const railBeam = (() => {
   const sh = new THREE.Shape([[0,0],[.07,.05],[.07,.12],[.03,.155],[.07,.19],[.07,.26],[0,.31],[-.006,.31],[.064,.262],[.064,.192],[.024,.155],[.064,.118],[.064,.052],[-.006,0]].map(p => new THREE.Vector2(p[0],p[1])));
   return new THREE.ExtrudeGeometry(sh, {depth:268, bevelEnabled:false});
 })();
-// 가로등 (D105): 받침(바닥 플랜지)이 있는 가늘어지는 기둥 · 살짝 꺾인 팔 · 납작한 등 머리 + 아래 렌즈 면(밤에 빛남, lampMat). 그림자는 드리우지 않음(가는 물체 원칙)
-const lampGeo = (() => {
-  const pole = merge([[new THREE.CylinderGeometry(.075,.12,10,12), M4()], [new THREE.CylinderGeometry(.2,.24,.08,16), M4().makeTranslation(0,-4.96,0)], [new THREE.CylinderGeometry(.13,.16,.5,12), M4().makeTranslation(0,-4.7,0)]]);
-  const arm = merge([[new THREE.CylinderGeometry(.045,.055,1.6,8), M4().makeRotationZ(Math.PI/2).premultiply(M4().makeTranslation(-.75,0,0))], [new THREE.CylinderGeometry(.04,.045,1.0,8), M4().makeRotationZ(Math.PI/2 - .18).premultiply(M4().makeTranslation(-2.0,.09,0))]]);
-  const head = merge([[new THREE.BoxGeometry(.95,.1,.34), M4()], [new THREE.BoxGeometry(.7,.04,.24), M4().makeTranslation(0,-.06,0)]]);
-  return {pole, arm, head, lens:new THREE.PlaneGeometry(.62,.2).rotateX(Math.PI/2).translate(0,-.085,0)};
-})();
+// 가로등 · 가드레일 기둥은 Blender 모델(props.js PROPM, 2026-11-17 — 예전 코드 모양 lampGeo 삭제)
 // 갈림목 충격흡수대: 노랑 + 검은 사선
 const goreMats = (() => {
   const stripes = canvasTex(128, 128, g => {
@@ -227,51 +224,7 @@ const goreMats = (() => {
   loadTex('assets/tex/gore.jpg', t => { face.map = t; face.color = lin('#ffffff'); face.roughness = .7; face.needsUpdate = true; const ts = t.clone(); ts.needsUpdate = true; ts.repeat.set(2.5, 1); yellow.map = ts; yellow.color = lin('#ffffff'); yellow.roughness = .7; yellow.needsUpdate = true; });
   return [yellow,yellow,yellow,yellow,face,yellow];
 })();
-// 나무: 그린 나무 그림을 세 방향으로 교차시킨 판(앞뒤 따로) — 멀리서 보면 입체로 보이고 그림자도 잎 모양으로 진다
-const treeKinds = (() => {
-  const pineTex = canvasTex(256, 512, (g,w,h) => {
-    g.fillStyle = '#3b2a1e'; g.fillRect(w/2-6, h*.62, 12, h*.38);
-    const top = 10, bot = h*.9;
-    for(let i=0;i<3400;i++){
-      const t = Math.pow(Math.random(), .75), y = top + t*(bot-top);
-      const half = w*.47 * t * (.6 + .4*((t*9) % 1));                  // 층층이 가지
-      const x = w/2 + (Math.random()*2-1) * half * Math.sqrt(.4 + Math.random()*.6);
-      const k = .55 + .5*(Math.abs(x-w/2)/Math.max(half,1))*Math.random() + .3*(1-t);
-      g.fillStyle = `rgb(${28*k|0},${60*k|0},${36*k|0})`;
-      g.beginPath(); g.ellipse(x, y, 3+Math.random()*6, 1.6+Math.random()*2.4, (x<w/2?1:-1)*(.25+Math.random()*.35), 0, 6.3); g.fill();
-    }
-  });
-  const leafTex = canvasTex(256, 256, (g,w,h) => {
-    g.strokeStyle = '#4a3a2c'; g.lineWidth = 8; g.beginPath(); g.moveTo(w/2,h); g.lineTo(w/2,h*.55); g.stroke();
-    g.lineWidth = 3; for(const a of [-.6,.5,-.2]){ g.beginPath(); g.moveTo(w/2,h*.72); g.lineTo(w/2+a*80,h*.42); g.stroke(); }
-    for(let c=0;c<14;c++){
-      const cx = w/2 + (Math.random()*2-1)*w*.3, cy = h*.2 + Math.random()*h*.4, r = 22 + Math.random()*26;
-      for(let i=0;i<260;i++){
-        const a = Math.random()*6.3, dd = Math.sqrt(Math.random())*r, x = cx + Math.cos(a)*dd, y = cy + Math.sin(a)*dd*.85;
-        const k = .6 + .55*(1 - (y-cy+r)/(2*r)) + Math.random()*.2;
-        g.fillStyle = `rgb(${50*k|0},${82*k|0},${38*k|0})`;
-        g.beginPath(); g.arc(x, y, 2+Math.random()*3, 0, 6.3); g.fill();
-      }
-    }
-  });
-  const cross = (w, h) => {
-    const parts = [];
-    for(const a of [0, Math.PI/3, 2*Math.PI/3]) for(const back of [0, Math.PI])
-      parts.push([new THREE.PlaneGeometry(w, h), M4().makeRotationY(a + back).multiply(M4().makeTranslation(0, h/2, 0))]);
-    const g = merge(parts), p = g.attributes.position, n = g.attributes.normal, v = new THREE.Vector3();
-    for(let i=0;i<p.count;i++){ v.set(p.getX(i), (p.getY(i) - h*.55)*.7 + h*.6, p.getZ(i)).normalize(); n.setXYZ(i, v.x, v.y, v.z); }   // 둥글게 음영
-    return g;
-  };
-  // 2026-10-29: 판에 그리는 그림을 Higgsfield 소나무 · 느티나무 사진(배경 제거, assets/tex/tree_*.png)으로 — 판 비율도 그림 비율로. 못 불러오면 위 코드 그림
-  // 2026-11-07 (D105): 그림을 그림자가 구워지지 않은 평평한 빛의 사진(1k, 배경 제거 · 흰 테 제거)으로 바꿈 — 장면 빛이 음영을 준다. 판 비율 = 그림 비율(소나무 688 × 1012 · 느티나무 838 × 1024).
-  // 가장자리: alphaTest를 낮추고 alphaToCoverage(MSAA)로 부드럽게 — 예전 320px 그림은 가장자리 반투명 픽셀이 42 ~ 82%라 alphaTest .5에서 잎이 뜯겨 보였음
-  return [[pineTex, cross(.68,1), 10, 7, 'assets/tex/tree_pine.png'], [leafTex, cross(.82,1), 8, 4, 'assets/tex/tree_zelkova.png']].map(([map, geo, hMin, hVar, url]) => {
-    const mat = new THREE.MeshStandardMaterial({map, alphaTest:.3, alphaToCoverage:true, roughness:.95, envMapIntensity:.25});
-    const depth = new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, map, alphaTest:.5});
-    loadTex(url, t => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; mat.map = t; depth.map = t; mat.needsUpdate = depth.needsUpdate = true; });
-    return {geo, mat, depth, hMin, hVar};
-  });
-})();
+// 나무는 trees.js (2026-11-17: 사진을 붙인 판 나무 treeKinds 삭제 — 모든 나무가 Blender 모델)
 // 건물 벽: 한 장 = 가로 18m × 세로 21m (창 6열 × 7층, 창 하나 ≈ 3m). 2026-10-29: Higgsfield 생성 텍스처(assets/tex/facade.jpg)를 불러와 바꿔 끼움.
 // 아래 코드 텍스처는 불러오기 전 · 실패했을 때 쓰는 같은 격자의 대체품
 const FACADE_TILE = [18, 21];
@@ -294,12 +247,13 @@ function facadeBox(w, h, d, tile = FACADE_TILE){
    아스팔트(이음새 없게 처리) · 보도 블록 · 건물 벽. 불러오기 전 · 실패 시엔 위 코드 텍스처 그대로 → 주행 판정과 무관(그림만) */
 loadTex('assets/tex/asphalt.jpg', t => { asphalt.map = t; asphalt.color = lin('#d2d6da'); asphalt.needsUpdate = true; });
 // 밤 창: 같은 그림에서 유리(어두운 곳)만, 창 칸(6 × 7)마다 30% 켬. lumMax: 유리로 볼 밝기 한계(유리 외벽은 밝아서 높게)
-function facadeNight(img, lumMax = 95){
+// 2026-11-17: 켜진 칸을 한 색으로 칠하던 것을 → 원래 그림의 밝기 무늬(커튼 · 창틀 · 유리 반사)를 살리고 칸마다 밝기를 다르게. 유리 외벽은 칸 전체가 유리라 가까이서 큰 네모 조각으로 보였다(gain으로 낮춤)
+function facadeNight(img, lumMax = 95, gain = 1){
   const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-  const g = c.getContext('2d'); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height), on = Array.from({length:42}, () => Math.random() < .3 ? (Math.random() < .7 ? [255,214,160] : [205,222,255]) : null);
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, c.width, c.height), on = Array.from({length:42}, () => Math.random() < .3 ? [...(Math.random() < .7 ? [255,214,160] : [205,222,255]), (.55 + Math.random()*.45)*gain] : null);
   for(let y = 0; y < c.height; y++) for(let x = 0; x < c.width; x++){
     const i = (y*c.width + x)*4, lum = .3*d.data[i] + .59*d.data[i+1] + .11*d.data[i+2], cell = on[Math.min(6, Math.floor(y/c.height*7))*6 + Math.min(5, Math.floor(x/c.width*6))];
-    const lit = cell && lum < lumMax; d.data[i] = lit ? cell[0] : 0; d.data[i+1] = lit ? cell[1] : 0; d.data[i+2] = lit ? cell[2] : 0;
+    const k = cell && lum < lumMax ? cell[3]*(.35 + .65*lum/lumMax) : 0; d.data[i] = k ? cell[0]*k : 0; d.data[i+1] = k ? cell[1]*k : 0; d.data[i+2] = k ? cell[2]*k : 0;
   }
   g.putImageData(d, 0, 0);
   const em = new THREE.CanvasTexture(c); em.encoding = THREE.sRGBEncoding; em.wrapS = em.wrapT = THREE.RepeatWrapping; return em;
@@ -315,7 +269,7 @@ const BUILD = {
   roof:new THREE.MeshStandardMaterial({color:lin('#8b8d8a'), roughness:.92})
 };
 loadTex('assets/tex/facade_apt.jpg', t => { const em = facadeNight(t.image, 110); BUILD.apt.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
-loadTex('assets/tex/facade_glass.jpg', t => { const em = facadeNight(t.image, 175); BUILD.glass.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
+loadTex('assets/tex/facade_glass.jpg', t => { const em = facadeNight(t.image, 175, .5); BUILD.glass.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
 loadTex('assets/tex/shopfront.jpg', t => { BUILD.shop.map = t; BUILD.shop.emissiveMap = t; BUILD.shop.needsUpdate = true; });
 
 /* ---------- 잔디 덩어리 (D105): 길가 흙 띠 바깥 1 ~ 6m에 낮은 풀 판(엇갈린 2장)을 인스턴스로 — 멀리는 지형 텍스처만 ---------- */
@@ -481,9 +435,8 @@ function buildMapScene(m){
       const b = addMesh(railBeam, steel); b.position.set(x, .45, -228); if(x > 0) b.scale.x = -1;   // 볼록한 면이 도로 쪽
       for(let z=38; z>-228; z-=4){ posts.push([x + Math.sign(x)*.1, z]); if(((Math.round(z) % 20) + 20) % 20 === 18) refl.push([x - Math.sign(x)*.05, z]); }
     }
-    const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(.1,.8,.14), galv, posts.length), d = new THREE.Object3D();
-    posts.forEach(([x,z],i) => { d.position.set(x,.4,z); d.updateMatrix(); pm.setMatrixAt(i, d.matrix); });
-    pm.receiveShadow = true; MG.add(pm);
+    const d = new THREE.Object3D();
+    posts.forEach(([x, z]) => PROPM.place(MG, 'rail_post', x, 0, z, x > 0 ? Math.PI : 0));   // ㄷ형 강 기둥 + 간격재(Blender 모델) — 빔 쪽이 도로를 보게
     const rm = new THREE.InstancedMesh(new THREE.BoxGeometry(.03,.09,.07), reflMat, refl.length);
     refl.forEach(([x,z],i) => { d.position.set(x,.83,z); d.updateMatrix(); rm.setMatrixAt(i, d.matrix); });
     MG.add(rm);
@@ -492,10 +445,7 @@ function buildMapScene(m){
   /* 가로등: 양쪽에 엇갈려 */
   for(const [x, z0] of [[H+1.5, 25], [-(H+1.5), 1]]) for(let z=z0; z>-225; z-=48){
     const s = Math.sign(x);
-    const p = addMesh(lampGeo.pole, galv); p.position.set(x, 5, z);
-    const a = addMesh(lampGeo.arm, galv, ''); a.position.set(x, 9.95, z); a.scale.x = -s;   // 팔은 도로 쪽(-s)으로
-    const h = addMesh(lampGeo.head, galv, ''); h.position.set(x - s*2.5, 10.05, z);
-    const lens = addMesh(lampGeo.lens, lampMat, ''); lens.position.copy(h.position);
+    PROPM.place(MG, 'lamp_hw', x, 0, z, s > 0 ? Math.PI : 0);   // 팔은 도로 쪽(-s)으로. 등 머리 자리는 예전과 같음(x - s·2.5, 높이 10.05)
     // 밤에만: 바닥 불빛 웅덩이 · 등 머리 빛 (실제 조명 대신 가벼운 그림 — 가로등 10여 개에 빛을 다 켜면 무거움)
     const pool = new THREE.Mesh(poolGeo, poolMat); pool.position.set(x - s*3.2, .03, z); pool.renderOrder = 1;
     const glow = new THREE.Sprite(glowMat); glow.scale.set(2.6, 2.6, 1); glow.position.set(x - s*2.35, 9.78, z);
@@ -555,21 +505,16 @@ function buildMapScene(m){
       if(fbm(x*.02+3, z*.02) < .33) continue;                             // 숲 덩어리와 빈 들판
       spots.push([x, terrainH(x,z) - .2, z]);
     }
-    // 도로에서 30m 안 나무는 입체(줄기 · 가지 · 잎 덩어리, props.js) — 지나가며 시차가 보이게. 나머지는 판 나무
-    const near3d = [];
+    // 모든 나무가 같은 모델(trees.js, 2026-11-17). 도로에서 45m 안(최대 340그루)은 모델 그대로 — 지나가며 시차가 보이게, 나머지는 그 모델을 찍은 판. 침엽(소나무) 70% · 활엽(느티나무) 30%
+    // 맵 난수는 예전과 같은 횟수만 쓴다(예전: 30m 안 260그루만 입체) → 나무 뒤에 정해지는 풍경이 2차와 같음
+    const near3d = [], kindAt = (x, z) => hash2(Math.round(x*3), Math.round(z*3)) < .7 ? 'pine' : 'zelkova';
     for(let i = spots.length - 1; i >= 0; i--){ const [x, y, z] = spots[i]; if(roadDist(x, z) < 30 && near3d.length < 260 && hash2(i, 5) < .55){ near3d.push([x, y, z, .95 + rnd()*.45, rnd()*6.3]); spots.splice(i, 1); } }
-    PROPS.plantTrees(MG, near3d, rnd);
-    const d = new THREE.Object3D(), c = new THREE.Color();
-    treeKinds.forEach(({geo, mat, depth, hMin, hVar}, ti) => {
-      const list = spots.filter((_,i) => (hash2(i, 3) < .7) === (ti === 0));   // 침엽 70% · 활엽 30%
-      const im = new THREE.InstancedMesh(geo, mat, list.length);
-      im.customDepthMaterial = depth;
-      list.forEach(([x,y,z],i) => {
-        const s = hMin + rnd()*hVar; d.position.set(x,y,z); d.rotation.set(0, rnd()*6.3, 0); d.scale.set(s*(.85+rnd()*.3), s, s*(.85+rnd()*.3)); d.updateMatrix();
-        im.setMatrixAt(i, d.matrix); im.setColorAt(i, c.setRGB(.8+rnd()*.35, .85+rnd()*.3, .75+rnd()*.3));
-      });
-      im.castShadow = im.receiveShadow = true; MG.add(im);
-    });
+    // 남은 나무 중 도로에 가까운 것부터 모델로(가까운 나무가 판으로 남지 않게)
+    const cand = spots.map((sp, i) => [roadDist(sp[0], sp[2]), i]).filter(q => q[0] < 45).sort((p, q) => p[0] - q[0]).slice(0, Math.max(0, 340 - near3d.length)).map(q => q[1]).sort((p, q) => q - p);
+    const more = cand.map(i => { const [x, y, z] = spots[i]; spots.splice(i, 1); return [x, y, z, .9 + hash2(i, 7)*.45]; });
+    TREES.plant(MG, near3d, rnd, sp => kindAt(sp[0], sp[2]));
+    TREES.plant(MG, more, rnd, sp => kindAt(sp[0], sp[2]), 7);
+    TREES.far(MG, spots, rnd, sp => kindAt(sp[0], sp[2]));
   })();
 
   /* 먼 아파트 단지 */
@@ -827,7 +772,7 @@ function updateCarLights(){
 }
 function loadCarModels(){
   if(!THREE.GLTFLoader){ console.warn('GLTFLoader 없음 → 코드 차량 메시'); return; }
-  const loader = new THREE.GLTFLoader();
+  const loader = GLTF;   // Draco 압축 모델(2026-11-17: 차량 5종 6.2MB → 2.3MB, assets/blender/compress_glb.py)
   const sizes = {sedan:CAR_TYPES.sedan, suv:CAR_TYPES.suv, hatch:CAR_TYPES.hatch, truck:CAR_TYPES.truck, bus:{L:11.4, W:2.5}};
   Object.entries(sizes).forEach(([type, T]) => loader.load(`assets/models/${type}.glb`, g => {
     let mesh = null; g.scene.updateMatrixWorld(true); g.scene.traverse(o => { if(o.isMesh && !mesh) mesh = o; }); if(!mesh) return;
@@ -882,7 +827,7 @@ function setSceneLight(night){
   carMats.tail.emissiveIntensity = L.tail; carMats.brake.emissiveIntensity = L.brake; carMats.head.emissiveIntensity = L.headlamp; carMats.indOn.emissiveIntensity = L.ind; carMats.shadow.opacity = L.carShadow;
   nightOnly.forEach(o => o.visible = night);
   // 나무 · 잎 색 (D105): 평평한 빛의 사진이라 낮엔 살짝 눌러 잔디와 맞추고, 밤엔 달빛 색으로 어둡게 (예전엔 밤에 잎이 낮처럼 밝았음)
-  const treeTint = lin(night ? '#55627a' : '#d9ddd0'); treeKinds.forEach(k => k.mat.color.copy(treeTint)); if(typeof PROPS !== 'undefined') PROPS.leafMat.color.copy(treeTint);
+  const treeTint = lin(night ? '#55627a' : '#d9ddd0'); if(typeof TREES !== 'undefined') TREES.tint(treeTint);
   if(typeof cityLight === 'function') cityLight(night);   // 일반도로 건물 창 · 노란 칠 · 길바닥 화살표 (city.js)
 }
 setSceneLight(false);

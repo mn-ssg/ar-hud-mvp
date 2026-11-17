@@ -21,7 +21,8 @@ src/
     scene.js          three.js 장면 · 하늘 · 도로 · 차량 메시 · 3D 차량 모델(GLB) 읽기 · 주야 조명
     cabin.js          운전석 실내 — Higgsfield 이미지 층(바탕 · 핸들 CSS 3D) + 계기판 · 센터 화면 캔버스 (2026-11-07 D111). HUD 상자 크기를 장면 각도(config.js HUD_DEG 14° × 7.3°, D116)로 px 환산, 아래끝은 대시보드 윗선 위, 야간 덮개는 바탕 알파 마스크
     mirrors.js        룸미러 — 실내 이미지의 받침 자리 · 실제 거울 크기 각도 (2026-11-07 저녁 D115), 크기는 cabin.js layoutCabin이 다시 놓음
-    props.js          가로수 · 건물 · 정류장 소품
+    props.js          정류장 · 연석 등 코드 소품 + PROPM(Blender 가로등 · 가드레일 기둥 모델 props.glb를 인스턴스로 놓음)
+    trees.js          나무 — Blender 모델 6그루(trees.glb). 가까운 나무는 모델, 먼 나무는 같은 모델을 찍은 판 (2026-11-17)
     city.js           일반도로 교차로 장면 · 신호 · 보행자 · 버스(정류장 흐름)
   hud/
     hud.js            현대 HUD(대조군) · 리뉴얼 HUD 1차(1차 실험 v1.9) · 미니 도로 공용 그리기 함수
@@ -35,13 +36,15 @@ src/
     session.js        참가자 진행 · 기록 · 엑셀 · 기록 서랍 · 방향키
 assets/
   tex/                노면 · 벽 · 잔디 · 금속 · 나무 재질 (코드가 읽음). 참고 시안은 ../04_리서치/assets/
-  models/             차량 · 버스 GLB 5개 (Higgsfield Tripo, 2026-11-07). 못 불러오면 코드 메시
+  models/             차량 · 버스 GLB 5개(Higgsfield Tripo, 2026-11-07 · Draco 압축 2026-11-17) · 나무 · 가로등 · 가드레일 기둥(Blender) · 보행자 4명(Higgsfield + 리깅) · HUD 아이콘 2개. 못 불러오면 코드 메시
+  blender/            Blender 원본(.blend)과 만드는 스크립트(.py), 보행자 리깅 원본(src/)
   cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
-  drive-regression.js 브라우저 자동 운전 회귀 116항목  node drive-regression.js (Chrome 필요)
+  drive-regression.js 브라우저 자동 운전 회귀 130항목  node drive-regression.js (Chrome 필요)
   capture-states.js   리뉴얼 HUD 3차 상태 6가지 캡처(주간 · 야간, 현대 HUD 줄 포함) + 대비 측정   node capture-states.js <폴더>
   handling-check.js   조작감 점검 — 새 조작 모델을 키 입력으로 돌려 차로 변경 시간 · 우회전 핸들 각도 · 가속 · 제동을 실제 값과 견줌(결과 handling-check.json)
+  perf-check.js       성능 재기 — 장면 4개 프레임 시간 · 삼각형 · 그리기 호출 · 로딩 용량   node perf-check.js after (결과 perf-after.json, 그래픽 작업 전 값 perf-before.json)
   autodrive-batch.js  자동 운전 묶음(현대 · 리뉴얼 같은 시나리오의 기록 값이 같은지, 3차 상태 통계)
   demo-audit.js       시연 · 주행 교통 겹침 · 이상 움직임 점검 (ONLY=CRT 처럼 맵 하나만)
   cutin-batch.js      '앞질러 끼어들기' 막기 방법 비교(가속 끼어들기 vs HUD 따라가기 자동 운전)
