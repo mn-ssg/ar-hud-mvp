@@ -81,7 +81,7 @@ const mulberry32 = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imu
 
 /* ---------- 상태 ---------- */
 const KEYS = {left:false, right:false, up:false, down:false};
-const D = {x:0, z:0, psi:0, v:SPEED, sw:0, r:0, wheel:0, holdT:0, holdDir:0, brakeT:0, thrT:0, autoSw:null, t:0, frozen:false, cars:[], jamLanes:[], cfg:null,
+const D = {x:0, z:0, psi:0, v:SPEED, sw:0, r:0, wheel:0, holdT:0, holdDir:0, brakeT:0, thrT:0, autoSw:null, roadPsi:0, t:0, frozen:false, cars:[], jamLanes:[], cfg:null,
   blink:0, blinkT0:0, blinkOnAt:null, blinkPhase:false, responder:null, blinkUsed:null, blinkLead:null, blinkResp:''};   // 깜빡이 (D103)
 
 // IDM(지능형 운전자 모델): 원하는 속도 v0 · 앞차와 간격 gap · 속도 차 dv(+ = 내가 빠름) → 가속도. T 차간 시간 · s0 최소 간격
@@ -111,7 +111,7 @@ function leaderOf(x, z, fx, fz, self, meLat, carLat = DRV.carW + .3){
 function driveReset(cfg){
   const m = cfg.map, p0 = path.curve.getPointAt(clamp(path.sStart/path.L));
   D.cruise = cruiseOf(m);
-  Object.assign(D, {x:m.laneX(cfg.lane), z:p0.z, psi:0, v:D.cruise, sw:0, r:0, wheel:0, holdT:0, holdDir:0, brakeT:0, thrT:0, autoSw:null, t:0, frozen:false, cfg, ped:0, pedIn:false, sigChecked:false,
+  Object.assign(D, {x:m.laneX(cfg.lane), z:p0.z, psi:0, v:D.cruise, sw:0, r:0, wheel:0, holdT:0, holdDir:0, brakeT:0, thrT:0, autoSw:null, roadPsi:0, t:0, frozen:false, cfg, ped:0, pedIn:false, sigChecked:false,
     seg:null, hint:-1, segS:0, cands:null, lane:cfg.lane, chosen:[], exitName:'',
     enterZ:null, changeDist:null, risky:0, enc:{}, lastCut:{}, offroad:0, lastTouch:-9, followT:0, crashWith:'', result:null, endT:0,
     safeOn:false, safeSince:0, reactT:null, moved:false, cutAhead:0, cutAheadGap:null, cutAheadTtc:null,   // 앞으로 끼어들기(2026-11-03): 옮길 차로의 뒤차 앞에 들어간 횟수 · 그때 뒤차 간격(m, 최소) · 닿기까지(초, 최소)
@@ -276,15 +276,21 @@ const swHoldOf = v => swForCurv(Infinity, v, tabAt(VEH.ayHold, v));
 const swReturnTau = v => VEH.returnTau/clamp(v/VEH.returnSlowV, .08, 1);
 const brakeOf = t => { const B = VEH.brake; return t < B.firstT ? B.first*t/B.firstT : B.first + (B.max - B.first)*clamp((t - B.firstT)/(B.fullT - B.firstT)); };
 function stepPlayer(dt){
-  const V = VEH, v0 = D.v, want = (KEYS.right ? 1 : 0) - (KEYS.left ? 1 : 0);
+  const V = VEH, v0 = D.v, want = (KEYS.right ? 1 : 0) - (KEYS.left ? 1 : 0), AS = V.assist && V.assist.on ? V.assist : null, retTau = AS ? AS.returnTau/clamp(v0/V.returnSlowV, .08, 1) : swReturnTau(v0);
   // 1) 핸들 각도
   if(D.autoSw !== null && D.autoSw !== undefined){ D.sw = clamp(D.autoSw, -V.lock, V.lock); D.autoSw = null; D.holdT = 0; D.holdDir = 0; }
   else if(want){
     D.holdT = D.holdDir === want ? D.holdT + dt : 0; D.holdDir = want;
-    const hold = swHoldOf(v0), rate = Math.min(V.swRate, hold/V.tFull)*(V.rampLo + (1 - V.rampLo)*clamp(D.holdT/V.rampT));
-    const back = D.sw*want < 0 ? Math.abs(D.sw)/swReturnTau(v0) : 0;   // 반대쪽으로 돌아가 있으면 복원되는 속도가 더해짐
+    const hold = swHoldOf(v0), rate = Math.min(V.swRate, hold/(AS ? AS.tFull : V.tFull))*((AS ? AS.rampLo : V.rampLo) + (1 - (AS ? AS.rampLo : V.rampLo))*clamp(D.holdT/V.rampT));
+    const back = D.sw*want < 0 ? Math.abs(D.sw)/retTau : 0;   // 반대쪽으로 돌아가 있으면 복원되는 속도가 더해짐
     D.sw += clamp(want*hold - D.sw, -(rate + back)*dt, (rate + back)*dt);
-  } else { D.holdT = 0; D.holdDir = 0; D.sw -= D.sw*Math.min(1, dt/swReturnTau(v0)); if(Math.abs(D.sw) < .02) D.sw = 0; }
+  } else {
+    D.holdT = 0; D.holdDir = 0;
+    // 조작 보조 ③ 방향 맞춤: 도로 방향(D.roadPsi — 본선 · 확정된 출구 위에서만 있음)과 틀어진 만큼을 alignTau초에 걸쳐 바로잡는 핸들 각도로 돌아간다. 없으면 가운데(0)로
+    let aim = 0;
+    if(AS && D.roadPsi !== null && D.roadPsi !== undefined && v0 > 2){ const err = wrapA(D.psi - D.roadPsi); if(Math.abs(err) < AS.alignMax*Math.PI/180) aim = swForCurv(-err/AS.alignTau/v0, v0, AS.alignAy); }
+    D.sw += (aim - D.sw)*Math.min(1, dt/retTau); if(!aim && Math.abs(D.sw) < .02) D.sw = 0;
+  }
   D.wheel = D.sw/V.ratio*Math.PI/180;
   // 2) 속도
   const fx = Math.sin(D.psi), fz = -Math.cos(D.psi);
@@ -400,6 +406,7 @@ function wall(r, side, lim, dt){
   D.lastTouch = D.t;
 }
 function stepMain(dt){
+  D.roadPsi = 0;   // 본선의 도로 방향(조작 보조의 방향 맞춤용)
   const m = S.map, lim = m.city ? m.edgeX - DRV.carW/2 + .2 : m.half + .4 - DRV.carW/2;   // 가드레일(포장 반폭 + 0.4m) · 일반도로는 중앙선 · 연석
   if(Math.abs(D.x) > lim) wall({d:D.x, tx:0, tz:-1}, Math.sign(D.x), lim, dt);
   trackLanes();
@@ -421,6 +428,7 @@ function stepMain(dt){
 }
 // 갈림 직후: 모든 출구가 후보. 한 출구 위에만 있고 다른 출구 포장에서 3m 넘게 떨어지면 확정. 두 출구 사이(코)면 충돌
 function stepCands(dt){
+  D.roadPsi = null;   // 갈림 · 교차로 안: 어느 길로 갈지 모름 → 방향 맞춤 없음
   const cs = D.cands, m = S.map;
   cs.forEach(c => { const r = project(segPts(c.e), D.x, D.z, c.hint); Object.assign(c, r); c.hint = r.i; });
   // 일반도로 교차로 안: 벽 · 갈림 코 없음. 한 출구 위(시작에서 6m 넘게)에 있고 다른 출구와 3m 넘게 떨어지면 확정. 교차로를 벗어나면 가장 가까운 출구로
@@ -447,7 +455,7 @@ function commit(c){
 }
 function stepSeg(dt){
   const e = D.seg, P = segPts(e), r = project(P, D.x, D.z, D.hint), lim = e.half - DRV.carW/2 + .3 + (S.map.city ? 1.75 : 0);   // 일반도로: 옆 차로까지 여유
-  D.hint = r.i; D.segS = r.s;
+  D.hint = r.i; D.segS = r.s; D.roadPsi = Math.atan2(r.tx, -r.tz);
   if(Math.abs(r.d) > lim) wall(r, Math.sign(r.d), lim, dt);
   if(e.node){ if(r.s >= P.L - .5) D.cands = e.node.exits.map(x => ({e:x, hint:-1})); }
   else if(r.s >= (S.map.city ? CITY_DRV.endAfter : DRV.endAfter)) endRun('ok');

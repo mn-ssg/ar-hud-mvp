@@ -98,7 +98,7 @@ const pedMeshes = PED_STYLE.map(([coat, pants, shoe], i) => {
    · 동작은 시각으로 정한다(같은 시각 = 같은 자세, 기록 재현): 걷는 중이면 걷는 빠르기에 맞춰 돌리고, 서 있으면 두 발이 가장 모인 순간의 자세로 멈춤
    · 제자리 걷기: 동작에 들어 있는 엉덩이의 앞뒤 · 좌우 이동은 뺀다(자리는 코드가 옮김)
    · 못 불러오면 코드 모양 그대로 */
-const PED_MODEL = {urls:['assets/models/ped_1.glb', 'assets/models/ped_2.glb', 'assets/models/ped_3.glb', 'assets/models/ped_4.glb'], slot:[0, 1, 2, 3, 1, 2], loaded:0};   // slot: 보행자 자리 6개(횡단보도 0 ~ 2 · 정류장 3 ~ 5)가 쓰는 모델
+const PED_MODEL = {urls:['assets/models/ped_1.glb', 'assets/models/ped_2.glb', 'assets/models/ped_3.glb', 'assets/models/ped_4.glb'], slot:[0, 1, 2, 3, 1, 2], loaded:0, src:[]};   // slot: 보행자 자리 6개(횡단보도 0 ~ 2 · 정류장 3 ~ 5)가 쓰는 모델
 if(typeof GLTF !== 'undefined' && GLTF && THREE.SkeletonUtils) PED_MODEL.urls.forEach((url, mi) => GLTF.load(url, g => {
   const clip = g.animations[0]; if(!clip) return;
   clip.tracks.forEach(tr => { if(/Hips\.position$/.test(tr.name)){ const v = tr.values; for(let k = 3; k < v.length; k += 3){ v[k] = v[0]; v[k + 2] = v[2]; } } });
@@ -122,6 +122,7 @@ if(typeof GLTF !== 'undefined' && GLTF && THREE.SkeletonUtils) PED_MODEL.urls.fo
     const inst = THREE.SkeletonUtils.clone(g.scene), grp = pedMeshes[i], mixer = new THREE.AnimationMixer(inst); mixer.clipAction(clip).play();
     inst.rotation.y = yaw;
     grp.userData.body.visible = false; grp.add(inst); Object.assign(grp.userData, {mixer, dur:clip.duration, natural, standT, model:inst}); });
+  PED_MODEL.src[mi] = {scene:g.scene, clip, yaw, natural};   // 보도를 걷는 사람들(WALK)이 복제해 씀
   PED_MODEL.loaded++;
 }, undefined, () => console.warn('보행자 모델을 못 불러옴 → 코드 모양:', url)));
 
@@ -241,6 +242,38 @@ function busFrame(P, st, t, m, idx = 9){
 }
 
 /* ---------- 장면 ---------- */
+/* ---------- 보도를 걷는 사람들 (2026-11-17 저녁, 사용자: ④ ⑤ 맵은 가로수를 없애고 차라리 걷는 사람을) ----------
+   장식이다 — 횡단보도 보행자(pedsAt · 보행자 양보 판정 · HUD 표시)와 완전히 따로이고, 차도로 내려오지 않는다(보도 안쪽 건물 가까이로만 걷는다).
+   횡단보도 머리에서 14m 안으로는 오지 않는다 — '건너려는 사람'으로 헷갈리지 않게. 정류장 자리도 비운다.
+   자리는 시각 t만의 함수(구간을 왔다 갔다) → 같은 시각이면 같은 장면. 맵 난수(rnd)는 쓰지 않는다(자기 난수) — 교통 · 건물 자리가 2차와 같게.
+   모델은 횡단보도 보행자와 같은 4명(ped_1 ~ 4.glb)을 복제 · 키와 밝기를 조금씩 다르게. 카메라에서 WALK.far m 넘으면 그리지 않는다 */
+const WALK = {far:150, tints:[[1, 1, 1], [.84, .87, .95], [.96, .9, .82], [.78, .78, .8]]};
+function makeWalkers(m, segs){
+  const R = mulberry32(9100 + MAPS.indexOf(m)*131), list = [];
+  segs.forEach(([ax, c, a, b, n, inner]) => { if(b - a < 12) return;
+    for(let i = 0; i < n; i++){ const dir0 = i % 2 ? 1 : -1;
+      list.push({ax, a, b, L:b - a, v:1.1 + R()*.45, ph:R()*2*(b - a), model:Math.floor(R()*4), tint:WALK.tints[Math.floor(R()*WALK.tints.length)], s:.95 + R()*.1,
+        c:c + inner*(dir0 > 0 ? .55 : -.45) + (R() - .5)*.3, dir0, node:null}); } });   // 가는 방향에 따라 안쪽 · 바깥쪽 줄(마주칠 때 겹치지 않게)
+  return list;
+}
+function walkFrame(t){
+  const m = S.map, list = m && m._walkers; if(!list) return;
+  list.forEach(w => {
+    const src = PED_MODEL.src[w.model]; if(!src) return;
+    if(!w.node){ const inst = THREE.SkeletonUtils.clone(src.scene); inst.rotation.y = src.yaw; inst.scale.multiplyScalar(w.s);
+      inst.traverse(o => { if(o.isMesh){ o.material = o.material.clone(); o.material.color.setRGB(w.tint[0], w.tint[1], w.tint[2]); o.frustumCulled = false; o.castShadow = true; } });
+      w.node = new THREE.Group(); w.node.add(inst); w.mixer = new THREE.AnimationMixer(inst); w.mixer.clipAction(src.clip).play(); w.dur = src.clip.duration; w.nat = src.natural; w.node.userData.walker = true; m._walkGroup.add(w.node); }
+    const u = ((t*w.v*w.dir0 + w.ph) % (2*w.L) + 2*w.L) % (2*w.L), fwd = u < w.L, pos = w.a + (fwd ? u : 2*w.L - u), e = Math.min(pos - w.a, w.b - pos);
+    const x = w.ax === 'z' ? w.c : pos, z = w.ax === 'z' ? pos : w.c, dx = x - camera.position.x, dz = z - camera.position.z;
+    w.node.position.set(x, .15, z);
+    if(dx*dx + dz*dz > WALK.far*WALK.far){ w.node.visible = false; return; }   // 멀면 안 그림(자리는 늘 갱신)
+    const sgn = (fwd ? 1 : -1)*w.dir0 >= 0 ? 1 : -1, base = w.ax === 'z' ? (sgn > 0 ? Math.PI : 0) : (sgn > 0 ? -Math.PI/2 : Math.PI/2);   // 걷는 방향(+ 쪽 · − 쪽)을 보게
+    const turn = e < .6 ? (1 - e/.6)*Math.PI/2*((pos - w.a < w.b - pos) === (sgn < 0) ? 1 : -1) : 0;   // 구간 끝에서 돌아설 때 반 바퀴를 나눠 돈다
+    w.node.visible = true; w.node.rotation.y = base + turn;
+    w.mixer.setTime((((t*w.v/w.nat + w.ph) % w.dur) + w.dur) % w.dur);
+  });
+}
+
 // 판(바닥) · 상자 · 흰/노란 칠 사각형
 function buildCityScene(m){
   MG = new THREE.Group();
@@ -363,8 +396,16 @@ function buildCityScene(m){
   for(let z = CZ.far - 10; z > -560; z -= 11){ trees.push([xR + 2.8, z]); trees.push([xL - 2.8, z - 5]); }
   for(let x = cwE0 + 10; x < 320; x += 12){ trees.push([x, CZ.near + 2.8]); trees.push([x + 5, CZ.far - 2.8]); }
   for(let x = cwW1 - 10; x > -320; x -= 12){ if(!alley || x > alley[1] + 4 || x < alley[0] - 4) trees.push([x, CZ.far - 2.8]); trees.push([x - 5, CZ.near + 2.8]); }
-  // 가로수 = 느티나무 모델(trees.js): 자리 · 크기 · 방향을 흔들고 10%는 비워 줄이 기계적으로 보이지 않게
-  TREES.plant(MG, trees.filter(() => rnd() > .1).map(([x, z]) => [x + (rnd() - .5)*.6, .15, z + (rnd() - .5)*2.4, .85 + rnd()*.4, rnd()*6.3]), rnd);
+  // 2026-11-17 저녁(사용자: '④ ⑤ 맵에서는 나무 없애 — 있으니까 이상해'): 가로수를 심지 않는다. 맵 난수는 예전과 같은 횟수만 쓴다(나무 뒤에 정해지는 것들의 자리가 그대로이게)
+  const kept = trees.filter(() => rnd() > .1); kept.forEach(() => { rnd(); rnd(); rnd(); rnd(); }); for(let i = 0; i < kept.length*6; i++) rnd();
+  if(CITY_TREES) TREES.plant(MG, kept.map(([x, z]) => [x, .15, z, 1, 0]), () => 0);   // 다시 심고 싶으면 config.js CITY_TREES = true
+  // 대신 보도를 걷는 사람들: [축, 보도 가운데 줄, 시작, 끝, 사람 수, 건물 쪽 방향]
+  const wk = [], zsplit = (x, a, b, n, inner) => { const bz = m.bus && x > 0 ? m.bus.z : null; if(bz !== null && bz > a && bz < b){ wk.push(['z', x, a, bz - 11, Math.round(n*(bz - 11 - a)/(b - a)), inner], ['z', x, bz + 11, b, Math.round(n*(b - bz - 11)/(b - a)), inner]); } else wk.push(['z', x, a, b, n, inner]); };
+  zsplit(xR + 2.6, CZ.near + RC + 6, 56, 13, 1); zsplit(xL - 2.6, CZ.near + RC + 6, 56, 8, -1);
+  zsplit(xR + 2.6, -330, CZ.far - RC - 6, 4, 1); zsplit(xL - 2.6, -330, CZ.far - RC - 6, 4, -1);
+  wk.push(['x', CZ.near + 2.6, cwE0 + 14, 190, 5, 1], ['x', CZ.far - 2.6, cwE0 + 14, 190, 5, -1], ['x', CZ.near + 2.6, -190, cwW1 - 14, 5, 1]);
+  if(alley) wk.push(['x', CZ.far - 2.6, -190, alley[0] - 5, 3, -1], ['x', CZ.far - 2.6, alley[1] + 5, cwW1 - 14, 2, -1]); else wk.push(['x', CZ.far - 2.6, -190, cwW1 - 14, 5, -1]);
+  m._walkers = makeWalkers(m, wk); m._walkGroup = new THREE.Group(); MG.add(m._walkGroup);
 
   /* 방향 표지 (일반도로 = 파랑): 오른쪽 보도에서 뻗은 팔에 판, 정지선 80m 앞 */
   (() => {
@@ -407,5 +448,5 @@ function cityFrame(t){
     if(m.bus){ if(!m._busDemo) m._busDemo = busPlanOf(m, null, null); const P = m._busDemo; if(P.departT === null) P.departT = P.tClosed + .5; busFrame(P, busStateAt(P, t), t, m); }
     else busMesh.visible = false;
   }
-  pedFrame(t);
+  pedFrame(t); walkFrame(t);
 }

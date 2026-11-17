@@ -21,20 +21,51 @@ GUIDE.rearGap = HUD3.waitGap; GUIDE.rearTtc = HUD3.waitTtc; GUIDE.hold = HUD3.co
    돌려줌: (월드 x, z, 높이 y = 0) → [상자 x, 상자 y, 축척(내 차 줄 = 1), 내 차 기준 앞 거리 m] | null(그리는 범위 밖).
    화면 px = 화면 중심 + (1 tan 단위 = ppt px) × 카메라 좌표 비 → HUD 상자(가운데 정렬, 아래끝 = LAY.hud.bottomY)의 520 × 270 좌표로 옮긴다. 상자 밖은 #hudClip이 자른다 */
 const _p3 = {r:new THREE.Vector3(), u:new THREE.Vector3(), f:new THREE.Vector3()};
-function makeProj3(p){
-  const q = camera.quaternion, r = _p3.r.set(1, 0, 0).applyQuaternion(q), u = _p3.u.set(0, 1, 0).applyQuaternion(q), f = _p3.f.set(0, 0, -1).applyQuaternion(q);
-  const hl = Math.hypot(f.x, f.z) || 1, hx = f.x/hl, hz = f.z/hl, V = HUD3.view, L = LAY;
-  const cx = camera.position.x - hx*V.back, cy = V.up, cz = camera.position.z - hz*V.back;
+/* 미니 도로를 보는 가상 카메라의 기준(2026-11-17 사용자: 차가 차로 안에서 조금만 움직여도 미니 도로가 좌우로 흔들림 · 차로를 바꾼 뒤에도 계속 움직여 보임).
+   예전: 장면 카메라(= 내 차)의 방향 · 자리를 그대로 → 차가 1° 틀어지면 소실점이 37 상자 단위나 움직였다.
+   지금: 본선(갈림 전)에서는 **도로 방향 · 지금 차로 가운데**에 붙인다 — 차로 안에서 흔들려도 미니 도로는 가만히. 차로를 바꾸면 새 차로 가운데로 한 번만 부드럽게 옮겨 간다(HUD3.stab.slide초).
+        갈림을 지나 꺾는 구간에서는 예전처럼 장면 카메라 그대로(미니 도로가 실제 도로와 같은 때 · 같은 기울기로 꺾이게). 두 방식 사이는 HUD3.stab.blend초에 걸쳐 섞는다.
+   화각 · 내려다보는 각 · 높이 · 뒤로 물린 거리는 그대로(장면 카메라와 같은 원근). HUD3.stab.on = false면 예전처럼 장면 카메라 그대로 */
+const VIEW3 = {onMain:false, x:null, lane:0, psi:0, w:0, ax:0, az:0, hx:0, hz:-1, cx:0, cz:0, fx:0, fy:0, fz:-1, ex:0, efx:0, efz:-1, lastT:null};
+const wrap3 = a => a - 2*Math.PI*Math.round(a/(2*Math.PI)), smooth3 = (x, a, b) => { const u = clamp((x - a)/(b - a)); return u*u*(3 - 2*u); };
+function view3(p, f, onMainStraight, t){
+  const V = VIEW3, m = S.map, ST = HUD3.stab, carPsi = Math.atan2(f.x, -f.z);
+  const dt = V.lastT === null ? 0 : clamp(t - V.lastT, 0, .1), first = V.x === null || V.lastT === null || t < V.lastT; V.lastT = t;
+  const k = sec => first ? 1 : 1 - Math.exp(-dt/sec);
+  if(!ST.on){ Object.assign(V, {x:p.x, psi:carPsi, w:1, ax:p.x, az:p.z, hx:f.x, hz:f.z, ex:p.x, efx:f.x, efz:f.z}); return V; }
+  // 지금 차로(선을 15cm 넘어야 바뀜 — 선 위에서 왔다 갔다 하지 않게)
+  if(first || Math.abs(p.x - m.laneX(V.lane)) > LANE/2 + .15) V.lane = laneOf(m, p.x);
+  const laneC = m.laneX(V.lane);
+  V.x = first ? laneC : V.x + (laneC - V.x)*k(ST.slide);
+  V.w = first ? (onMainStraight ? 0 : 1) : V.w + clamp((onMainStraight ? 0 : 1) - V.w, -dt/ST.blend, dt/ST.blend);
+  const w = smooth3(V.w, 0, 1); V.psi = wrap3(carPsi)*w;   // 본선의 도로 방향 = 0(-z). 꺾는 구간(w = 1)은 장면 카메라와 똑같이 — 늦게 따라가게 하면 미니 도로가 실제 도로보다 늦게 꺾인다(3차에서 고친 '투시 맞추기'가 깨짐)
+  V.ax = V.x + (p.x - V.x)*w; V.az = p.z; V.hx = Math.sin(V.psi); V.hz = -Math.cos(V.psi);
+  // 내 차 아이콘: 차로 가운데에서 ST.dead[0]m 안이면 가운데에 그대로, ST.dead[1]m 넘게 벗어나면 실제 자리(그 사이는 이어지게). 방향도 조금 틀어진 것은 감춘다
+  const e = p.x - V.x, es = e*smooth3(Math.abs(e), ST.dead[0], ST.dead[1]); V.ex = p.x + (V.x + es - p.x)*(1 - w);
+  const pe = wrap3(carPsi - V.psi), ps = V.psi + pe*(w + (1 - w)*smooth3(Math.abs(pe), ST.deadPsi[0]*Math.PI/180, ST.deadPsi[1]*Math.PI/180)); V.efx = Math.sin(ps); V.efz = -Math.cos(ps);
+  return V;
+}
+function makeProj3(p, f){
+  // f가 없으면(테스트 등) 장면 카메라 방향을 내 차 방향으로 본다
+  const q = camera.quaternion, cf = _p3.f.set(0, 0, -1).applyQuaternion(q), chl = Math.hypot(cf.x, cf.z) || 1, pitchS = -cf.y, pitchC = chl;
+  const carF = f || {x:cf.x/chl, z:cf.z/chl}, t = S.drive ? D.t : S.cityT;
+  const W = view3(p, carF, VIEW3.onMain && p.z > FORK_Z - 1, t), hx = W.hx, hz = W.hz, V = HUD3.view, L = LAY;
+  // 눈 자리: 장면 카메라가 내 차에서 옆 · 앞으로 떨어진 만큼을 보기 기준에 그대로 옮긴다
+  const dxe = camera.position.x - p.x, dze = camera.position.z - p.z, eLat = dxe*(-carF.z) + dze*carF.x, eFwd = dxe*carF.x + dze*carF.z;
+  const rx = -hz, ry = 0, rz = hx, fx = hx*pitchC, fy = -pitchS, fz = hz*pitchC, ux = ry*fz - rz*fy, uy = rz*fx - rx*fz, uz = rx*fy - ry*fx;
+  const cx = W.ax + rx*eLat + hx*(eFwd - V.back), cy = V.up, cz = W.az + rz*eLat + hz*(eFwd - V.back);
+  Object.assign(W, {cx, cz, fx, fy, fz});
   const ppt = L.H/(2*Math.tan(camera.fov*Math.PI/360)), kx = 520/L.hud.w, ky = 270/L.hud.h, bx = L.W/2 - L.hud.w/2, by = L.hud.bottomY - L.hud.h;
-  const rx = r.x, ry = r.y, rz = r.z, ux = u.x, uy = u.y, uz = u.z, fx = f.x, fy = f.y, fz = f.z, far = HUD3.far || 300, near = -HUD3.behind - 6;
+  const far = HUD3.far || 300, near = -HUD3.behind - 6;
   const fn = (wx, wz, wy = 0) => {
-    const d = (wx - p.x)*hx + (wz - p.z)*hz;
+    const d = (wx - W.ax)*hx + (wz - W.az)*hz;
     if(d < near || d > far) return null;
     const dx = wx - cx, dy = wy - cy, dz = wz - cz, zc = dx*fx + dy*fy + dz*fz;
     if(zc < 2) return null;
     return [(L.W/2 + ppt*(dx*rx + dy*ry + dz*rz)/zc - bx)*kx, (L.H/2 - ppt*(dx*ux + dy*uy + dz*uz)/zc - by)*ky, V.back/zc, d];
   };
   fn.unit = ppt*kx/V.back;   // 내 차 줄에서 1m = 상자 단위
+  fn.view = W;
   return fn;
 }
 // 볼록 껍질 (점 8개 이하)
@@ -99,8 +130,8 @@ function car3Render(){
   Object.values(CAR3.models).forEach(M => { for(let i = M.n; i < M.pool.length; i++) M.pool[i].visible = false; M.n = 0; });
   const L = LAY, r = CAR3.r, c = CAR3.cam, V = HUD3.view, pr = Math.min(window.devicePixelRatio || 1, 2), w = Math.round(L.hud.w), h = Math.round(L.hud.h);
   if(w !== CAR3.w || h !== CAR3.h || pr !== CAR3.pr){ r.setPixelRatio(pr); r.setSize(w, h, false); CAR3.w = w; CAR3.h = h; CAR3.pr = pr; }
-  const f = _p3.f.set(0, 0, -1).applyQuaternion(camera.quaternion), hl = Math.hypot(f.x, f.z) || 1;
-  c.fov = camera.fov; c.aspect = L.W/L.H; c.quaternion.copy(camera.quaternion); c.position.set(camera.position.x - f.x/hl*V.back, V.up, camera.position.z - f.z/hl*V.back);
+  const W = VIEW3;   // 미니 도로와 같은 보기(makeProj3가 이 프레임에 계산해 둠)
+  c.fov = camera.fov; c.aspect = L.W/L.H; c.position.set(W.cx, V.up, W.cz); c.up.set(0, 1, 0); c.lookAt(W.cx + W.fx, V.up + W.fy, W.cz + W.fz);
   c.setViewOffset(L.W, L.H, L.W/2 - L.hud.w/2, L.hud.bottomY - L.hud.h, L.hud.w, L.hud.h); c.updateProjectionMatrix();
   r.render(CAR3.scene, c);
 }
@@ -149,7 +180,7 @@ function laneRibbon3(zNear, onMain, offFn, proj){
 const C3 = {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1};
 function resetHud3(){
   Object.assign(C3, {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1});
-  S.H3 = null;
+  S.H3 = null; VIEW3.x = null; VIEW3.lastT = null;
   ['cSurf', 'cLaneFill', 'cEdges', 'cDash', 'cRails', 'cSolid', 'cGate', 'cSlot', 'cQueue', 'cStop', 'cPed', 'cFrontBand', 'cLead', 'cLeadGlass', 'cDistBand', 'cFlow', 'cAhead', 'cGap', 'cGapLine', 'cZebra', 'cZebraHot', 'cTrail1', 'cTrail2', 'cRing1', 'cRing2', 'cRear', 'cRearGlass', 'cEgo', 'cEgoGlass', 'cDots'].forEach(id => $('#' + id).setAttribute('d', ''));
   $$('#cChev path, #cAppr path').forEach(q => q.setAttribute('d', ''));
   $('#cEdgeL').setAttribute('opacity', 0); $('#cEdgeR').setAttribute('opacity', 0); $('#cWarn').setAttribute('opacity', 0); $('#cJam').setAttribute('opacity', 0);
@@ -200,10 +231,12 @@ function mirrorCue3(show, base, side){
 }
 
 /* ---------- 그리기 ---------- */
+const WARN_GAP = 8;   // 앞쪽 경고 삼각형과 남은 거리 막대 사이(상자 단위)
 function drawAr3(p, f, C, k){
   const m = S.map, R = S.route, G = S.G, H = S.H3 || stepHud3(C, S.drive ? D.t : S.cityT), onMain = C.i === 0, st = C.st;
   const now = performance.now(), t = S.drive ? D.t : S.cityT, dt = C3.lastT === null ? 1/60 : clamp(t - C3.lastT, 0, .1); C3.lastT = t;
-  const T = tk2(now), proj = makeProj3(p), tx = R.tx, sgn = R.side;
+  VIEW3.onMain = onMain;
+  const T = tk2(now), proj = makeProj3(p, f), tx = R.tx, sgn = R.side, ex = proj.view.ex, ef = {x:proj.view.efx, z:proj.view.efz};   // ex · ef: 내 차 아이콘을 그릴 자리 · 방향(차로 안의 작은 흔들림은 감춤)
   const base = H.base, front = H.state === 6, wait = base === 3, confirm = base === 4, move = base === 5, caution = base === 2;
   const needMove = H.needMove, besideQueue = H.besideQueue, tail = H.tail, gateZ = H.gateZ;
   const set = (id, d) => $('#' + id).setAttribute('d', d || '');
@@ -222,7 +255,8 @@ function drawAr3(p, f, C, k){
   const act = $('#cAct'), e = ease(clamp((now - C3.iconSince)/200));
   ['cIcoRight', 'cIcoLeft', 'cIcoUp'].forEach(n => $('#' + n).style.display = n === icon ? '' : 'none');
   act.style.display = icon ? '' : 'none';
-  act.setAttribute('transform', `translate(${HX} ${ICON_Y}) scale(${((.88 + .12*e)*(1 - .3*dim)).toFixed(3)})`);
+  // 앞쪽 위험(06)이 뜨면 화살표는 작고 옅어져 삼각형 오른쪽으로 비켜난다(삼각형 밑에 깔려 끝만 삐져나오던 것, 2026-11-17)
+  act.setAttribute('transform', `translate(${(HX + 52*ease(C3.warnA || 0)).toFixed(1)} ${ICON_Y}) scale(${((.88 + .12*e)*(1 - .3*dim)).toFixed(3)})`);
   C3.iconOp = ramp(C3.iconOp, wait ? .45 : 1, .18);
   act.setAttribute('opacity', (e*C3.iconOp*(1 - .78*dim)).toFixed(3));
   $('#cIcon').setAttribute('transform', `scale(${T.iconScale})`);
@@ -237,11 +271,11 @@ function drawAr3(p, f, C, k){
   $('#cCd').style.display = bar === null ? 'none' : '';
   if(bar !== null){
     const emph = wait && needMove && !front;
-    C3.barA = ramp(C3.barA, emph ? 1 : .78, .18);
+    C3.barA = ramp(C3.barA, emph ? 1 : .9, .18);
     const w = 120*bar, b = $('#cCdBar'), ring = $('#cCdRing');
     b.setAttribute('y', barY); b.setAttribute('width', w.toFixed(1)); b.setAttribute('fill-opacity', (C3.barA*soft).toFixed(3)); b.style.fill = emph ? T.core : '';
     $('#cCdBg').setAttribute('y', barY); $('#cCdBg').setAttribute('opacity', soft.toFixed(2));
-    ring.setAttribute('y', barY - 5.5); ring.setAttribute('height', 17); ring.setAttribute('rx', 8.5); ring.setAttribute('width', (Math.max(w, 6) + 11).toFixed(1)); ring.setAttribute('opacity', emph ? .95 : 0);
+    ring.setAttribute('y', barY - 5); ring.setAttribute('height', 20); ring.setAttribute('rx', 10); ring.setAttribute('width', (Math.max(w, 6) + 10).toFixed(1)); ring.setAttribute('opacity', emph ? .95 : 0);
   }
 
   /* ① 미니 도로 — 실제 차선 좌표 그대로(3D 도로와 같은 점선 자리 · 가장자리 · 출구 곡선)를 같은 카메라 투영으로. 일반도로는 백색실선(마감선 ~ 정지선) · 횡단보도 줄무늬도 실제대로.
@@ -362,26 +396,26 @@ function drawAr3(p, f, C, k){
   set('cAhead', ad); $('#cAhead').setAttribute('opacity', (T.opDetect*(1 - .5*dim)).toFixed(3));
 
   /* 내 차 — 실제 자리 · 방향(f) 그대로 */
-  const es = slab3(proj, p.x, p.z, f.x, f.z, DRV.carL, DRV.carW);
+  const es = slab3(proj, ex, p.z, ef.x, ef.z, DRV.carL, DRV.carW);
   set('cEgo', es ? es.d : ''); set('cEgoGlass', es ? es.glass : '');
-  if(es) car3Put(p.x, p.z, f.x, f.z, DRV.carL, DRV.carW, HUD3.icon, T.core, S.light === 'night' ? .85 : 1);
+  if(es) car3Put(ex, p.z, ef.x, ef.z, DRV.carL, DRV.carW, HUD3.icon, T.core, S.light === 'night' ? .85 : 1);
 
   /* 이동 화살표(초록 꺾쇠) · 기다려(빨간 점 세 개) — 내 차 옆에서 옮길 차로 쪽으로, 앞으로 갈수록 한 칸씩 옆으로(대각선). 노면에 그려진 표시처럼 같은 투영으로 눕힌다
      01 안전 · 02 주의: 꺾쇠 2개가 흐름 / 05 이동: 꺾쇠 3개가 크게 흐름 / 03 대기: 점 3개(멈춤) / 04 확인: 없음(틈 상자와 거울 표시만).
      자리: 내 차 옆 1.3m부터 옮길 차로 가운데 조금 너머까지 — 차가 넘어가며 남은 폭이 줄면 간격도 같이 줄어든다 */
   const chev = $$('#cChev path'), dots = $('#cDots');
   if(needMove && !confirm){
-    const mo = 1 - .55*dim, span = Math.max(.6, (laneX - p.x)*side + .55 - 1.3);
+    const mo = 1 - .55*dim, span = Math.max(.6, (laneX - ex)*side + .55 - 1.3);
     if(wait){
       const dx = Math.min(.74, (span - .6)/2);
-      dots.setAttribute('d', [0, 1, 2].map(i => gdot3(proj, p.x + side*(1.62 + i*dx), p.z - 2 - i*2.2, .3, 3.5)).join(''));
+      dots.setAttribute('d', [0, 1, 2].map(i => gdot3(proj, ex + side*(1.62 + i*dx), p.z - 2 - i*2.2, .3, 3.5)).join(''));
       dots.setAttribute('opacity', mo.toFixed(2)); chev.forEach(q => q.setAttribute('d', ''));
     } else {
       dots.setAttribute('d', '');
       const n = move ? 3 : 2, a = move ? .52 : .44, b = move ? 5 : 4, tk = move ? .46 : .4, dx = Math.min(move ? .82 : .9, (span - 2*a)/(n - 1)), ph = now/850;   // 앞뒤로 8 ~ 10m 길이(노면 화살표처럼 길게) — 화면에서 '>' 모양으로 읽히게
       chev.forEach((q, i) => {
         if(i >= n){ q.setAttribute('d', ''); return; }
-        q.setAttribute('d', gchev3(proj, p.x + side*(1.3 + a + i*dx), p.z - 3, side, a, b, tk));   // 같은 줄에 나란히 '>>' (앞뒤로 엇갈리면 겹쳐 보임)
+        q.setAttribute('d', gchev3(proj, ex + side*(1.3 + a + i*dx), p.z - 3, side, a, b, tk));   // 같은 줄에 나란히 '>>' (앞뒤로 엇갈리면 겹쳐 보임)
         q.setAttribute('opacity', ((.34 + .66*(.5 + .5*Math.cos(2*Math.PI*(ph - i/n))))*mo).toFixed(3));   // 내 차 쪽 → 옮길 차로 쪽으로 차례로 밝아짐(흐름)
       });
     }
@@ -413,12 +447,13 @@ function drawAr3(p, f, C, k){
 
   /* 06 앞쪽 위험 — 주황 삼각형(가운데 위, 가장 크게) + 앞차(주황)와 앞쪽 간격. 한 번 커지며 나타남 */
   const wEl = $('#cWarn'), wa = C3.warnA;
-  wEl.setAttribute('opacity', wa.toFixed(3)); wEl.setAttribute('transform', `translate(${HX} 44) scale(${(.8 + .2*ease(wa)).toFixed(3)})`);
+  // 자리: 삼각형 아래끝(테두리 포함)과 남은 거리 막대 사이를 WARN_GAP만큼 띄운다 (2026-11-17 사용자: 삼각형과 막대가 겹침 — 예전 y 44는 아래끝 71.5 · 막대 윗선 69)
+  wEl.setAttribute('opacity', wa.toFixed(3)); wEl.setAttribute('transform', `translate(${HX} ${(barY - WARN_GAP - 27.5).toFixed(1)}) scale(${(.8 + .2*ease(wa)).toFixed(3)})`);
   let ld = null, fb = '';
   if(wa > .01 && H.front && H.kind === 'lead'){
     const c = H.front.c, ry = c.ref && c.ref.rotation ? c.ref.rotation.y : 0, cf = [-Math.sin(ry), -Math.cos(ry)];
     ld = slab3(proj, c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW); if(ld) car3Put(c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW, HUD3.icon, T.warn, wa);
-    const ax = p.x + f.x*DRV.carL/2, az = p.z + f.z*DRV.carL/2, bx2 = c.x - cf[0]*c.halfL, bz2 = c.z - cf[1]*c.halfL, rx = -f.z, rz = f.x, w = .95;
+    const ax = ex + ef.x*DRV.carL/2, az = p.z + ef.z*DRV.carL/2, bx2 = c.x - cf[0]*c.halfL, bz2 = c.z - cf[1]*c.halfL, rx = -ef.z, rz = ef.x, w = .95;
     if(Math.hypot(bx2 - ax, bz2 - az) > .4) fb = quadW([[ax - rx*w, az - rz*w], [ax + rx*w, az + rz*w], [bx2 + rx*w, bz2 + rz*w], [bx2 - rx*w, bz2 - rz*w]], proj);
   }
   set('cLead', ld ? ld.d : ''); set('cLeadGlass', ld ? ld.glass : ''); $('#cLead').setAttribute('opacity', wa.toFixed(3)); $('#cLeadGlass').setAttribute('opacity', wa.toFixed(3));

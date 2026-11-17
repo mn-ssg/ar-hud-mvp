@@ -1,6 +1,7 @@
 /* ============================================================
    session.js — 주행 테스트 진행 · 기록 · 내보내기 (2026-10-29 개편, 예전 D60 · D64 · D65 · D68 · D70 위에)
-   흐름: 참가자 정보 → (연습 주행) → HUD A 3회 → 질문 2개 → HUD B 3회 → 질문 2개 → 요약 + 엑셀 자동 저장
+   흐름(3차, 2026-11-17 ~): 참가자 정보 → 연습 주행(HUD 없음) → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해) → 요약 + 엑셀 자동 저장
+   흐름(2차까지): 참가자 정보 → (연습 주행) → HUD A 3회 → 질문 → HUD B 3회 → 질문 → 요약 + 엑셀 자동 저장
    · 비교 (2026-11-03 두 번째 개정, 2차 실험): 현대 HUD(nav, 1차 그대로) 3회 · 리뉴얼 HUD 2차(ar2, 2.1) 3회. 순서는 늘 현대 → 2차로 고정 (2026-11-04 사용자: 참가자 번호 홀수 · 짝수 교대를 없앰).
      1차 HUD(ar, v1.9)는 실험 조건에서 빠지고 시연에서만 열어 볼 수 있음. 'HUD 버전' 칸: 현대 3.3 · 리뉴얼 2.1-A/B (1차 기록의 '리뉴얼 HUD'는 빈칸 = v1.7~1.9)
    · 시나리오(맵 · 상황 · 시간대 · 교통 번호 · 시작 차로 · 목적지 · 신호 시각)는 짝마다 한 번 정해 두 HUD 블록이 그대로 다시 씀
@@ -20,7 +21,7 @@ const hudKey = h => h;
 const modeName = m => ({ar:'리뉴얼 HUD (1차)', ar2:'리뉴얼 HUD (2차)', ar3:'리뉴얼 HUD', nav:'현대 HUD', off:'HUD 없음'})[m] || m;   // 3차 실험 조건(ar3)이 '리뉴얼 HUD'. 1 · 2차는 예전 기록 구분용
 const modeShort = m => ({ar:'1차', ar2:'2차', ar3:'리뉴얼', nav:'현대'})[m] || m;
 const hudVerOf = m => m === 'ar2' ? HUD_VER.ar2 + '-' + (S.tone || 'A') : HUD_VER[m] || '';   // 2차만 마감(A 절제 · B 선명)을 뒤에 붙임
-const orderText = (o, pair = EXP.pair) => o === 'AB' ? `${modeShort(pair[0])} → ${modeShort(pair[1])}` : o === 'BA' ? `${modeShort(pair[1])} → ${modeShort(pair[0])}` : o || '';
+const orderText = (o, pair = EXP.pair) => o === 'ALT' ? `${modeShort(pair[0])} · ${modeShort(pair[1])} 교대 (${modeShort(pair[0])} 먼저)` : o === 'AB' ? `${modeShort(pair[0])} → ${modeShort(pair[1])}` : o === 'BA' ? `${modeShort(pair[1])} → ${modeShort(pair[0])}` : o || '';
 const RESULT = {ok:'성공', wrong:'다른 출구', crash:'충돌', timeout:'시간 초과', signal:'신호 위반'};   // 신호 위반: 일반도로(D69)
 const CITY_SITU = {CL2:'좌회전 대기 줄 · 신호', CRT:'정류장 버스 · 보행자'};
 const situName = r => (r.type === 'practice' ? '연습' : r.type === 'city' ? CITY_SITU[r.map] || '일반도로' : r.type === 'jam' ? ({1:'정체 보통(예전)', 2:'정체 심함(예전)'}[r.jam] || '정체') : `뒤차 ${r.rearN}대`) + (r.brake ? ' · 앞차 급정거' : '');
@@ -37,9 +38,11 @@ const envName = () => `환경 ${ENV_VER} · 미러 ${MIR.on ? '켬' : '끔'}`;
 
 /* ---------- 실험 설정 ---------- */
 // 비교 쌍 A = 현대 · B = 2차. 연습 주행은 늘 한다(2026-11-07: 연구자 설정의 '연습 주행' 체크박스 · localStorage 저장 삭제 — 순서는 늘 연습 → 블록 1 → 블록 2)
-const EXP = {pair:['nav', 'ar3']};   // 3차 실험(2026-11-17 ~): 현대 HUD 3회 · 리뉴얼 HUD(3.0) 3회
+const EXP = {pair:['nav', 'ar3'], alternate:true};   // 3차 실험(2026-11-17 ~): 현대 HUD 3회 · 리뉴얼 HUD(3.0) 3회
 // 제시 순서: 늘 현대 먼저('AB'). 2026-11-03엔 참가자 번호 홀수 AB · 짝수 BA로 교대했으나 2026-11-04 사용자가 고정을 택함 (짝수 참가자에게 2차가 먼저 나와 혼란). 순서 효과는 상쇄되지 않으므로 분석 때 참고
-const orderFor = pid => { void pid; return 'AB'; };
+// 3차 실험(2026-11-17, 피그마 '3차 검증 계획'): **판마다 교대**('ALT') — 연습 → 현대 → 리뉴얼 → 현대 → 리뉴얼 → 현대 → 리뉴얼. 2차의 한계였던 '현대 3판 뒤 리뉴얼 3판'(익숙해진 효과가 리뉴얼에 몰림)을 없애려는 것.
+// 첫 판은 모든 참가자 현대 HUD [가정 — 참가자마다 첫 HUD를 바꿀지는 사용자 판단]. 예전 블록 방식은 EXP.alternate = false
+const orderFor = pid => { void pid; return EXP.alternate ? 'ALT' : 'AB'; };
 
 /* ---------- 진행 순서 ---------- */
 const SES = {on:false, pid:'', steps:[], i:-1, rows:[], qs:[], prs:[], order:'AB', cur:null, timer:0, seq:0};
@@ -69,6 +72,12 @@ function buildSteps(order){
   const scns = [makeScenario(A, 'rear', lights[0], seed()), makeScenario(B, 'jam', lights[1], seed()), makeScenario(C, 'city', lights[2], seed())];
   const [h1, h2] = order === 'AB' ? EXP.pair : EXP.pair.slice().reverse();
   const block = (hud, no) => shuffle(scns.slice()).map((p, i) => ({kind:'run', hud, block:no, no:i + 1, ...p}));
+  if(order === 'ALT'){
+    // 판마다 교대. 두 HUD가 같은 장면 3개를 한 번씩 — 같은 장면이 연달아 나오지 않게 둘째 HUD의 순서는 첫째를 두 칸 민 것(X Z Y X Z Y)
+    const a = shuffle(scns.slice()), b = [a[2], a[0], a[1]], runs = [];
+    a.forEach((p, i) => { runs.push({kind:'run', hud:EXP.pair[0], block:1, no:i + 1, ...p}); runs.push({kind:'run', hud:EXP.pair[1], block:2, no:i + 1, ...b[i]}); });
+    return [{kind:'practice'}, ...runs, {kind:'survey', hud:EXP.pair[0], block:1}, {kind:'survey', hud:EXP.pair[1], block:2}, {kind:'done'}];
+  }
   return [{kind:'practice'}, ...block(h1, 1), {kind:'survey', hud:h1, block:1}, ...block(h2, 2), {kind:'survey', hud:h2, block:2}, {kind:'done'}];
 }
 function runCfg(st){ return {map:mapById(st.map), leaf:st.leaf, lane:st.lane, type:st.type, jam:st.jam, seed:st.seed, sigT:st.sigT}; }
@@ -145,24 +154,35 @@ function runPractice(){
   countdown(true);
 }
 
-/* 블록 끝 질문: ① 확신 1~5(1차와 같음)만 (2026-11-07 밤 사용자: '기다려' 이해 문항 ②는 뜻이 없어 삭제). Q2_TEXT · Q2_OPTS는 예전 기록(2026-11-03 ~ 11-07)의 '질문' 시트를 읽을 때만 쓴다 */
+/* 질문: ① 확신 1~5(1차와 같음). 2차(2026-11-07 밤 ~)에는 ②를 뺐다(사용자: 뜻이 없어 삭제). 3차는 리뉴얼 HUD에만 ② 대기 표시 이해를 다시 묻는다(Q2_TEXT3).
+   Q2_TEXT는 예전 기록(2026-11-03 ~ 11-07)의 '질문' 시트를 읽을 때만 쓴다. 판마다 교대(ALT)면 여섯 판이 모두 끝난 뒤 현대 → 리뉴얼 순서로 묻는다 */
 const Q_TEXT = '차로를 옮길 때 얼마나 확신했나요?';
 const Q2_TEXT = '옆 차로로 옮기려는데 뒤차 때문에 HUD에 \'기다려\' 표시가 나왔을 때, 그 표시를 봤나요? 봤다면 어떤 뜻으로 읽었나요?';
 const Q2_OPTS = ['봤다 · 지금 차로를 유지하고 기다린다', '봤다 · 브레이크를 밟아 멈춘다', '봤다 · 빨리 옮긴다', '못 봤다 · 모르겠다'];
+// 3차(2026-11-17, 피그마 '3차 검증 계획 — 질문: 확신 + 대기 표시 이해 1문항'): 리뉴얼 HUD 질문에만 ② '기다려 표시(빨간 점 세 개)'를 어떻게 읽었는지. 문장 [가정 — 사용자 확인 대기]
+const Q2_TEXT3 = '옆 차로로 옮기려는데 뒤차가 가까워서 HUD에 빨간 점 세 개가 나왔을 때, 그 표시를 봤나요? 봤다면 어떤 뜻으로 읽었나요?';
+const HUD_HINT = {nav:'화살표와 차로 칸이 나오던 화면', ar3:'미니 도로에 들어갈 차로가 색으로 칠해져 있던 화면'};
 function surveyCard(st){
-  SES.rate = 0;
-  sesCard({eyebrow:`${st.block} / 2`, title:'질문', body:`<div class="q"><p class="q-title">${Q_TEXT}</p>
+  SES.rate = 0; SES.wait = -1;
+  const two = st.hud === 'ar3', alt = SES.order === 'ALT';
+  sesCard({eyebrow:`${st.block} / 2`, title:'질문', body:(alt ? `<p class="lead"><b>${modeName(st.hud)}</b>(${HUD_HINT[st.hud] || ''})로 달린 3번을 떠올려 답해 주세요.</p>` : '') + `<div class="q"><p class="q-title">${two ? '1. ' : ''}${Q_TEXT}</p>
       <div class="rate" id="rate">${[1,2,3,4,5].map(n => `<button data-r="${n}">${n}</button>`).join('')}</div>
-      <div class="rate-ends"><span>전혀</span><span>매우</span></div></div>`,
-    btn:[st.block === 1 ? '다음 블록' : '마치기', () => {
-      if(!SES.rate) return;
-      const q = {p:SES.pid, block:st.block, hud:st.hud, ver:hudVerOf(st.hud), rate:SES.rate, wait:0, order:SES.order, at:new Date().toISOString()};   // wait 0 = ② 문항 없음(2026-11-07 밤부터)
+      <div class="rate-ends"><span>전혀</span><span>매우</span></div></div>` + (two ? `
+    <div class="q"><p class="q-title">2. ${Q2_TEXT3}</p>
+      <div class="choice" id="choice">${Q2_OPTS.map((o, i) => `<button data-c="${i}"><span>${'ABCD'[i]}</span>${o}</button>`).join('')}</div></div>` : ''),
+    btn:[st.block === 1 ? (alt ? '다음 질문' : '다음 블록') : '마치기', () => {
+      if(!SES.rate || (two && SES.wait < 0)) return;
+      const q = {p:SES.pid, block:st.block, hud:st.hud, ver:hudVerOf(st.hud), rate:SES.rate, wait:two ? SES.wait + 1 : 0, ...(two ? {waitText:Q2_OPTS[SES.wait], q2:Q2_TEXT3} : {}), order:SES.order, at:new Date().toISOString()};   // wait 0 = ② 문항 없음
       surveys.push(q); saveArr(QKEY, surveys); SES.qs.push(q); nextStep();
     }]});
+  SES.two = two;
   $('#sesBtn').disabled = true; $('#sesBtn').focus();
   $$('#rate button').forEach(b => b.onclick = () => setRate(+b.dataset.r));
+  $$('#choice button').forEach(b => b.onclick = () => setWait(+b.dataset.c));
 }
-function setRate(n){ SES.rate = n; $$('#rate button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.r === n))); $('#sesBtn').disabled = !SES.rate; }
+const surveyReady = () => { $('#sesBtn').disabled = !(SES.rate && (!SES.two || SES.wait >= 0)); };
+function setRate(n){ SES.rate = n; $$('#rate button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.r === n))); surveyReady(); }
+function setWait(i){ SES.wait = i; $$('#choice button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.c === i))); surveyReady(); }
 
 /* 한 판에서 뽑는 새 값 (이벤트에서): 대기 표시 시간 · 대기(또는 확인) 중 옮기기 시작한 횟수 · 이동 판단 뒤 옮기기까지 · 위험 발생 횟수.
    판단(S.G)은 어느 HUD에서든 같게 계산 — 화면에 보인 건 리뉴얼 HUD뿐(이벤트 shown) */
@@ -272,7 +292,7 @@ const SUM_HEAD = ['HUD','판 종류','판 수','성공률 (%)','다른 출구 (�
 const sumCells = (rows, qs) => HUDS_IN(rows).flatMap(h => [null, '고속도로 뒤차', '고속도로 정체', '일반도로'].map(k => { const s = summarize(rows, h, qs, k);
   return [modeName(h), k || '전체', s.n, s.rate ?? '', s.wrong, s.crash, s.risky, s.sig, s.ped, s.off, r1(s.margin), s.react === null ? '' : Math.round(s.react*100)/100, k ? '' : r1(s.sure), s.waitMoves ?? '', k ? '' : (summarize(rows, h, qs).waitOk || '')]; }));
 const Q_HEAD = ['참가자','HUD','질문','답 (1 전혀 ~ 5 매우)','질문 2','답 2','HUD 버전','제시 순서'];
-const qCells = q => [q.p, modeName(q.hud), Q_TEXT, q.rate, q.wait ? Q2_TEXT : '', q.wait ? `${'ABCD'[q.wait - 1]} ${q.waitText}` : '', q.ver ?? '', orderText(q.order)];
+const qCells = q => [q.p, modeName(q.hud), Q_TEXT, q.rate, q.wait ? (q.q2 || Q2_TEXT) : '', q.wait ? `${'ABCD'[q.wait - 1]} ${q.waitText}` : '', q.ver ?? '', orderText(q.order)];
 const EV_NAME = {h3:'리뉴얼 HUD 상태', gate:'판단 상태', hazardOn:'위험 발생', hazardOff:'위험 해소', lcStart:'차로 변경 시작', lcDone:'차로 변경 완료', lcAbort:'차로 변경 취소', cutIn:'옆 차로 진입', crash:'충돌', blink:'깜빡이', blinkResp:'뒤차 반응'};
 const GATE_NAME = {none:'없음', wait:'대기', clearing:'확인', go:'이동'};
 const EV_HEAD = ['참가자','HUD','시나리오 ID','판 순서','시각 (초)','이벤트','내용'];
@@ -284,7 +304,7 @@ const evRows = rows => rows.flatMap(r => (r.events || []).map(e => [r.p, modeNam
 const EXPLAIN = [['칸','뜻','어떻게 읽나'],
   ['HUD','현대 HUD = 지금 차에 있는 HUD(1 · 2차와 같은 대조군) · 리뉴얼 HUD = 3차 실험의 실험군(3.0, 2026-11-17) · 리뉴얼 HUD (2차) = 2차 실험 때 HUD(2.4) · 리뉴얼 HUD (1차) = 1차 실험 때 HUD(1.9). \'HUD 버전\' 칸이 빈칸이면 1차 실험 기록, \'우리 2.4-B\'는 2차 실험 기록(그때 이름)','3차: 같은 사람이 현대 3회 · 리뉴얼 3회. 같은 시나리오 ID끼리 짝'],
   ['옮기기 시작 때 리뉴얼 HUD 상태','목표 쪽으로 차로를 처음 넘기 시작한 순간 리뉴얼 HUD가 어느 상태였나: 01 안전 · 02 주의 · 03 대기 · 04 확인 · 05 이동 · 06 앞쪽 위험. 현대 HUD로 달릴 때도 같은 계산을 해서 남김(화면엔 안 보임). (안 옮김) = 끝까지 안 옮김, 빈칸 = 2026-11-17 전 기록','03 대기 · 04 확인에서 옮겼으면 \'기다려\'를 따르지 않은 것. \'대기 · 확인 중 옮기기 시작\' 칸은 예전과 같은 기준(판단 게이트)으로 그대로 셈'],
-  ['제시 순서','현대 → 리뉴얼 (모든 참가자 같음, 2026-11-04 고정)','순서 효과가 상쇄되지 않음 — 리뉴얼 HUD 결과엔 익숙해진 효과가 섞일 수 있음. 2026-11-03 이전 기록은 짝수 번호가 2차 → 현대'],
+  ['제시 순서','3차(2026-11-17 ~): 현대 · 리뉴얼 교대 — 연습 뒤 현대 → 리뉴얼 → 현대 → 리뉴얼 → 현대 → 리뉴얼(모든 참가자 현대 먼저). 2차: 현대 → 리뉴얼(현대 3판 뒤 리뉴얼 3판)','2차 기록의 리뉴얼 HUD 결과엔 익숙해진 효과가 섞일 수 있음. 2026-11-03 이전 기록은 짝수 번호가 2차 → 현대'],
   ['연습 여부','본 실험 / 연습. 연습 주행은 \'연습\' 시트에만 있고 요약 · 기록에 들어가지 않음',''],
   ['정체 줄 합류 방식','정체 판 성공이 \'줄 합류\'(목표 차로 줄 뒤에 붙어 3초)였는지 \'줄 건너뜀\'(줄 옆을 지나 갈림 뒤에 출구로 들어감)이었는지. 건너뜀이면 차로 옮긴 곳 · 반응 시간이 빈칸으로 남음','정체 판 성공률을 읽을 때 둘을 나눠 볼 것. 1차 엑셀엔 이 칸이 없음'],
   ['앞으로 끼어들기 (번) · 그때 뒤차 간격 · 닿기까지','옮길 차로에서 내 뒤 60m 안에 차가 있는데 그 앞에 들어간 횟수, 그때 가장 가까운 뒤차와의 범퍼 간격(m)과 닿기까지 시간(초, 뒤차가 더 빠를 때만). 위험 여부와 상관없이 셈','2차 가설의 \'위험한 차로 변경\' 지표. 간격 · 시간이 작을수록 무리한 끼어들기'],

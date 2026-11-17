@@ -263,25 +263,28 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const st = r.events.find(e => e.type === 'lcStart' && e.toward); return {st, es:eventStats(r.events, r.t)}; });
     check('기록: 옮기기 시작한 순간의 리뉴얼 HUD 상태(03 대기)가 이벤트 · 한 줄 기록에 남고, 기다려 중 옮기기 시작 횟수는 그대로 1', lc.st && lc.st.hs === 3 && lc.st.gate === 'wait' && lc.es.lcState === 3 && lc.es.waitMoves === 1, JSON.stringify(lc));
 
-    // 미니 도로 투영: 어느 방향의 평행선이든 미니 도로의 소실점 = 장면 카메라의 소실점 (고속도로 직선 · 일반도로 회전 중 여러 프레임, 상자 단위)
+    /* 미니 도로 투영 (2026-11-17 저녁 개정 — 미니 도로 고정):
+       · 꺾는 구간(갈림 뒤, VIEW3.w = 1): 어느 방향의 평행선이든 미니 도로의 소실점 = 장면 카메라의 소실점 (예전과 같음)
+       · 본선(VIEW3.w = 0): 도로 방향의 소실점이 프레임마다 같은 자리(차가 차로 안에서 틀어져도 미니 도로는 안 움직임) + 지평선 높이는 장면 카메라와 같음(같은 화각 · 내려다보는 각) */
     const vp = await E(() => { const out = {};
-      const one = () => { const p = {x:D.x, z:D.z}, pr = makeProj3(p), L = LAY, ppt = L.H/(2*Math.tan(camera.fov*Math.PI/360)); let worst = 0;
-        const fw = new THREE.Vector3(); camera.updateMatrixWorld(); camera.getWorldDirection(fw); const yaw = Math.atan2(fw.x, -fw.z);
-        for(const da of [-.25, -.1, 0, .12, .3]){ const a = yaw + da, dx = Math.sin(a), dz = -Math.cos(a), nx = -dz, nz = dx;
-          const ln = o => [pr(p.x + nx*o + dx*30, p.z + nz*o + dz*30), pr(p.x + nx*o + dx*220, p.z + nz*o + dz*220)], A = ln(-3), B = ln(4); if([...A, ...B].some(q => !q)) continue;
-          const x1 = A[0][0], y1 = A[0][1], x2 = A[1][0], y2 = A[1][1], x3 = B[0][0], y3 = B[0][1], x4 = B[1][0], y4 = B[1][1], den = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
-          const mx = ((x1*y2 - y1*x2)*(x3-x4) - (x1-x2)*(x3*y4 - y3*x4))/den, my = ((x1*y2 - y1*x2)*(y3-y4) - (y1-y2)*(x3*y4 - y3*x4))/den;
-          const v = new THREE.Vector3(camera.position.x + dx*1e7, camera.position.y, camera.position.z + dz*1e7).project(camera);   // 장면 카메라가 보는 그 방향의 소실점
-          const rx = ((v.x*.5 + .5)*L.W - (L.W/2 - L.hud.w/2))*520/L.hud.w, ry = ((1 - (v.y*.5 + .5))*L.H - (L.hud.bottomY - L.hud.h))*270/L.hud.h;
-          worst = Math.max(worst, Math.hypot(mx - rx, my - ry)); out.horizonY = +ry.toFixed(1); }
-        return worst; };
-      for(const [id, dest, lane, type, T] of [['ICR', '용인·기흥', 1, 'rear', 3], ['ICR', '용인·기흥', 1, 'rear', 13], ['CRT', '종합병원', 1, 'city', 13], ['CL2', '전통시장', 2, 'city', 15]]){
-        const m = mapById(id), leaf = m.leaves.findIndex(l => l.dest === dest); let w = 0, n = 0;
+      const vpOf = (pr, p, a) => { const dx = Math.sin(a), dz = -Math.cos(a), nx = -dz, nz = dx, ln = o => [pr(p.x + nx*o + dx*30, p.z + nz*o + dz*30), pr(p.x + nx*o + dx*220, p.z + nz*o + dz*220)], A = ln(-3), B = ln(4); if([...A, ...B].some(q => !q)) return null;
+        const x1 = A[0][0], y1 = A[0][1], x2 = A[1][0], y2 = A[1][1], x3 = B[0][0], y3 = B[0][1], x4 = B[1][0], y4 = B[1][1], den = (x1-x2)*(y3-y4) - (y1-y2)*(x3-x4);
+        return [((x1*y2 - y1*x2)*(x3-x4) - (x1-x2)*(x3*y4 - y3*x4))/den, ((x1*y2 - y1*x2)*(y3-y4) - (y1-y2)*(x3*y4 - y3*x4))/den]; };
+      const camVp = a => { const L = LAY, v = new THREE.Vector3(camera.position.x + Math.sin(a)*1e7, camera.position.y, camera.position.z - Math.cos(a)*1e7).project(camera);
+        return [((v.x*.5 + .5)*L.W - (L.W/2 - L.hud.w/2))*520/L.hud.w, ((1 - (v.y*.5 + .5))*L.H - (L.hud.bottomY - L.hud.h))*270/L.hud.h]; };
+      for(const [id, dest, lane, type, T, wob] of [['ICR', '용인·기흥', 1, 'rear', 3, 1], ['ICR', '용인·기흥', 1, 'rear', 13, 0], ['CRT', '종합병원', 1, 'city', 13, 0], ['CL2', '전통시장', 2, 'city', 15, 0]]){
+        const m = mapById(id), leaf = m.leaves.findIndex(l => l.dest === dest); let turn = 0, nT = 0, nM = 0, hor = 0; const xs = [];
         runDrive({map:m, leaf, lane, type, jam:0, seed:777, sigT:0}, {hud:'ar3', noPeds:true, secs:T, ap:{}, setup:() => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); },
-          sample:() => { if(D.t > T - 2.5){ w = Math.max(w, one()); n++; } }});
-        out[id + ' ' + T + 's'] = +w.toFixed(3); out.n = n; }
+          sample:() => { if(D.t <= T - 2.5) return;
+            if(wob){ D.psi = .035*Math.sin(D.t*4); D.x = m.laneX(lane) + .3*Math.sin(D.t*3); update(0); }   // 차로 안에서 좌우 0.3m · 방향 2°로 흔듦
+            const p = {x:D.x, z:D.z}, pr = makeProj3(p), W = VIEW3, fw = new THREE.Vector3(); camera.updateMatrixWorld(); camera.getWorldDirection(fw); const yaw = Math.atan2(fw.x, -fw.z);
+            if(W.w === 1){ nT++; for(const da of [-.25, -.1, 0, .12, .3]){ const q = vpOf(pr, p, yaw + da), r = camVp(yaw + da); if(q) turn = Math.max(turn, Math.hypot(q[0] - r[0], q[1] - r[1])); } }
+            else if(W.w === 0){ nM++; const q = vpOf(pr, p, 0), r = camVp(yaw); if(q){ xs.push(q[0]); hor = Math.max(hor, Math.abs(q[1] - r[1])); out.horizonY = +q[1].toFixed(1); } } }});
+        out[id + ' ' + T + 's'] = {turn:+turn.toFixed(3), nTurn:nT, nMain:nM, sway:xs.length ? +(Math.max(...xs) - Math.min(...xs)).toFixed(3) : 0, horizon:+hor.toFixed(3)}; }
       return out; });
-    check('3차 미니 도로: 소실점이 장면 카메라의 소실점과 같은 자리(차이 < 0.5 상자 단위) — 고속도로 직선 · 갈림 · 일반도로 우회전 · 좌회전 중', Object.entries(vp).filter(([k]) => / \d+s$/.test(k)).every(([, v]) => v < .5), JSON.stringify(vp));
+    const vps = Object.entries(vp).filter(([k]) => / \d+s$/.test(k)).map(([, v]) => v);
+    check('3차 미니 도로: 꺾는 구간(갈림을 지난 뒤 — 일반도로 좌회전 중)에서는 소실점이 장면 카메라의 소실점과 같은 자리(차이 < 0.5 상자 단위)', vps.every(v => v.turn < .5) && vps.some(v => v.nTurn > 20), JSON.stringify(vp));
+    check('3차 미니 도로 고정: 본선에서 차가 차로 안에서 흔들려도(좌우 0.3m · 방향 2°) 미니 도로의 소실점은 안 움직이고(< 0.5 상자 단위), 지평선 높이는 장면 카메라와 같음', vps.every(v => v.sway < .5 && v.horizon < .5) && vps[0].nMain > 20, JSON.stringify(vp));
   }
 
   /* ---------- 4. 미러: 룸미러만 · 같은 차가 거울 같은 쪽에 (그린 픽셀 차이로) ---------- */
@@ -337,14 +340,14 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         let guard = 0;
         while(SES.on && guard++ < 40){
           const st = SES.steps[SES.i];
-          if(!$('#sess').hidden && $('#rate')){ setRate(4); $('#sesBtn').click(); continue; }
+          if(!$('#sess').hidden && $('#rate')){ setRate(4); if($('#choice')) setWait(0); (window.__qCards = window.__qCards || []).push({hud:st.hud, two:!!$('#choice'), text:$('#sesBody').innerText.slice(0, 60)}); $('#sesBtn').click(); continue; }
           if(!$('#sess').hidden){ if(/연습/.test($('#sesEyebrow').textContent) && /성공|다른 출구|충돌|시간 초과/.test($('#sesTitle').textContent)) window.__practiceCard = $('#sesTitle').textContent; $('#sesBtn').click(); continue; }
           // 주행 중: 카운트다운 건너뛰고 자동 운전
           clearTimeout(SES.timer); $('#count').hidden = true; D.frozen = false;
           for(let k = 0; k < 120*30 && S.running; k++) update(1/30);
           void st;
         }
-        sessions[pid] = {rows:SES.rows.map(r => ({hud:r.hud, scn:r.scn, seq:r.seq, order:r.order, ver:r.ver, env:r.env, ev:(r.events || []).length, practice:r.practice, lcState:r.lcState})), qs:SES.qs.length, prs:SES.prs.length, mode:S.mode, testing:S.testing};
+        sessions[pid] = {rows:SES.rows.map(r => ({hud:r.hud, scn:r.scn, seq:r.seq, order:r.order, ver:r.ver, env:r.env, ev:(r.events || []).length, practice:r.practice, lcState:r.lcState})), qs:SES.qs.length, qd:SES.qs.map(q => ({hud:q.hud, rate:q.rate, wait:q.wait, q2:!!q.q2})), prs:SES.prs.length, mode:S.mode, testing:S.testing};
       }
       const stored = loadArr(DKEY);
       return {sessions, practiceCard:window.__practiceCard || null, storedN:stored.length, oldKept:stored.some(r => r.p === 'P_OLD'), practiceN:loadArr(PKEY).length, practiceInDrives:stored.some(r => r.practice),
@@ -353,16 +356,17 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const p1 = s.sessions.P1, p2 = s.sessions.P2;
     check('세션: 참가자마다 본 주행 6판 기록', p1.rows.length === 6 && p2.rows.length === 6, `P1 ${p1.rows.length} · P2 ${p2.rows.length}`);
     check('세션: 연습 기록은 본 기록에 섞이지 않음 (따로 저장)', s.practiceN === 2 && !s.practiceInDrives && p1.prs === 1, `연습 ${s.practiceN}`);
-    const first = (rows, a, b) => rows.slice(0, 3).every(r => r.hud === a) && rows.slice(3).every(r => r.hud === b);
-    check('세션: 번호와 상관없이 늘 현대 → 리뉴얼(3차) (순서 2026-11-04 고정, 조건 2026-11-17)', first(p1.rows, 'nav', 'ar3') && first(p2.rows, 'nav', 'ar3') && p1.rows[0].order === 'AB' && p2.rows[0].order === 'AB', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
-    check('세션: HUD 버전 칸 — 현대 3.5 · 리뉴얼 3.0', p1.rows.filter(r => r.hud === 'ar3').length === 3 && p1.rows.filter(r => r.hud === 'ar3').every(r => r.ver === '리뉴얼 3.0') && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.5'), JSON.stringify(p1.rows.map(r => r.ver)));
+    const alt = rows => rows.map(r => r.hud).join(',') === 'nav,ar3,nav,ar3,nav,ar3' && rows.map(r => r.seq).join('') === '123456';
+    check('세션(3차, 피그마 3차 검증 계획): 연습 뒤 현대 · 리뉴얼을 판마다 교대(현대 먼저, 번호와 상관없이) · 순서 칸 ALT', alt(p1.rows) && alt(p2.rows) && p1.rows[0].order === 'ALT' && p2.rows[0].order === 'ALT', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
+    check('세션: 같은 장면이 연달아 나오지 않음(두 HUD의 같은 장면 사이에 다른 판이 낌)', [p1, p2].every(q => q.rows.every((r, i) => i === 0 || r.scn !== q.rows[i-1].scn)), JSON.stringify(p1.rows.map(r => r.scn)));
+    check('세션: HUD 버전 칸 — 현대 3.5 · 리뉴얼 3.1', p1.rows.filter(r => r.hud === 'ar3').length === 3 && p1.rows.filter(r => r.hud === 'ar3').every(r => r.ver === '리뉴얼 3.1') && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.5'), JSON.stringify(p1.rows.map(r => r.ver)));
     check('세션: 연습이 끝나면 결과 카드 없이 바로 첫 주행(연습 기록 1 · 카드에 결과 글 없음)', p1.prs === 1 && !s.practiceCard, JSON.stringify(s.practiceCard));
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
     check('세션: 같은 시나리오 ID를 두 HUD가 한 번씩 (교통 · 목적지 · 시간대 고정)', pairOk(p1.rows) && pairOk(p2.rows), JSON.stringify(p1.rows.map(r => r.scn)));
     check('세션: 새 필드(시나리오 · HUD 버전 · 환경 · 순서 · 이벤트) 기록', p1.rows.every(r => r.scn && r.ver && r.env && r.order && r.ev > 0), JSON.stringify(p1.rows[0]));
     check('세션: 모든 판에 \'옮기기 시작 때 리뉴얼 HUD 상태\'가 남음(1 ~ 6 또는 안 옮김 null) — 현대 HUD 판도', p1.rows.concat(p2.rows).every(r => r.lcState === null || (r.lcState >= 1 && r.lcState <= 6)) && p1.rows.concat(p2.rows).some(r => r.lcState >= 1), JSON.stringify(p1.rows.map(r => r.hud + ':' + r.lcState)));
     check('세션: 예전 기록이 지워지거나 덮이지 않음', s.oldKept && s.storedN === 13, `저장 ${s.storedN}`);
-    check('세션 끝: 질문 2블록 · HUD/테스트 상태 복원', p1.qs === 2 && !p2.testing, `질문 ${p1.qs}`);
+    check('세션 끝: 질문은 여섯 판 뒤에 현대(확신) → 리뉴얼(확신 + 대기 표시 이해) · HUD/테스트 상태 복원', p1.qs === 2 && !p2.testing && p1.qd[0].hud === 'nav' && p1.qd[0].wait === 0 && p1.qd[1].hud === 'ar3' && p1.qd[1].wait === 1 && p1.qd[1].q2 && p1.rows.length === 6, JSON.stringify(p1.qd));
     check('엑셀: 요약 · 기록 · 질문 · 이벤트 · 연습 · 설명 시트', s.sheets && ['요약','기록','질문','이벤트','연습','설명'].every(n => s.sheets.some(x => x[0] === n)), JSON.stringify(s.sheets));
     check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에(연습 여부 · 정체 줄 합류 방식 · 끼어들기 · 깜빡이 3칸 · 화면 맞추기 4칸 · 3차 상태 1칸)', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 13] === '연습 여부' && s.head[s.head.length - 12] === '정체 줄 합류 방식' && s.head[s.head.length - 9] === '그때 닿기까지 (초)' && s.head[s.head.length - 6] === '옮길 차로 뒤차 반응' && s.head[s.head.length - 5] === '화면 1cm당 px' && s.head[s.head.length - 2] === 'HUD 상자 (px)' && s.head[s.head.length - 1] === '옮기기 시작 때 리뉴얼 HUD 상태' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
   }
@@ -401,10 +405,10 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const r = await E(() => ({modes:$$('#modeSeg button').map(b => b.dataset.mode + ':' + b.textContent.trim()), pair:!!$('#pairSeg'),
       verWords:/v1|v2/.test(document.body.innerText + $$('#setup button, #intro button').map(b => b.title).join(' ')), rules:/순서|홀수|짝수|비교:/.test(document.body.innerText),
       arText:$$('#arHud text').map(t => t.id + ':' + t.textContent), ar2Text:$$('#arHud2 text').map(t => t.id + ':' + t.textContent), ar3Text:$$('#arHud3 text').length, ours:/우리 HUD/.test(document.body.innerText + document.documentElement.innerHTML), arHud2:!!$('#arHud2'), orderUi:!!$('#orderSeg')}));
-    check('시연 HUD 선택은 현대 · 리뉴얼(3차) · 2차 · 1차, 순서 선택지 · 안내 문장 없음, 화면 · 문서에 예전 이름 없음', JSON.stringify(r.modes) === JSON.stringify(['nav:현대 HUD', 'ar3:리뉴얼 HUD', 'ar2:2차', 'ar:1차']) && !r.ours && !r.pair && !r.verWords && r.arHud2 && !r.orderUi && !r.rules, JSON.stringify(r));
+    check('시연 HUD 선택은 현대 · 3차 · 2차 · 1차(2026-11-17 저녁 사용자), 순서 선택지 · 안내 문장 없음, 화면 · 문서에 예전 이름 없음', JSON.stringify(r.modes) === JSON.stringify(['nav:현대', 'ar3:3차', 'ar2:2차', 'ar:1차']) && !r.ours && !r.pair && !r.verWords && r.arHud2 && !r.orderUi && !r.rules, JSON.stringify(r));
     check('리뉴얼 HUD 1 · 2차 안 글자는 제한속도 숫자뿐, 3차는 글자 없음', r.arText.length === 1 && /^limA:\d+$/.test(r.arText[0]) && r.ar2Text.length === 1 && /^bLim:\d+$/.test(r.ar2Text[0]) && r.ar3Text === 0, JSON.stringify(r.arText.concat(r.ar2Text)));
     const prep = await E(() => { $('#pid').value = 'P3'; openSession(); const o = {screen:$('#app').dataset.screen, setupVisible:!!$('#setup').offsetParent, setupBtn:!!$('#setupBtn').offsetParent, modeBtns:$$('#modeSeg button').filter(b => b.offsetParent).length, text:$('#sess').innerText, o3:orderFor('P3'), o4:orderFor('P4')}; goHome(); return o; });
-    check('주행 테스트 준비 화면: HUD · 순서 고르기 · 안내 문장 없음, 순서는 늘 현대 먼저(P3 · P4 모두 AB)', !prep.setupVisible && !prep.setupBtn && prep.modeBtns === 0 && !/순서|비교|연습 주행 있음/.test(prep.text) && prep.o3 === 'AB' && prep.o4 === 'AB', JSON.stringify(prep));
+    check('주행 테스트 준비 화면: HUD · 순서 고르기 · 안내 문장 없음, 순서는 누구나 판마다 교대(P3 · P4 모두 ALT)', !prep.setupVisible && !prep.setupBtn && prep.modeBtns === 0 && !/순서|비교|연습 주행 있음/.test(prep.text) && prep.o3 === 'ALT' && prep.o4 === 'ALT', JSON.stringify(prep));
   }
 
   /* ---------- 8-2. HUD 표시 영역 밖으로 나오지 않음: 같은 프레임을 HUD 켬 / 끔으로 그려 상자 밖 픽셀 비교 ---------- */
@@ -531,6 +535,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const dt = 1/60, stepPlayer = window.__sp0, keys = (l, r, u, d) => { KEYS.left = !!l; KEYS.right = !!r; KEYS.up = !!u; KEYS.down = !!d; };
       const fresh = v => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥'); setMode('off'); setScreen('drive'); startDrive({map:m, leaf, lane:1, type:'practice', jam:0, seed:1, sigT:0}); D.frozen = false;
         D.cars.forEach(c => c.mesh.visible = false); D.cars = []; Object.assign(D, {x:0, z:0, psi:0, v, sw:0, r:0, wheel:0, cruise:v, holdT:0, holdDir:0, brakeT:0, thrT:0, autoSw:null}); };
+      VEH.assist.on = false;   // 아래 실제 값 검사는 조작 보조를 끄고 잰다(보조는 맨 끝에서 따로)
       const press = (kmh, secs) => { fresh(kmh/3.6); const tr = []; for(let k = 0; k < secs*60; k++){ keys(0, 1); D.v = kmh/3.6; stepPlayer(dt); tr.push(D.sw); } return tr; };
       const o = {};
       const a100 = press(100, 1), a20 = press(20, 1), tap = press(100, .15);
@@ -551,6 +556,12 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       fresh(0); D.cruise = 0; let t = 0; while(D.v < 100/3.6 - .01 && t < 30){ keys(0, 0, 1); stepPlayer(dt); t += dt; } o.t100 = +t.toFixed(1);
       fresh(65/3.6); const z0 = D.z; t = 0; while(D.v > .01 && t < 10){ keys(0, 0, 0, 1); stepPlayer(dt); t += dt; } o.stop65 = +(z0 - D.z).toFixed(1);
       fresh(65/3.6); for(let k = 0; k < 18; k++){ keys(0, 0, 0, 1); stepPlayer(dt); } o.tapBrake = +((65/3.6 - D.v)*3.6).toFixed(1);
+      // 조작 보조(VEH.assist, 2026-11-17 저녁): 켜면 ① 떼었을 때 핸들이 금방 가운데로 ② 키 한 번(옆으로 1.2m 갈 때까지 누르고 뗌)으로 옆 차로에 곧게 섬 ③ 누르고 있는 동안 닿는 각도는 그대로 ④ 교차로 안(도로 방향 모름)에서는 방향 맞춤 없음
+      VEH.assist.on = true;
+      { const b100 = press(100, 1); o.as = {sw100:+b100[b100.length - 1].toFixed(1)};
+        fresh(20/3.6); for(let k = 0; k < 60; k++){ keys(0, 1); D.v = 20/3.6; stepPlayer(dt); } const pk = D.sw; D.roadPsi = null; let tt = null; for(let k = 0; k < 240; k++){ keys(); D.v = 20/3.6; stepPlayer(dt); if(tt === null && D.sw < pk*.1) tt = (k + 1)*dt; } o.as.t10 = +tt.toFixed(2); o.as.noAlignSw = +D.sw.toFixed(2); o.as.noAlignPsi = +(D.psi*180/Math.PI).toFixed(1);
+        const one = (kmh, on) => { VEH.assist.on = on; fresh(kmh/3.6); D.roadPsi = 0; let rel = false; for(let k = 0; k < 60*8; k++){ if(!rel && D.x > 1.2) rel = true; keys(0, !rel); D.v = kmh/3.6; stepPlayer(dt); } return {x:+D.x.toFixed(2), psi:+(D.psi*180/Math.PI).toFixed(2)}; };
+        o.as.one100 = one(100, true); o.as.one65 = one(65, true); o.as.off100 = one(100, false); VEH.assist.on = true; }
       keys(); stopDrive(); S.testing = false;
       // 키 배치는 그대로: 방향키 4개 · Q · E
       S.testing = true; S.drive = true; const ev = (type, key, code) => dispatchEvent(new KeyboardEvent(type, {key, code, bubbles:true, cancelable:true}));
@@ -558,9 +569,10 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       o.keys = dn.left && dn.up && !dn.right && !dn.down && dn2.right && dn2.down && !dn2.left && !Object.values(KEYS).some(Boolean); S.testing = false; S.drive = false; setMode('ar3'); goHome();
       o.veh = {L:VEH.L, ratio:VEH.ratio, lock:VEH.lock, wheelMax:+(VEH.lock/VEH.ratio).toFixed(1)};
       return o; });
+    check('조작 보조: 켜면 키 한 번으로 옆 차로에 곧게 서고(100km/h 옆 3.5m 안팎 · 65km/h 옆 차로 폭 안 · 방향 0.5° 안), 끄면 그대로 비스듬히 계속 감. 떼면 핸들이 0.6초 안에 10% 아래. 누르고 있을 때 닿는 각도는 그대로, 교차로 안에서는 방향을 안 건드림', Math.abs(h.as.one100.x - 3.5) < .9 && Math.abs(h.as.one100.psi) < .5 && h.as.one65.x > 1.75 && h.as.one65.x < 5.25 && Math.abs(h.as.one65.psi) < .5 && h.as.off100.x > 8 && h.as.t10 < .6 && Math.abs(h.as.sw100 - h.sw100) < 1.5 && Math.abs(h.as.noAlignSw) < .5 && Math.abs(h.as.noAlignPsi) > 20, JSON.stringify(h.as));
     check('조작감: 핸들 각도와 앞바퀴 각을 따로 계산(앞바퀴 = 핸들 ÷ 기어비 12.7) · 화면 속 핸들이 실제 핸들 각도 그대로 돎', h.wheelLink && Math.abs(h.wheelImg - h.swNow) < .11 && h.swNow > 20 && h.veh.ratio === 12.7 && h.veh.lock === 446, JSON.stringify({img:h.wheelImg, sw:h.swNow, veh:h.veh}));
-    check('조작감: 키를 누르고 있는 동안 핸들이 점점 돌아가고(누른 직후는 느리게), 빠를수록 같은 입력에 덜 돎 — 1초 누름 100km/h 수 도 · 20km/h 150° 넘게, 톡 누르면(0.15초) 1° 안', h.grows && h.sw100 > 5 && h.sw100 < 14 && h.sw20 > 150 && h.tap100 < 1, JSON.stringify({sw100:h.sw100, sw20:h.sw20, tap100:h.tap100}));
-    check('조작감: 키를 떼면 핸들이 끊기지 않고 가운데로(매 프레임 줄어듦 · 한 프레임에 3% 넘게 안 뜀 · 2.5초 안에 10% 아래)', h.ret.mono && h.ret.maxStepPct < 3 && h.ret.t10 < 2.5 && h.ret.t10 > .8 && Math.abs(h.ret.end) < 2, JSON.stringify(h.ret));
+    check('조작감(보조 끔 = 실제 값): 키를 누르고 있는 동안 핸들이 점점 돌아가고(누른 직후는 느리게), 빠를수록 같은 입력에 덜 돎 — 1초 누름 100km/h 수 도 · 20km/h 150° 넘게, 톡 누르면(0.15초) 1° 안', h.grows && h.sw100 > 5 && h.sw100 < 14 && h.sw20 > 150 && h.tap100 < 1, JSON.stringify({sw100:h.sw100, sw20:h.sw20, tap100:h.tap100}));
+    check('조작감(보조 끔 = 실제 값): 키를 떼면 핸들이 끊기지 않고 가운데로(매 프레임 줄어듦 · 한 프레임에 3% 넘게 안 뜀 · 2.5초 안에 10% 아래)', h.ret.mono && h.ret.maxStepPct < 3 && h.ret.t10 < 2.5 && h.ret.t10 > .8 && Math.abs(h.ret.end) < 2, JSON.stringify(h.ret));
     check('조작감: 같은 핸들 각도에 100km/h는 30km/h보다 덜 꺾임(곡률 비 0.4 ~ 0.6, 언더스티어)', h.gain > .4 && h.gain < .6, `${h.gain}`);
     check('조작감: ↑ 0 → 100km/h 10.3초 안팎(아반떼 1.6 실측 10.27초) · ↓ 계속 누르면 65km/h에서 20 ~ 25m에 섬(예전 7m/s² 고정 23m와 비슷) · 0.3초 톡 누르면 5km/h 안 줄어듦', Math.abs(h.t100 - 10.3) < .5 && h.stop65 > 20 && h.stop65 < 25 && h.tapBrake < 5, JSON.stringify({t100:h.t100, stop65:h.stop65, tapBrake:h.tapBrake}));
     check('조작감: 키 배치 그대로(← → ↑ ↓)', h.keys, '');
@@ -576,7 +588,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const count = (grp, f) => { let n = 0; grp.traverse(q => { if(q.isInstancedMesh && f(q)) n += q.count; }); return n; };
       const hw = builtMaps.ICR, city = builtMaps.CRT; const isLeaf = q => q.userData.tree === 'leaf', isFar = q => q.userData.tree === 'far';
       o.hw = hw ? {near:count(hw, isLeaf), far:count(hw, isFar), culled:(() => { let ok = true; hw.traverse(q => { if(q.userData.tree && q.userData.tree !== 'far' && (!q.frustumCulled || !q.geometry.boundingSphere)) ok = false; }); return ok; })(), lamps:count(hw, q => PROPM.models.lamp_hw.some(p => p.geo === q.geometry))/PROPM.models.lamp_hw.length, posts:count(hw, q => PROPM.models.rail_post.some(p => p.geo === q.geometry))/PROPM.models.rail_post.length} : null;
-      o.city = city ? {trees:count(city, isLeaf), lamps:count(city, q => PROPM.models.lamp_city.some(p => p.geo === q.geometry))/PROPM.models.lamp_city.length} : null;
+      o.city = city ? {trees:count(city, isLeaf), walkers:mapById('CRT')._walkers.length + ' ' + mapById('CL2')._walkers.length, lamps:count(city, q => PROPM.models.lamp_city.some(p => p.geo === q.geometry))/PROPM.models.lamp_city.length} : null;
       // 보행자: 모델 4개 · 자리 6개 모두 뼈대 동작, 걷는 방향을 보고 섬(머리 → 얼굴 앞 뼈대가 진행 방향)
       const m = mapById('CRT'), leaf = m.leaves.findIndex(l => l.dest === '종합병원');
       runDrive({map:m, leaf, lane:2, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', secs:1, keep:true, ap:{}});
@@ -585,12 +597,19 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const pose = i => { const u = pedMeshes[i].userData; if(!u.model) return null; const f = u.model.getObjectByName('LeftFoot').getWorldPosition(new THREE.Vector3()); return f.toArray().map(v => +v.toFixed(2)).join(','); };
       const p3 = pose(0); cityFrame(3.3); scene.updateMatrixWorld(true); const p33 = pose(0); cityFrame(3); scene.updateMatrixWorld(true);
       o.peds = {loaded:PED_MODEL.loaded, mixers:pedMeshes.filter(q => q.userData.mixer).length, codeHidden:pedMeshes.every(q => !q.userData.body.visible), face0:face(0), face1:face(1), moves:p3 !== p33, same:pose(0) === p3, nat:pedMeshes.map(q => +(q.userData.natural || 0).toFixed(2))};
+      // 보도를 걷는 사람들(장식): 보도 위에만(차도 x 범위 밖) · 횡단보도 머리에서 떨어져 · 시각에 따라 움직이고 같은 시각이면 같은 자리 · 횡단보도 보행자 수(pedsAt)는 그대로
+      { const W = m._walkers, xR = m.lanes*LANE/2, xL = -xR - m.lanes*LANE; const at = tt => { cityFrame(tt); return W.filter(w => w.node).map(w => [+w.node.position.x.toFixed(2), +w.node.position.z.toFixed(2)]); };
+        camera.position.set(0, 1.2, -100); const a = at(3), b = at(9), a2 = at(3);
+        const onWalk = q => q.every(([x, z]) => (x > xR + 1.2 || x < xL - 1.2) || (z > CZ.near + 1.2 && z < CZ.near + 4) || (z < CZ.far - 1.2 && z > CZ.far - 4));
+        o.walk = {n:W.length, made:a.length, onWalk:onWalk(a) && onWalk(b), moved:a.filter((q, i) => Math.hypot(q[0] - b[i][0], q[1] - b[i][1]) > 3).length, same:JSON.stringify(a) === JSON.stringify(a2),
+          cwClear:W.every(w => w.ax !== 'x' || !m.cw || w.a >= m.cw.x0 + 13 || w.b <= m.cw.x0 - 13), peds:pedsAt(3).length, pedMeshes:pedMeshes.length}; }
       stopDrive(); S.testing = false; goHome();
       o.cars = {draco:!!THREE.DRACOLoader, n:Object.keys(CAR_MODELS).length};
       return o; });
-    check('그래픽: 나무 모델 6그루(느티나무 3 · 소나무 3)와 텍스처를 불러와, 고속도로에 가까운 나무는 모델 · 먼 나무는 그 모델을 찍은 판으로 심김(같은 나무), 도심 가로수도 같은 모델. 가까운 나무는 구역별로 묶여 화면 밖 구역은 안 그림', g.trees.ready && g.trees.models === 'pine_a,pine_b,pine_c,zelkova_a,zelkova_b,zelkova_c' && g.trees.cards === 6 && g.trees.mapOk && g.hw && g.hw.near >= 300 && g.hw.far > 3000 && g.hw.culled && g.city && g.city.trees > 40, JSON.stringify({t:g.trees, hw:g.hw, city:g.city}));
+    check('그래픽: 나무 모델 6그루(느티나무 3 · 소나무 3)와 텍스처를 불러와, 고속도로에 가까운 나무는 모델 · 먼 나무는 그 모델을 찍은 판으로 심김(같은 나무), 가까운 나무는 구역별로 묶여 화면 밖 구역은 안 그림. 일반도로(④ ⑤)에는 가로수 없음(2026-11-17 저녁 사용자)', g.trees.ready && g.trees.models === 'pine_a,pine_b,pine_c,zelkova_a,zelkova_b,zelkova_c' && g.trees.cards === 6 && g.trees.mapOk && g.hw && g.hw.near >= 300 && g.hw.far > 3000 && g.hw.culled && g.city && g.city.trees === 0, JSON.stringify({t:g.trees, hw:g.hw, city:g.city}));
       check('그래픽: 가로등 2종 · 가드레일 기둥(Blender 모델)이 인스턴스로 놓임', g.props.ready && g.props.models === 'lamp_city,lamp_hw,rail_post' && g.hw.lamps >= 8 && g.hw.posts >= 100 && g.city.lamps >= 10, JSON.stringify({p:g.props, hw:g.hw, city:g.city}));
       check('그래픽: 보행자 모델 4명이 자리 6개에 모두 들어가 뼈대로 걷고(시각에 따라 자세가 바뀌고 같은 시각이면 같은 자세), 걷는 방향을 보고 섬. 코드 모양은 숨김', g.peds.loaded === 4 && g.peds.mixers === 6 && g.peds.codeHidden && g.peds.face0 < -.05 && g.peds.face1 > .05 && g.peds.moves && g.peds.same && g.peds.nat.every(v => v > .4 && v < 1.6), JSON.stringify(g.peds));
+      check('그래픽: 일반도로 보도를 걷는 사람들(장식) — 보도 위로만 다니고 횡단보도 머리 13m 안으로는 안 옴, 시각에 따라 걷고 같은 시각이면 같은 자리, 횡단보도 보행자 자리(6개)는 그대로', g.walk.n >= 30 && g.walk.made === g.walk.n && g.walk.onWalk && g.walk.moved > g.walk.n*.8 && g.walk.same && g.walk.cwClear && g.walk.pedMeshes === 6, JSON.stringify(g.walk));
       check('그래픽: 차량 모델 5종은 Draco 압축본을 읽음', g.cars.draco && g.cars.n === 5, JSON.stringify(g.cars));
   }
 

@@ -33,8 +33,8 @@
     <h2>시연</h2>
     <p class="field">HUD</p>
     <div class="seg" id="modeSeg">
-      <button data-mode="nav" aria-pressed="false">현대 HUD</button>
-      <button data-mode="ar3" aria-pressed="true">리뉴얼 HUD</button>
+      <button data-mode="nav" aria-pressed="false" title="현대 HUD (대조군)">현대</button>
+      <button data-mode="ar3" aria-pressed="true" title="리뉴얼 HUD 3차 (3.1) — 3차 실험 조건">3차</button>
       <button data-mode="ar2" aria-pressed="false" title="리뉴얼 HUD 2차 (2.4) — 2차 실험 때 화면">2차</button>
       <button data-mode="ar" aria-pressed="false" title="리뉴얼 HUD 1차 (1.9) — 1차 실험 때 화면">1차</button>
     </div>
@@ -351,9 +351,9 @@
           </g>
           <!-- ③ 마감선까지 남은 거리: 색 없는 막대(왼쪽 고정, 오른쪽에서 줄어듦). 대기 중엔 밝아지고 테두리가 붙는다 -->
           <g id="cCd" filter="url(#glow2)">
-            <rect id="cCdBg" x="200" y="68" width="120" height="6" rx="3"/>
-            <rect id="cCdBar" x="200" y="68" width="120" height="6" rx="3"/>
-            <rect id="cCdRing" x="194" y="62" width="132" height="18" rx="9" opacity="0"/>
+            <rect id="cCdBg" x="200" y="68" width="120" height="10" rx="5"/>
+            <rect id="cCdBar" x="200" y="68" width="120" height="10" rx="5"/>
+            <rect id="cCdRing" x="195" y="63" width="130" height="20" rx="10" opacity="0"/>
           </g>
         </g>
 

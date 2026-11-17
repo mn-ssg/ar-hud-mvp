@@ -10,7 +10,10 @@ const serve = () => new Promise(res => { const srv = http.createServer((q, r) =>
   const srv = await serve(), browser = await chromium.launch({executablePath:CHROME, headless:true, args:['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist']});
   const page = await browser.newPage({viewport:{width:1366, height:768}});
   await page.goto(`http://127.0.0.1:${srv.address().port}/index.html`, {waitUntil:'load'}); await page.waitForTimeout(2500);
-  const out = await page.evaluate(() => {
+  // 조작 보조(config.js VEH.assist): 기본은 켠 채로 잼 → handling-check-assist.json. ASSIST=0 이면 끄고(실제 값 그대로) → handling-check.json (2026-11-17 저녁)
+  const ASSIST = process.env.ASSIST !== '0';
+  const out = await page.evaluate(assist => {
+    VEH.assist.on = assist;
     const dt = 1/60, keys = (l, r, u, d) => { KEYS.left = l; KEYS.right = r; KEYS.up = !!u; KEYS.down = !!d; };
     const fresh = v => { const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥'); setMode('off'); startDrive({map:m, leaf, lane:1, type:'practice', jam:0, seed:1, sigT:0}); D.frozen = false;
       D.cars.forEach(c => c.mesh.visible = false); D.cars = []; Object.assign(D, {x:0, z:0, psi:0, v, sw:0, r:0, wheel:0, cruise:v, holdT:0, holdDir:0, brakeT:0, thrT:0}); };
@@ -47,9 +50,12 @@ const serve = () => new Promise(res => { const srv = http.createServer((q, r) =>
         if(Math.abs(D.sw) > swMax){ swMax = Math.abs(D.sw); vAt = D.v; } }
       const res = D.result; stopDrive(); return {sw:+swMax.toFixed(0), turns:+(swMax/360).toFixed(2), kmh:+(vAt*3.6).toFixed(0), result:res, offroad:D.offroad}; };
     return {lane:[laneChange(100, 1.0), laneChange(100, .75), laneChange(65, 1.0), laneChange(50, 1.0)], hard:[hard(100), hard(65)], hold:[100, 80, 65, 50, 30, 20, 10].map(hold), accel:accel(), brake:[brake(100), brake(65)], tap:[tap(65, .3), tap(65, .6), tap(65, 1)], coast:[coast(100), coast(50)], turn:turn(),
-      gain:[30, 50, 80, 100].map(k => { const v = k/3.6; return {kmh:k, pct:Math.round(VEH.L/(VEH.L + VEH.K*v*v)*100)}; })};
-  });
+      gain:[30, 50, 80, 100].map(k => { const v = k/3.6; return {kmh:k, pct:Math.round(VEH.L/(VEH.L + VEH.K*v*v)*100)}; }), assist,
+      // 6) 키 한 번으로 차로 변경: 오른쪽 키를 누르고 있다가 옆으로 x0 m 갔을 때 떼고 그냥 둠 → 2 · 4초 뒤 방향(°)과 옆 위치. 보조가 켜져 있으면 스스로 곧게 서야 함
+      oneKey:[100, 65].map(kmh => { const v = kmh/3.6; let best = null; for(const x0 of [.6, .9, 1.2, 1.5, 1.8, 2.1]){ fresh(v); D.roadPsi = 0; let rel = false, t = 0, tr = null, p2 = null; for(let k = 0; k < 60*8; k++){ if(!rel && D.x > x0){ rel = true; tr = t; } keys(false, !rel); D.v = v; stepPlayer(dt); t += dt; if(rel && p2 === null && t > tr + 2) p2 = D.psi*180/Math.PI; }
+        const r = {kmh, release:x0, hold:+tr.toFixed(2), psi2:+p2.toFixed(2), psiEnd:+(D.psi*180/Math.PI).toFixed(2), x:+D.x.toFixed(2)}; if(!best || Math.abs(r.x - 3.5) < Math.abs(best.x - 3.5)) best = r; } return best; })};
+  }, ASSIST);
   console.log(JSON.stringify(out, null, 1).replace(/\n\s+(?=[^\[\]{}]*[}\]])/g, ' ').replace(/{\n\s+/g, '{'));
-  fs.writeFileSync(path.join(__dirname, 'handling-check.json'), JSON.stringify(out, null, 1));
+  fs.writeFileSync(path.join(__dirname, ASSIST ? 'handling-check-assist.json' : 'handling-check.json'), JSON.stringify(out, null, 1));
   await browser.close(); srv.close();
 })().catch(e => { console.error(e); process.exit(2); });

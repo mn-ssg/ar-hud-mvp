@@ -194,5 +194,24 @@
    "kmh": 100,
    "pct": 44
   }
+ ],
+ "assist": false,
+ "oneKey": [
+  {
+   "kmh": 100,
+   "release": 0.6,
+   "hold": 1.43,
+   "psi2": 5.9,
+   "psiEnd": 6.08,
+   "x": 18.84
+  },
+  {
+   "kmh": 65,
+   "release": 0.6,
+   "hold": 1.28,
+   "psi2": 12.08,
+   "psiEnd": 12.48,
+   "x": 25.26
+  }
  ]
 }

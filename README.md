@@ -22,8 +22,8 @@ src/
     cabin.js          운전석 실내 — Higgsfield 이미지 층(바탕 · 핸들 CSS 3D) + 계기판 · 센터 화면 캔버스 (2026-11-07 D111). HUD 상자 크기를 장면 각도(config.js HUD_DEG 14° × 7.3°, D116)로 px 환산, 아래끝은 대시보드 윗선 위, 야간 덮개는 바탕 알파 마스크
     mirrors.js        룸미러 — 실내 이미지의 받침 자리 · 실제 거울 크기 각도 (2026-11-07 저녁 D115), 크기는 cabin.js layoutCabin이 다시 놓음
     props.js          정류장 · 연석 등 코드 소품 + PROPM(Blender 가로등 · 가드레일 기둥 모델 props.glb를 인스턴스로 놓음)
-    trees.js          나무 — Blender 모델 6그루(trees.glb). 가까운 나무는 모델, 먼 나무는 같은 모델을 찍은 판 (2026-11-17)
-    city.js           일반도로 교차로 장면 · 신호 · 보행자 · 버스(정류장 흐름)
+    trees.js          나무 — Blender 모델 6그루(trees.glb). 가까운 나무는 모델, 먼 나무는 같은 모델을 찍은 판 (2026-11-17). 고속도로만 — 일반도로 가로수는 없앰(config.js CITY_TREES)
+    city.js           일반도로 교차로 장면 · 신호 · 횡단보도 보행자 · 버스(정류장 흐름) · 보도를 걷는 사람들(WALK — 장식, 판정과 무관)
   hud/
     hud.js            현대 HUD(대조군) · 리뉴얼 HUD 1차(1차 실험 v1.9) · 미니 도로 공용 그리기 함수
     hud2.js           리뉴얼 HUD 2차(2.4, 2차 실험) — 도로 기준 미니 도로 투영, hud.js의 띠 함수를 씀. 시연 비교용
@@ -41,9 +41,9 @@ assets/
   cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
-  drive-regression.js 브라우저 자동 운전 회귀 130항목  node drive-regression.js (Chrome 필요)
+  drive-regression.js 브라우저 자동 운전 회귀 134항목  node drive-regression.js (Chrome 필요)
   capture-states.js   리뉴얼 HUD 3차 상태 6가지 캡처(주간 · 야간, 현대 HUD 줄 포함) + 대비 측정   node capture-states.js <폴더>
-  handling-check.js   조작감 점검 — 새 조작 모델을 키 입력으로 돌려 차로 변경 시간 · 우회전 핸들 각도 · 가속 · 제동을 실제 값과 견줌(결과 handling-check.json)
+  handling-check.js   조작감 점검(보조 켬 → handling-check-assist.json · ASSIST=0 이면 실제 값 → handling-check.json) — 새 조작 모델을 키 입력으로 돌려 차로 변경 시간 · 우회전 핸들 각도 · 가속 · 제동을 실제 값과 견줌(결과 handling-check.json)
   perf-check.js       성능 재기 — 장면 4개 프레임 시간 · 삼각형 · 그리기 호출 · 로딩 용량   node perf-check.js after (결과 perf-after.json, 그래픽 작업 전 값 perf-before.json)
   autodrive-batch.js  자동 운전 묶음(현대 · 리뉴얼 같은 시나리오의 기록 값이 같은지, 3차 상태 통계)
   demo-audit.js       시연 · 주행 교통 겹침 · 이상 움직임 점검 (ONLY=CRT 처럼 맵 하나만)
@@ -56,7 +56,8 @@ tests/
 
 - 열기: `index.html`을 정적 서버로 연다 (파일로 직접 열면 재질 이미지가 막힐 수 있음). 예: `python3 -m http.server` 뒤 `http://localhost:8000/`
 - 테스트: `cd tests && npm i && npm test`
-- 조작: ← → 핸들 · ↑ 가속 · ↓ 브레이크 · Q E 깜빡이(차로 변경이 끝나면 자동으로 꺼짐). 차 움직임은 아반떼(CN7) 제원 · 실측 기준(`config.js VEH`): 키를 누르고 있는 동안 핸들이 점점 돌아가고(빠를수록 덜), 떼면 가운데로 돌아옴. ↓는 누르고 있을수록 세게.
+- 조작: ← → 핸들 · ↑ 가속 · ↓ 브레이크 · Q E 깜빡이(차로 변경이 끝나면 자동으로 꺼짐). 차 움직임은 아반떼(CN7) 제원 · 실측 기준(`config.js VEH`): 키를 누르고 있는 동안 핸들이 점점 돌아가고(빠를수록 덜), 떼면 가운데로 돌아옴. ↓는 누르고 있을수록 세게. 키보드 운전이 어려운 부분은 조작 보조(`VEH.assist`)가 덜어 줌 — 핸들이 더 빨리 돌고, 떼면 금방 가운데로 오고, 떼고 있으면 도로 방향으로 스스로 곧게 섬(차로 가운데로 끌지는 않음).
+- 주행 테스트 순서(3차): 연습(HUD 없음) → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해). `session.js EXP.alternate`
 - 느린 기기: 화소 배율이 최대 1.5이고, 프레임이 자주 25ms를 넘으면 1.25 → 1로 내려가며 룸미러는 두 프레임에 한 번 갱신된다(`scene.js PERF`). 캡처처럼 선명하게 고정하려면 `?dpr=2`
 - WebGL 컨텍스트가 끊기면(사파리가 오래 둔 탭에서 거둬 감) 안내를 띄우고 복구, 4초 안에 안 되면 새로고침한다(`scene.js`)
 
