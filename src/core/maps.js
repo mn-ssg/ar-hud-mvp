@@ -67,7 +67,9 @@ const MAPS = [
       {key:'R', label:'우회전', lanes:[3], dest:'대학로', quiz:false, road:{n:CROSS.n, i:CROSS.n - 1}, pts:turnPts(5.25, 1, CROSS.laneZ(1, CROSS.n - 1), 9, 300)} ]},
   // ⑤ 우회전 + 횡단보도 (D69): 맨 오른쪽 차로에 버스가 서 있고(정류장), 꺾자마자 횡단보도에 보행자 — 건너거나 건너려 하면 일시정지
   { id:'CRT', no:'⑤', name:'우회전 · 횡단보도', city:true, lanes:3, start:[1], cruise:13.9, limit:50, sig:'green',
-    changeEnd:-195, laneChange:[-152,-186], bus:{lane:2, z:-140}, cw:{x0:16, x1:20},
+    // work(공사 구간, config.js CITY_WORK): 가운데 차로 z0 ~ z1을 막음. z0 앞 taper m는 라바콘이 좁혀 드는 곳 — 그 시작(z0 + taper = -136)이 마감선(출발 뒤 약 8초 — 뒤차 1 ~ 3대를 보고 판단할 시간).
+    // 정류장은 2차(-140)보다 교차로 쪽(-172): 버스 뒤(약 -164)에 서 있는 동안 보행자 시작 지점(drive.js PED_TRIG)을 넘지 않게. laneChange: 시연 · 자동 운전이 옮기는 구간(공사 전) / old: 공사 없을 때 값(2차와 같음 — 버스를 지난 뒤 옮김)
+    changeEnd:-195, laneChange:[-70,-125], bus:{lane:2, z:-172}, cw:{x0:16, x1:20}, work:{lane:1, z0:-148, z1:-204, taper:12, old:{laneChange:[-152,-186], busZ:-140}},
     exits:[
       {key:'L', label:'좌회전', lanes:[0], dest:'구청', quiz:false, road:{n:CROSS.n, i:0}, pts:turnPts(-3.5, -1, CROSS.laneZ(-1, 0), 10.75, 300)},
       {key:'S', label:'직진', lanes:[1], dest:'시청', quiz:false, road:{n:3, i:1}, pts:cityStraight(0)},
@@ -77,6 +79,7 @@ const MAPS = [
 /* ---------- 맵 준비: 폭 · 곡선 · 구간(seg) · 목적지(leaf) ---------- */
 function prepareMap(m){
   const N = m.lanes;
+  if(m.work && !CITY_WORK){ m.laneChange = m.work.old.laneChange; m.bus.z = m.work.old.busZ; delete m.work; }
   m.laneX = i => (i - (N-1)/2)*LANE;
   m.edgeX = N*LANE/2 + .15;          // 가장자리 실선 (3차로 5.4)
   m.half = N*LANE/2 + .55;           // 포장면 반폭 (3차로 5.8)

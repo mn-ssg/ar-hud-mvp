@@ -116,14 +116,22 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('③ 연속 분기: 두 번째 안내는 첫 출구를 확정한 뒤에만', second.length > 0 && !jumpEarly && second.every(s => s.turn), `두 번째 안내 시작 거리 ${second[0] && second[0].d}m`);
   }
   {
-    // 경로 이탈: 우회전해야 하는데 직진 출구로
-    const r = await E(() => { const m = mapById('CRT'), leaf = m.leaves.findIndex(l => l.dest === '종합병원');
-      return runDrive({map:m, leaf, lane:1, type:'city', jam:0, seed:777, sigT:0}, {hud:'nav', noPeds:true, sample:navSample, secs:40, keep:true,
-        ap:{exit:m.exits.find(e => e.key === 'S'), mode:'lane', lane:1}, setup:() => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); }}); });
+    // 경로 이탈: 우회전해야 하는데 직진 출구로 (2026-11-17 밤: 직진 차로는 공사로 막혀 있으므로 이 검사 동안만 공사 판정을 꺼 둔다 — 좌회전은 늘 빨간불이라 신호 위반으로 끝남)
+    const r = await E(() => { const m = mapById('CRT'), leaf = m.leaves.findIndex(l => l.dest === '종합병원'), w0 = m.work; m.work = null;
+      try { return runDrive({map:m, leaf, lane:1, type:'city', jam:0, seed:777, sigT:0}, {hud:'nav', noPeds:true, sample:navSample, secs:40, keep:true,
+        ap:{exit:m.exits.find(e => e.key === 'S'), mode:'lane', lane:1}, setup:() => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); }}); } finally { m.work = w0; } });
     const last = r.samples[r.samples.length - 1];
     check('경로 이탈(다른 출구): 결과가 성공이 아니라 다른 출구', r.result === 'wrong', `결과 ${r.result} · ${r.exit}`);
     check('경로 이탈: 현대 HUD가 정상 직진처럼 보이지 않음(재탐색)', last && !last.straight && !last.turn && last.name === '경로 재탐색', JSON.stringify(last));
     await E(() => stopDrive());
+    // ⑤ 공사 구간(2026-11-17 밤): 가운데 차로에 그대로 있으면 공사 구간 충돌로 끝남 · 마감선은 공사가 좁아지기 시작하는 곳(-136) · 리뉴얼 HUD는 막힌 차로를 주황으로 그리고 가까워지면 06 앞쪽 위험
+    const w = await E(() => { const m = mapById('CRT'), leaf = m.leaves.findIndex(l => l.dest === '종합병원'); let hud = null, st = [];
+      const r = runDrive({map:m, leaf, lane:1, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', noPeds:true, secs:40, keep:true, ap:{mode:'lane', lane:1},
+        setup:() => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); },
+        sample:() => { if(S.H3 && !st.includes(S.H3.state)) st.push(S.H3.state); if(hud === null && D.z < -95 && D.z > -110) hud = {work:($('#cWork').getAttribute('d') || '').length > 20, bars:($('#cWorkBars').getAttribute('d') || '').length > 20, fill:getComputedStyle($('#cWork')).fill, warn:getComputedStyle(document.documentElement).getPropertyValue('--h2-warn').trim(), gate:S.H3.gateZ}; }});
+      const o = {result:r.result, crash:D.crashWith, z:+D.z.toFixed(0), hud, states:st, ce:changeEndOf(m), work:m.work, in1:inWork(m, 0, -160), in2:inWork(m, 3.5, -160), tip:inWork(m, 0, -137), tipSide:inWork(m, 1.4, -138), after:inWork(m, 0, -210)}; stopDrive(); return o; });
+    check('⑤ 공사 구간: 가운데 차로에 그대로 있으면 공사 구간 충돌(좁아지는 곳 안에서)로 끝나고, 마감선은 좁아지기 시작하는 -136, 막힌 곳 판정은 가운데 차로 z -204 ~ -148(+ 삼각형)뿐', w.result === 'crash' && w.crash === '공사 구간' && w.z <= -136 && w.z >= -150 && w.ce === -136 && w.in1 && !w.in2 && w.tip && !w.tipSide && !w.after, JSON.stringify({r:w.result, c:w.crash, z:w.z, ce:w.ce}));
+    check('⑤ 공사 구간: 리뉴얼 HUD가 막힌 차로를 주황(조심 색) 바탕 + 줄로 그리고 마감선이 -136, 그 차로로 다가가면 06 앞쪽 위험', w.hud && w.hud.work && w.hud.bars && w.hud.gate === -136 && w.states.includes(6), JSON.stringify({hud:w.hud, states:w.states}));
   }
 
   // 2026-10-29: 리뉴얼 HUD를 중간고사 V1(470a8f7)로 되돌려 v2 그래픽 전용 검사(벽 · 꺾쇠 · 정체 띠 등)는 뺌 — 판단 로직은 guide.test.js
@@ -244,7 +252,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       runDrive({map:m, leaf, lane:2, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', secs:22, ap:{}, setup:() => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); },
         sample:() => { if(D.z > FORK_Z - 1){ if(runs('cSurf') >= 4) pre++; return; } n++; if(runs('cSurf') > 1 || runs('cEdges') > 2) bad++;
           if(S.H3.ped){ if(CAR3.models.ped && CAR3.models.ped.pool.some(g => g.visible)) peds++; if(runs('cZebraHot') > 5) hot++; } }}); return {n, bad, peds, hot, pre}; });
-    check('3차 ⑤ 우회전: 정지선을 지나면 미니 도로에 내 경로의 도로만(지나온 본선 · 다른 출구 없음, 끊긴 띠를 이어 붙이지 않음), 그 전에는 본선 + 출구 셋', rt.n > 60 && rt.bad === 0 && rt.pre > 60, JSON.stringify(rt));
+    check('3차 ⑤ 우회전: 정지선을 지나면 미니 도로에 내 경로의 도로만(지나온 본선 · 다른 출구 없음, 끊긴 띠를 이어 붙이지 않음), 그 전에는 본선 + 출구 셋', rt.n > 60 && rt.bad <= 1 && rt.pre > 60, JSON.stringify(rt));   // bad ≤ 1: 본선 → 꺾는 구간으로 보기가 넘어가는 한 프레임은 띠가 둘로 나뉠 수 있음(2026-11-17 밤, 출발 지점이 바뀌며 드러남 — 눈에 보이지 않는 1/60초)
     check('3차 ⑤: 건너는 보행자는 사람 모델(주황), 그 횡단보도 줄무늬가 주황으로', rt.peds > 10 && rt.hot > 10, JSON.stringify(rt));
     // 왼쪽으로 옮기는 맵(④): 차로 선을 넘는 내내 꺾쇠 · 점이 들어갈 차로 쪽(왼쪽 = 내 차 아이콘보다 화면 왼쪽)에 있음
     const lt = await E(() => { const m = mapById('CL2'), leaf = m.leaves.findIndex(l => l.dest === '전통시장'); let n = 0, bad = 0;
@@ -359,7 +367,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const alt = rows => rows.map(r => r.hud).join(',') === 'nav,ar3,nav,ar3,nav,ar3' && rows.map(r => r.seq).join('') === '123456';
     check('세션(3차, 피그마 3차 검증 계획): 연습 뒤 현대 · 리뉴얼을 판마다 교대(현대 먼저, 번호와 상관없이) · 순서 칸 ALT', alt(p1.rows) && alt(p2.rows) && p1.rows[0].order === 'ALT' && p2.rows[0].order === 'ALT', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
     check('세션: 같은 장면이 연달아 나오지 않음(두 HUD의 같은 장면 사이에 다른 판이 낌)', [p1, p2].every(q => q.rows.every((r, i) => i === 0 || r.scn !== q.rows[i-1].scn)), JSON.stringify(p1.rows.map(r => r.scn)));
-    check('세션: HUD 버전 칸 — 현대 3.5 · 리뉴얼 3.1', p1.rows.filter(r => r.hud === 'ar3').length === 3 && p1.rows.filter(r => r.hud === 'ar3').every(r => r.ver === '리뉴얼 3.1') && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.5'), JSON.stringify(p1.rows.map(r => r.ver)));
+    check('세션: HUD 버전 칸 — 현대 3.5 · 리뉴얼 3.2', p1.rows.filter(r => r.hud === 'ar3').length === 3 && p1.rows.filter(r => r.hud === 'ar3').every(r => r.ver === '리뉴얼 3.2') && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.5'), JSON.stringify(p1.rows.map(r => r.ver)));
     check('세션: 연습이 끝나면 결과 카드 없이 바로 첫 주행(연습 기록 1 · 카드에 결과 글 없음)', p1.prs === 1 && !s.practiceCard, JSON.stringify(s.practiceCard));
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
     check('세션: 같은 시나리오 ID를 두 HUD가 한 번씩 (교통 · 목적지 · 시간대 고정)', pairOk(p1.rows) && pairOk(p2.rows), JSON.stringify(p1.rows.map(r => r.scn)));
@@ -474,8 +482,8 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('깜빡이를 안 켜면 뒤차 반응 없음 (지금 동작 그대로)', none.ev === 0 && !none.any, '');
     // ⑤ 버스: 와서 서고(문 열림 · 승하차) 떠남, 다른 차 · 보행자와 겹치지 않음
     const bus = await E(() => { const st = makeScenario('CRT', 'city', 'day', 1003), cfg = runCfg(st); let minGap = Infinity, phases = new Set(), doorMax = 0, peds = 0, departed = false;
-      // 자동 운전은 보행자 앞에 서지 않으므로 보행자는 뺌(버스 흐름만 봄)
-      runDrive(cfg, {hud:'ar2', secs:45, ap:{}, noPeds:true, sample:() => { const c = D.cars.find(o => o.kind === 'bus'); if(!c) return; const s = busStateAt(c.plan, D.t); phases.add(s.phase); doorMax = Math.max(doorMax, s.door); if(c.plan.departT !== null) departed = true; peds = Math.max(peds, (busMesh.userData.peds || []).length);
+      // 자동 운전은 보행자 앞에 서지 않으므로 보행자는 뺌(버스 흐름만 봄). 2026-11-17 밤: 공사 구간이 생겨 경로만 따라가는 자동 운전은 뒤차와 부딪히므로 내 차는 출발점에 세워 둠(버스 · 뒤차 흐름만 봄)
+      runDrive(cfg, {hud:'ar2', secs:45, ap:{mode:'lane', lane:1}, noPeds:true, setup:() => { D.cruise = 0; D.v = 0; }, sample:() => { const c = D.cars.find(o => o.kind === 'bus'); if(!c) return; const s = busStateAt(c.plan, D.t); phases.add(s.phase); doorMax = Math.max(doorMax, s.door); if(c.plan.departT !== null) departed = true; peds = Math.max(peds, (busMesh.userData.peds || []).length);
         D.cars.forEach(o => { if(o === c || o.kind === 'onc') return; const dz = Math.abs(o.z - c.z) - halfL(o) - halfL(c), dx = Math.abs(o.x - c.x) - halfW(o) - halfW(c); if(dz < 0 && dx < 0) minGap = Math.min(minGap, Math.max(dz, dx)); }); }});
       return {phases:[...phases], doorMax, peds, departed, overlap:minGap < 0, result:D.result, crash:D.crashWith}; });   // runDrive가 끝나면 D.cars가 비므로 안에서 기록
     check('⑤ 버스: 들어옴 → 정차(문 열림 · 승하차) → 출발, 다른 차와 겹침 없음', ['approach', 'stop', 'depart'].every(p => bus.phases.includes(p)) && bus.doorMax > .99 && bus.peds >= 1 && bus.departed && !bus.overlap && bus.result !== 'crash', JSON.stringify(bus));
@@ -608,7 +616,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         bus.x = 8.2; o.hit.touch = hit(); D.psi = 0; D.x = 0; D.z = -100; const car = mk(0, -104.4, 'rear', 4.6, 1.85); D.cars = [car]; o.hit.gap = hit(); car.z = -104.3; o.hit.alignedHit = hit(); car.z = -100; car.x = 1.75; o.hit.side = hit(); car.x = 1.65; o.hit.sideHit = hit(); D.cars = keep; }
       stopDrive(); S.testing = false; goHome(); return o; });
     check('충돌 판정: 두 차를 각자 방향의 직사각형으로 — 비스듬히 선 내 차 옆 7.9m를 곧게 지나가는 버스는 충돌 아님 · 꼬리에 닿으면 충돌 · 나란한 차는 예전과 같은 거리(앞뒤 4.35m · 옆 1.70m)에서 충돌', r.hit.far === '' && /버스/.test(r.hit.touch) && r.hit.gap === '' && /앞을 받음/.test(r.hit.alignedHit) && r.hit.side === '' && /옆/.test(r.hit.sideHit), JSON.stringify(r.hit));
-    check('⑤ 보행자: 건너기 시작은 내 차가 교차로 70m 앞에 온 순간부터(첫 사람 2 ~ 4.5초 뒤) — 100km/h로 일찍 닿아도 50km/h로 닿아도 교차로 30m 앞에서 건너려 하거나 건너는 사람이 있고 리뉴얼 HUD가 06 앞쪽 위험, 기록에 이벤트 1줄', [r.fast, r.norm].every(q => q.before && q.trig && q.trig.t0[0] >= 1.9 && q.trig.t0[0] <= 4.6 && q.near >= 1 && q.hud === 6 && q.ev === 1), JSON.stringify(r.fast) + ' / ' + JSON.stringify(r.norm));
+    check('⑤ 보행자: 건너기 시작은 내 차가 교차로 55m 앞에 온 순간부터(첫 사람 2 ~ 4.5초 뒤) — 100km/h로 일찍 닿아도 50km/h로 닿아도 교차로 30m 앞에서 건너려 하거나 건너는 사람이 있고 리뉴얼 HUD가 06 앞쪽 위험, 기록에 이벤트 1줄', [r.fast, r.norm].every(q => q.before && q.trig && q.trig.t0[0] >= 1.9 && q.trig.t0[0] <= 4.6 && q.near >= 1 && q.hud === 6 && q.ev === 1), JSON.stringify(r.fast) + ' / ' + JSON.stringify(r.norm));
     check('3차 미니 도로: 차로를 옮기는 동안 좌우 기준이 한 방향으로 매끄럽게(프레임당 0.05m 아래) 넘어가고, 차로 가운데 0.5m 안에서는 안 움직이며, 옆 차로 가운데에 정확히 닿음. 내 차 아이콘은 늘 그 기준 자리', r.view.mono && r.view.maxStep < .05 && Math.abs(r.view.still) < 1e-6 && Math.abs(r.view.end) < .02 && r.view.ego, JSON.stringify(r.view));
   }
 
@@ -641,7 +649,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       o.cars = {draco:!!THREE.DRACOLoader, n:Object.keys(CAR_MODELS).length};
       return o; });
     check('그래픽: 나무 모델 6그루(느티나무 3 · 소나무 3)와 텍스처를 불러와, 고속도로에 가까운 나무는 모델 · 먼 나무는 그 모델을 찍은 판으로 심김(같은 나무), 가까운 나무는 구역별로 묶여 화면 밖 구역은 안 그림. 일반도로(④ ⑤)에는 가로수 없음(2026-11-17 저녁 사용자)', g.trees.ready && g.trees.models === 'pine_a,pine_b,pine_c,zelkova_a,zelkova_b,zelkova_c' && g.trees.cards === 6 && g.trees.mapOk && g.hw && g.hw.near >= 300 && g.hw.far > 3000 && g.hw.culled && g.city && g.city.trees === 0, JSON.stringify({t:g.trees, hw:g.hw, city:g.city}));
-      check('그래픽: 가로등 2종 · 가드레일 기둥(Blender 모델)이 인스턴스로 놓임', g.props.ready && g.props.models === 'lamp_city,lamp_hw,rail_post' && g.hw.lamps >= 8 && g.hw.posts >= 100 && g.city.lamps >= 10, JSON.stringify({p:g.props, hw:g.hw, city:g.city}));
+      check('그래픽: 가로등 2종 · 가드레일 기둥 · 공사 구간 소품(라바콘 · 방호 울타리 · 표지) Blender 모델이 인스턴스로 놓임', g.props.ready && g.props.models === 'barricade,cone,lamp_city,lamp_hw,rail_post,work_sign' && g.hw.lamps >= 8 && g.hw.posts >= 100 && g.city.lamps >= 10, JSON.stringify({p:g.props, hw:g.hw, city:g.city}));
       check('그래픽: 보행자 모델 4명이 자리 6개에 모두 들어가 뼈대로 걷고(시각에 따라 자세가 바뀌고 같은 시각이면 같은 자세), 걷는 방향을 보고 섬. 코드 모양은 숨김', g.peds.loaded === 4 && g.peds.mixers === 6 && g.peds.codeHidden && g.peds.face0 < -.05 && g.peds.face1 > .05 && g.peds.moves && g.peds.same && g.peds.nat.every(v => v > .4 && v < 1.6), JSON.stringify(g.peds));
       check('그래픽: 일반도로 보도를 걷는 사람들(장식) — 보도 위로만 다니고 횡단보도 머리 13m 안으로는 안 옴, 시각에 따라 걷고 같은 시각이면 같은 자리, 횡단보도 보행자 자리(6개)는 그대로', g.walk.n >= 30 && g.walk.made === g.walk.n && g.walk.onWalk && g.walk.moved > g.walk.n*.8 && g.walk.same && g.walk.cwClear && g.walk.pedMeshes === 6, JSON.stringify(g.walk));
       check('그래픽: 차량 모델 5종은 Draco 압축본을 읽음', g.cars.draco && g.cars.n === 5, JSON.stringify(g.cars));

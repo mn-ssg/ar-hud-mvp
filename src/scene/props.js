@@ -53,12 +53,14 @@ const PROPS = (() => {
 const PROPM = (() => {
   const models = {}, dirty = new Set(); let ready = false, timer = 0;
   const dark = new THREE.MeshStandardMaterial({color:lin('#24282d'), roughness:.6, metalness:.35});
-  const matOf = n => ({galv, lens:lampMat, dark, refl:reflMat})[n] || galv;
+  // 공사 구간 소품(2026-11-17 밤): 주황 플라스틱 · 흰 반사 띠 · 노란 판
+  const coneMat = new THREE.MeshStandardMaterial({color:lin('#f2591c'), roughness:.55}), bandMat = new THREE.MeshStandardMaterial({color:lin('#eef0ec'), roughness:.35, emissive:lin('#ffffff'), emissiveIntensity:.08}), signMat = new THREE.MeshStandardMaterial({color:lin('#f0c11a'), roughness:.5});
+  const matOf = n => ({galv, lens:lampMat, dark, refl:reflMat, cone:coneMat, band:bandMat, sign:signMat})[n] || galv;
   function flush(){
     timer = 0; if(!ready) return;
     dirty.forEach(group => { const pm = group.userData.pm; group.userData.pm = null; if(!pm) return;
       Object.entries(pm).forEach(([name, list]) => (models[name] || []).forEach(part => { const im = new THREE.InstancedMesh(part.geo, matOf(part.mat), list.length);
-        list.forEach((mx, i) => im.setMatrixAt(i, mx)); im.receiveShadow = true; im.frustumCulled = false; group.add(im); })); });
+        list.forEach((mx, i) => im.setMatrixAt(i, mx)); im.receiveShadow = true; im.castShadow = /^(cone|barricade|work_sign)$/.test(name); im.frustumCulled = false; group.add(im); })); });
     dirty.clear();
   }
   const d = new THREE.Object3D();

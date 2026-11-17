@@ -45,7 +45,8 @@ function buildPath(R, jam){
     return L;
   });
   // sStart: 일반도로는 60m 앞에서 출발(50km/h라 접근이 길어져서). P: 주행 테스트에서 내 차를 경로 위로 옮겨 잴 때
-  return {curve, L, sStart:m.city ? 100 : 40, mergeZ, nodeS, commitS, cwS:cwI >= 0 ? cwI : null, P:resample(samples.map(q => [q.x, q.z]), 1)};
+  // 2026-11-17 밤: 공사 구간이 있는 ⑤는 60m 더 뒤(z = 0)에서 출발 — 마감선(-136)까지 약 10초로, 오른쪽 차로 뒤차 1 ~ 3대를 보고 판단할 시간(예전 자리에선 6초 남짓이라 자동 운전 3판 중 2판이 못 옮기고 공사 구간에 부딪힘)
+  return {curve, L, sStart:m.city ? (m.work ? 40 : 100) : 40, mergeZ, nodeS, commitS, cwS:cwI >= 0 ? cwI : null, P:resample(samples.map(q => [q.x, q.z]), 1)};
 }
 /* 다음 갈림: 번호 i · 남은 거리 d(경로 위 m) · phase(guide.js navPhase) · 진행 단계 st(1 접근 · 2 지선 구분 · 3 차로 옮김 · 4 진입 · 5 도착)
    단계는 '출구를 실제로 확정했는가'로 넘긴다 — 주행 테스트는 drive.js가 확정한 출구(D.chosen), 시연은 경로 위 확정 지점(commitS).
@@ -95,7 +96,7 @@ function setLight(l){
 }
 // HUD 네 가지: 'nav' 현대 HUD(대조군) · 'ar3' 리뉴얼 HUD 3차(3.0, hud3.js drawAr3 — 3차 실험 조건) · 'ar2' 리뉴얼 HUD 2차(2.4, hud2.js) · 'ar' 리뉴얼 HUD 1차(v1.9, hud.js drawAr). 'off' = 연습 주행(HUD 없음)
 // HUD_VER는 기록 식별용(엑셀 'HUD 버전' 칸). 개선 후는 마감(A · B)을 뒤에 붙인다(session.js). 1차 실험 기록은 이 칸이 비어 있음
-const HUD_VER = {nav:'현대 3.5', ar:'리뉴얼 1.9', ar2:'리뉴얼 2.4', ar3:'리뉴얼 3.1'};   // 3.1 (2026-11-17 저녁): 막대 두께 · 삼각형 자리 · 미니 도로 고정. 3.0 (2026-11-17): 3차 실험 조건은 nav · ar3. ar · ar2는 시연 전용. 2차 실험 기록의 이 칸은 예전 이름('우리 2.4-B') 그대로 남아 있음 —   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용. 2.2 (2026-11-07, D107): 그래픽만 바뀜(실루엣 아이콘 · 채움 · 먼 곳 소실). 3.4 · 2.3 (2026-11-07 저녁, D113 · D114): 상자 크기 · 자리를 각도로(10° × 5.2°, 둘 다 같음) + 2차 HUD 일반도로 갈림 뒤 도로 전체 폭. 3.5 · 2.4 (같은 날 밤, D116): 상자를 장면 각도 14° × 7.3°로(사용자 결정)
+const HUD_VER = {nav:'현대 3.5', ar:'리뉴얼 1.9', ar2:'리뉴얼 2.4', ar3:'리뉴얼 3.2'};   // 3.2 (2026-11-17 밤): 차로 변경 때 미니 도로가 한 번에 넘어감 · 공사로 막힌 차로 표시. 3.1 (2026-11-17 저녁): 막대 두께 · 삼각형 자리 · 미니 도로 고정. 3.0 (2026-11-17): 3차 실험 조건은 nav · ar3. ar · ar2는 시연 전용. 2차 실험 기록의 이 칸은 예전 이름('우리 2.4-B') 그대로 남아 있음 —   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용. 2.2 (2026-11-07, D107): 그래픽만 바뀜(실루엣 아이콘 · 채움 · 먼 곳 소실). 3.4 · 2.3 (2026-11-07 저녁, D113 · D114): 상자 크기 · 자리를 각도로(10° × 5.2°, 둘 다 같음) + 2차 HUD 일반도로 갈림 뒤 도로 전체 폭. 3.5 · 2.4 (같은 날 밤, D116): 상자를 장면 각도 14° × 7.3°로(사용자 결정)
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
@@ -252,7 +253,9 @@ function guideStep(t, C){
   const onMain = C.i === 0 && C.phase === 'approach' && EGO.z > FORK_Z;
   const tl = goal.reduce((a, b) => Math.abs(b - my) < Math.abs(a - my) ? b : a), side = Math.sign(tl - my);
   const centered = Math.abs(EGO.x - m.laneX(my)) < DRV.settle;
-  const need = onMain && side !== 0 && EGO.z > changeEndOf(m);   // 옮길 차로가 남았고 마감선 전 (고속도로 갈림 25m 앞 · 일반도로 백색실선 시작)
+  // 옮길 차로가 남았고 마감선 전 (고속도로 갈림 25m 앞 · 일반도로 백색실선 시작). 공사 구간이 있는 맵(⑤)은 마감선(좁아지기 시작하는 곳)을 지나도 막힌 곳(work.z0)에 닿기 전까지는 계속 —
+  // 공사 구간 앞에 서서 기다리는 동안에도 '기다려 → 확인 → 이동' 안내가 이어져야 한다(2026-11-17 밤)
+  const need = onMain && side !== 0 && EGO.z > (m.work ? m.work.z0 : changeEndOf(m));
   const next = my + side, A = side ? assessLane(EGO, cars, next) : {safe:true, clear:true, blockers:[], primary:null};
   const prev = GS.gate.state;
   gateStep(GS.gate, t, need, A);

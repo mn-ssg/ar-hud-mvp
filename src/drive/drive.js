@@ -44,7 +44,7 @@ function pathDirAt(P, s){
   const tx = P.tx[i] + (P.tx[j]-P.tx[i])*u, tz = P.tz[i] + (P.tz[j]-P.tz[i])*u, l = Math.hypot(tx, tz) || 1;
   return [tx/l, tz/l];
 }
-const PED_TRIG = 70;   // ⑤ 보행자: 내 차가 가로 도로 가까운 끝(CZ.near)에서 이 m 앞에 오면 건너기 시작 시각을 잼 — 횡단보도까지 길 따라 약 85m, 50km/h로 6초 [가정]
+const PED_TRIG = 55;   // ⑤ 보행자: 내 차가 가로 도로 가까운 끝(CZ.near)에서 이 m 앞에 오면 건너기 시작 시각을 잼 — 횡단보도까지 길 따라 약 70m, 50km/h로 5초 [가정]. 버스 뒤에 서 있는 자리(약 74m 앞)보다 교차로 쪽이어야 함
 const wrapA = a => a - 2*Math.PI*Math.round(a/(2*Math.PI));
 const laneOf = (m, x) => clamp(Math.round(x/LANE + (m.lanes-1)/2), 0, m.lanes-1);
 const exitName = e => e.dest || e.label;
@@ -134,6 +134,8 @@ function driveReset(cfg){
   cfg.brake = cfg.type !== 'practice' && R() < HARD.brakeAhead;   // 연습 판(session.js)은 급정거 · 뒤차 · 정체 없이 앞차와 옆 차로 차만
   const lead = add(flowCars[fi++], cfg.lane, D.z - DRV.carL - rr(HARD.block.leadNear && cfg.type !== 'practice' ? HARD.leadNearGap : HARD.lead), V0, 'lead');   // block.leadNear: 앞차를 가까이 (연습 판은 보통 거리 — 내 속도가 흔들려 옆 차로 연습 뒤차가 먼저 지나가 버리지 않게)
   lead.brakeAt = cfg.brake ? rr(HARD.brakeAt) : null; lead.phase = 0;
+  // ⑤ 공사 구간(2026-11-17 밤): 내 차로(가운데)가 앞에서 막혀 있어 그 차로를 끝까지 달리는 앞차를 둘 수 없다 → 앞차 없이(급정거도 없음). 난수는 위에서 예전과 같은 횟수만 썼다
+  if(m.work && cfg.lane === m.work.lane){ D.cars.splice(D.cars.indexOf(lead), 1); lead.mesh.visible = false; cfg.brake = false; }
   // 바짝 붙은 뒤차는 뒤차 판에만 — 정체 판은 줄 때문에 누구나 크게 줄여야 해서, 뒤차까지 붙으면 제대로 줄여도 받힘(실제론 뒤차도 정체를 보고 같이 줄임)
   if(!cfg.brake && cfg.type === 'rear') add(flowCars[fi++], cfg.lane, D.z + rr(HARD.tail), V0 + .4, 'tail', {T:.5, s0:2, v0:V0 + 1.5});
   // 뒤차 판: 목표 차로에 3~5대 무리가 바짝 붙어(차간 0.4초) 빠르게 온다. 첫 차가 1.5~5초에 내 옆
@@ -153,9 +155,11 @@ function driveReset(cfg){
   /* 일반도로 (D69): 맵에 딸린 상황 — ④ 좌회전 대기 줄(아래 정체 줄과 같은 코드) + 뒤에서 와 줄 끝에 붙는 좌회전 차 0~2대 ·
      ⑤ 정류장 버스(4~10초 뒤 떠나 곧장 감) + 맨 오른쪽 차로 뒤차 1~3대. 둘 다 마주 오는 차 2~4대 · 신호 · ⑤ 보행자 */
   if(m.city){
-    const n = m.bus ? ri([1, 3]) : ri([0, 2]), dv = rr(m.bus ? [10, 20] : [5, 15])/3.6;
+    // 공사 구간이 있으면(⑤, 2026-11-17 밤) 오른쪽 차로 뒤차는 1 ~ 2대 · 나보다 18 ~ 28km/h 빠르게 · 간격 6 ~ 12m — 마감선(출발 뒤 약 10초) 전에 다 지나가 옮길 틈이 생기게.
+    // 예전 값(1 ~ 3대 · 10 ~ 20km/h · 8 ~ 20m)은 느리게 따라붙어 10초 넘게 옆을 막았다(자동 운전 3종 중 2종이 못 옮기고 공사 구간에 부딪힘)
+    const wk = !!m.work, n = m.bus ? ri(wk ? [1, 2] : [1, 3]) : ri([0, 2]), dv = rr(m.bus ? (wk ? [18, 28] : [10, 20]) : [5, 15])/3.6;
     let z = D.z + dv*rr(HARD.rearArrive) + (m.bus ? 0 : 10);
-    for(let k=0;k<n;k++){ add(flowCars[fi++], tl, z, V0 + dv, 'rear', {T:.6, s0:2}); z += DRV.carL + rr([8, 20]); }
+    for(let k=0;k<n;k++){ add(flowCars[fi++], tl, z, V0 + dv, 'rear', {T:.6, s0:2}); z += DRV.carL + rr(wk ? [6, 12] : [8, 20]); }
     if(m.bus){ const bx = m.laneX(m.bus.lane), plan = busPlanOf(m, rr, ri); add(busMesh, m.bus.lane, plan.z0, BUS.v0, 'bus', {len:11.4, w:2.5, plan, P:resample([[bx, LANE_START], [bx, -900]], 1)}); }   // 정류장 흐름 (D104): 앞에서 천천히 와서 서고 떠남
     const nO = ri([2, 4]);
     for(let k=0;k<nO && fi < flowCars.length;k++){
@@ -491,8 +495,12 @@ function hit(){
     const dx = p.x - D.x, dz = p.z - D.z, lon = dx*fx + dz*fz;
     if(Math.abs(lon) < DRV.carL/2 + .2 && Math.abs(dx*(-fz) + dz*fx) < DRV.carW/2 + .2) return '보행자';
   }
+  // 공사 구간(⑤): 내 차 네 귀퉁이 중 하나라도 막힌 곳(라바콘 안쪽 0.25m) 안에 들면 충돌 '공사 구간'
+  if(S.map.work){ const hl = DRV.carL/2 - .1, hw = DRV.carW/2 - .1; for(const [a, b] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) if(inWork(S.map, D.x + fx*hl*a - fz*hw*b, D.z + fz*hl*a + fx*hw*b)) return '공사 구간'; }
   return '';
 }
+// 점 (x, z)가 공사로 막힌 곳 안인가: 막힌 구간(z1 ~ z0)은 차로 폭 − 0.25m씩, 좁아지는 곳(z0 ~ z0 + taper)은 차로 가운데에서 벌어지는 삼각형
+function inWork(m, x, z, pad = .25){ const W = m.work; if(!W || z < W.z1 || z > W.z0 + W.taper) return false; const dxc = Math.abs(x - m.laneX(W.lane)), hw = LANE/2 - pad; return dxc < (z <= W.z0 ? hw : hw*(1 - (z - W.z0)/W.taper)); }
 // ⑤ 횡단보도: 사람이 건너거나 건너려 할 때(pedBlock) 앞범퍼가 횡단보도에 들어가면 '보행자 양보 안 함' 1번 (들어갈 때마다)
 function pedCheck(){
   const cw = S.map.cw, fx = Math.sin(D.psi), fz = -Math.cos(D.psi), xf = D.x + fx*DRV.carL/2, zf = D.z + fz*DRV.carL/2;

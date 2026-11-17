@@ -1,14 +1,14 @@
 {
  "name": "after",
- "at": "2026-11-17T10:17:08.819Z",
+ "at": "2026-11-17T11:39:02.812Z",
  "scenes": [
   {
    "label": "고속도로 ① 주간 뒤차",
-   "frames": 1226,
-   "avgMs": 6.52,
-   "fps": 153.3,
-   "p95Ms": 12.8,
-   "worstMs": 17,
+   "frames": 1306,
+   "avgMs": 6.12,
+   "fps": 163.5,
+   "p95Ms": 11.8,
+   "worstMs": 15.4,
    "tier": 0,
    "tris": 1839246,
    "calls": 531,
@@ -17,47 +17,47 @@
   },
   {
    "label": "고속도로 ② 야간 정체",
-   "frames": 1195,
-   "avgMs": 6.69,
-   "fps": 149.5,
+   "frames": 1262,
+   "avgMs": 6.33,
+   "fps": 157.9,
    "p95Ms": 11.1,
-   "worstMs": 174.4,
+   "worstMs": 14,
    "tier": 0,
-   "tris": 2422147,
-   "calls": 713,
+   "tris": 2414519,
+   "calls": 717,
    "geos": 767,
    "tex": 44
   },
   {
    "label": "일반도로 ④ 주간",
-   "frames": 1537,
-   "avgMs": 5.2,
-   "fps": 192.3,
-   "p95Ms": 6,
-   "worstMs": 161.5,
+   "frames": 1698,
+   "avgMs": 4.71,
+   "fps": 212.4,
+   "p95Ms": 5.5,
+   "worstMs": 6.6,
    "tier": 0,
-   "tris": 1866673,
-   "calls": 249,
+   "tris": 1948240,
+   "calls": 255,
    "geos": 832,
-   "tex": 100
+   "tex": 102
   },
   {
    "label": "일반도로 ⑤ 야간",
-   "frames": 1556,
-   "avgMs": 5.14,
-   "fps": 194.7,
-   "p95Ms": 6.2,
-   "worstMs": 12.6,
+   "frames": 1654,
+   "avgMs": 4.83,
+   "fps": 206.9,
+   "p95Ms": 5.7,
+   "worstMs": 16.1,
    "tier": 0,
-   "tris": 1843442,
-   "calls": 356,
-   "geos": 908,
-   "tex": 150
+   "tris": 1597416,
+   "calls": 358,
+   "geos": 919,
+   "tex": 142
   }
  ],
  "bytes": {
-  "first": 8731599,
-  "all": 8731599,
+  "first": 8787225,
+  "all": 8787225,
   "files": [
    [
     "/assets/models/trees.glb",
@@ -118,11 +118,11 @@
   ]
  },
  "byType": {
-  ".html": 35984,
-  ".css": 29447,
+  ".html": 36101,
+  ".css": 29487,
   ".webp": 1069068,
-  ".js": 448102,
-  ".glb": 4624364,
+  ".js": 460919,
+  ".glb": 4667016,
   ".jpg": 1927542
  }
 }

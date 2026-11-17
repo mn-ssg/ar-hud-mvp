@@ -407,6 +407,19 @@ function buildCityScene(m){
   if(alley) wk.push(['x', CZ.far - 2.6, -190, alley[0] - 5, 3, -1], ['x', CZ.far - 2.6, alley[1] + 5, cwW1 - 14, 2, -1]); else wk.push(['x', CZ.far - 2.6, -190, cwW1 - 14, 5, -1]);
   m._walkers = makeWalkers(m, wk); m._walkGroup = new THREE.Group(); MG.add(m._walkGroup);
 
+  /* 공사 구간 (2026-11-17 밤, config.js CITY_WORK · maps.js work): 가운데 차로를 라바콘 · 방호 울타리로 막는다. 모델은 Blender(props.glb cone · barricade · work_sign).
+     좁아지는 곳(z0 + taper → z0): 차로 가운데에서 양쪽 차선으로 벌어지는 라바콘 줄 · 그 뒤 방호 울타리 2개와 표지. 막힌 구간(z0 → z1): 양쪽 차선 위 라바콘(6m마다) · 깎아 낸 노면 · 안쪽 울타리. 끝(z1)도 울타리 */
+  if(m.work){ const W = m.work, xc = m.laneX(W.lane), hw = LANE/2 - .12;
+    for(let k = 0; k <= 4; k++){ const f = k/4, z = W.z0 + W.taper*(1 - f); for(const sx of k ? [-1, 1] : [0]) PROPM.place(MG, 'cone', xc + sx*hw*f, 0, z, k*.9); }
+    for(const sx of [-.72, .72]) PROPM.place(MG, 'barricade', xc + sx, 0, W.z0 - 1.2, 0);
+    PROPM.place(MG, 'work_sign', xc, 0, W.z0 - 2.6, 0);
+    for(let z = W.z0 - 5; z > W.z1 + 2; z -= 6) for(const sx of [-1, 1]) PROPM.place(MG, 'cone', xc + sx*hw, 0, z, z*.37);
+    for(const z of [W.z0 - 30, W.z0 - 58]) PROPM.place(MG, 'barricade', xc + (z % 2 ? .3 : -.3), 0, z, .12);
+    for(const sx of [-.72, .72]) PROPM.place(MG, 'barricade', xc + sx, 0, W.z1 + 1, Math.PI);
+    // 깎아 낸 노면(절삭면): 어두운 거친 띠 + 가장자리 턱
+    const cut = new THREE.Mesh(new THREE.PlaneGeometry(LANE - .9, W.z0 - W.z1 - 14).rotateX(-Math.PI/2), new THREE.MeshStandardMaterial({color:lin('#2b2a28'), roughness:1})); cut.position.set(xc, .006, (W.z0 + W.z1)/2 - 1); cut.receiveShadow = true; MG.add(cut);
+  }
+
   /* 방향 표지 (일반도로 = 파랑): 오른쪽 보도에서 뻗은 팔에 판, 정지선 80m 앞 */
   (() => {
     const panelOf = e => ({from:e.lanes[0], to:e.lanes[e.k - 1], lines:e.node ? e.node.exits.map(c => c.dest) : [e.dest],

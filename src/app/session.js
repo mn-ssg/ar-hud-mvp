@@ -24,14 +24,15 @@ const hudVerOf = m => m === 'ar2' ? HUD_VER.ar2 + '-' + (S.tone || 'A') : HUD_VE
 const orderText = (o, pair = EXP.pair) => o === 'ALT' ? `${modeShort(pair[0])} · ${modeShort(pair[1])} 교대 (${modeShort(pair[0])} 먼저)` : o === 'AB' ? `${modeShort(pair[0])} → ${modeShort(pair[1])}` : o === 'BA' ? `${modeShort(pair[1])} → ${modeShort(pair[0])}` : o || '';
 const RESULT = {ok:'성공', wrong:'다른 출구', crash:'충돌', timeout:'시간 초과', signal:'신호 위반'};   // 신호 위반: 일반도로(D69)
 const CITY_SITU = {CL2:'좌회전 대기 줄 · 신호', CRT:'정류장 버스 · 보행자'};
-const situName = r => (r.type === 'practice' ? '연습' : r.type === 'city' ? CITY_SITU[r.map] || '일반도로' : r.type === 'jam' ? ({1:'정체 보통(예전)', 2:'정체 심함(예전)'}[r.jam] || '정체') : `뒤차 ${r.rearN}대`) + (r.brake ? ' · 앞차 급정거' : '');
+const situName = r => (r.type === 'practice' ? '연습' : r.type === 'city' ? (r.work ? '공사 구간 · ' : '') + (CITY_SITU[r.map] || '일반도로') : r.type === 'jam' ? ({1:'정체 보통(예전)', 2:'정체 심함(예전)'}[r.jam] || '정체') : `뒤차 ${r.rearN}대`) + (r.brake ? ' · 앞차 급정거' : '');
 const kindOf = r => r.type === 'city' ? '일반도로' : r.type === 'jam' ? '고속도로 정체' : r.type === 'practice' ? '연습' : '고속도로 뒤차';
 const lightName = l => l === 'night' ? '야간' : '주간';
 const resultName = r => r.result === 'crash' && r.crash ? `충돌 (${r.crash.split(' · ')[0]})` : RESULT[r.result];
 // 차로 옮긴 곳 = 목표 차로에 자리 잡은 곳이 '마감선' 몇 m 앞인가 (기준 그대로). change = 갈림 앞 m, 마감선 = 갈림 25m 앞(고속도로) · 35m 앞(일반도로) → 마감선 앞 = change − 25 (· 35)
 // 2026-11-03 고침: 1차 실험 때 코드(470a8f7)는 change − (FORK_Z − changeEnd) = change + 25로 부호가 뒤집혀 있었음 → 1차 엑셀의 이 칸은 고속도로 +50m · 일반도로 +70m 치우침
 // (저장된 change 값은 맞음 — 브라우저 기록을 다시 내보내면 바른 값). 1차 문서 수치는 그대로 두고 04_실험로그 EXP-01에 적어 둠
-const marginOf = r => { if(r.change === null || r.change === undefined) return null; const m = mapById(r.map) || MAPS_OFF.find(o => o.id === r.map); return Math.round(r.change - (changeEndOf(m) - FORK_Z)); };
+// ce: 그 판의 마감선 z(2026-11-17 밤부터 기록에 남김 — ⑤에 공사 구간이 생겨 마감선이 -195 → -100으로 바뀜). 없는 예전 기록은 그때 값(백색실선 시작 · 고속도로 갈림 25m 앞)
+const marginOf = r => { if(r.change === null || r.change === undefined) return null; const m = mapById(r.map) || MAPS_OFF.find(o => o.id === r.map), ce = r.ce !== undefined && r.ce !== null ? r.ce : ((m && m.changeEnd) || CHANGE_END); return Math.round(r.change - (ce - FORK_Z)); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const envName = () => `환경 ${ENV_VER} · 미러 ${MIR.on ? '켬' : '끔'}`;
@@ -212,7 +213,7 @@ function onDriveEnd(){
   $('#keyHint').hidden = true; $('#abortBtn').hidden = true;
   const res = D.result, good = res === 'ok', ev = D.events || [], es = eventStats(ev, D.t);
   const lcN = ev.filter(e => e.type === 'lcDone').length, riskyWith = ev.filter(e => e.type === 'cutIn' && e.risky).map(e => e.with).join(' / ');
-  const row = {p:SES.pid || $('#pid').value, block:st ? st.block : 0, no:st ? st.no : 0, hud:practice ? 'off' : st.hud, light:S.light, map:cfg.map.id, type:cfg.type, jam:cfg.jam, rearN:cfg.rearN, brake:cfg.brake, seed:cfg.seed,
+  const row = {p:SES.pid || $('#pid').value, block:st ? st.block : 0, no:st ? st.no : 0, hud:practice ? 'off' : st.hud, light:S.light, map:cfg.map.id, ce:changeEndOf(cfg.map), ...(cfg.map.work ? {work:true} : {}), type:cfg.type, jam:cfg.jam, rearN:cfg.rearN, brake:cfg.brake, seed:cfg.seed,
     lane:cfg.lane + 1, dest:exitName(cfg.map.leaves[cfg.leaf].path.slice(-1)[0]), exit:D.exitName, result:res,
     change:D.changeDist, react:D.reactT, risky:D.risky, offroad:D.offroad, ped:D.ped, crash:D.crashWith || '', secs:+D.t.toFixed(2), at:new Date().toISOString(),
     // 2026-10-29 추가 (예전 기록엔 없음)

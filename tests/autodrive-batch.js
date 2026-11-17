@@ -15,13 +15,17 @@ const PILOT = () => {
     const G = S.G, m = S.map, my = laneOf(m, D.x);
     // 어느 차로를 겨눌까: 갈림 뒤는 경로, 본선은 판단이 이동이면 다음 차로(목표 쪽), 아니면 지금 차로
     let tx, tz; const ld = Math.max(8, D.v*.6);
+    let aimLane = null;
     if(D.cands || D.seg || D.z < FORK_Z + 5){ const r = project(path.P, D.x, D.z, -1); [tx, tz] = pathAt(path.P, r.s + ld); }
-    else { const lane = G && G.side && (G.need ? G.gate === 'go' : (G.A && G.A.safe && G.A.clear)) ? G.next : my; tx = m.laneX(lane); tz = D.z - ld; }   // 마감선 뒤에도 옆이 비었을 때만
+    else { const lane = G && G.side && (G.need ? G.gate === 'go' : (G.A && G.A.safe && G.A.clear)) ? G.next : my; aimLane = lane; tx = m.laneX(lane); tz = D.z - (m.work && D.v < 6 ? Math.max(4, ld*.5) : ld); }   // 마감선 뒤에도 옆이 비었을 때만
     const fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1, sinA = (fx*dz - fz*dx)/l;
     KEYS.left = KEYS.right = false;
     // 서기: 앞차가 급정거하면 · 빨간불 · 보행자 · 정체 줄 뒤 (SCC 한도 3.5보다 세게 밟아야 할 때)
     const lead = leaderOf(D.x, D.z, fx, fz, null, 0, DRV.carW + .4);
     let brake = lead.gap < Infinity && (lead.gap < 6 || (D.v - lead.v > 0 && lead.gap/(D.v - lead.v) < 1.6));
+    // 공사 구간(⑤): 내 차로 앞이 막혀 있으면 그 앞에서 선다(막힌 곳까지 남은 거리로 낼 수 있는 속도를 넘으면 브레이크) — 옆이 비면 위 차로 선택이 옆 차로를 겨눠 빠져나간다
+    if(m.work && D.z > m.work.z0){ const off = Math.abs(D.x - m.laneX(m.work.lane)), hw = LANE/2; if(off < hw){ const d = D.z - DRV.carL/2 - (m.work.z0 + m.work.taper*(1 - off/hw)); const leaving = aimLane !== null && aimLane !== m.work.lane && d > .5;   // 옆이 비어 빠져나가는 중이면 서지 않는다
+      if(!leaving && D.v > Math.sqrt(2*3*Math.max(0, d - 2))) brake = true; } }
     if(m.city && G && G.stop && (G.stop.kind === 'ped' || (G.stop.kind === 'signal' && D.z - FORK_Z < 45 && D.v > 3))) brake = true;
     { const r = project(path.P, D.x, D.z, -1), a = pathAt(path.P, r.s + 2), b = pathAt(path.P, r.s + 17), turnA = Math.acos(clamp(a[2]*b[2] + a[3]*b[3], -1, 1)); if(turnA > .35 && D.v > 7) brake = true; }
     KEYS.down = brake; KEYS.up = false;

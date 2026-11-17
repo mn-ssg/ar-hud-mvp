@@ -34,7 +34,7 @@
     <p class="field">HUD</p>
     <div class="seg" id="modeSeg">
       <button data-mode="nav" aria-pressed="false" title="현대 HUD (대조군)">현대</button>
-      <button data-mode="ar3" aria-pressed="true" title="리뉴얼 HUD 3차 (3.1) — 3차 실험 조건">3차</button>
+      <button data-mode="ar3" aria-pressed="true" title="리뉴얼 HUD 3차 (3.2) — 3차 실험 조건">3차</button>
       <button data-mode="ar2" aria-pressed="false" title="리뉴얼 HUD 2차 (2.4) — 2차 실험 때 화면">2차</button>
       <button data-mode="ar" aria-pressed="false" title="리뉴얼 HUD 1차 (1.9) — 1차 실험 때 화면">1차</button>
     </div>
@@ -308,6 +308,8 @@
             <path id="cEdges" class="c-edges"/>
             <path id="cDash" class="c-dash"/>
             <path id="cJam" fill="url(#jamHatch)" opacity="0"/>
+            <!-- 공사로 막힌 차로(⑤): 주황 바탕 + 비스듬한 줄 + 시작 자리 막대 -->
+            <path id="cWork" class="c-work"/><path id="cWorkBars" class="c-work"/>
             <path id="cRails" class="c-rails" filter="url(#glow2)"/>
             <!-- ③ 마감선(흰 가로선)과 그 뒤 실선 구간(차로를 옮길 수 없는 곳). 대기 중엔 밝아진다 -->
             <path id="cSolid" class="c-deadline"/>

@@ -37,7 +37,7 @@
 | `models/hud_car.glb` (298KB, 삼각형 1.6만) | 리뉴얼 HUD 3차의 차 아이콘 — `src/hud/hud3.js` CAR3 층이 미니 도로와 같은 가상 카메라로 그림 | `blender/hud_car.py`(Blender 5.3 백그라운드 실행: 단면을 이어 붙이고 곡면 분할) → 원본 `blender/hud_car.blend`. 바깥에서 가져온 모양 · 텍스처 없음 | 직접 만든 것 |
 | `models/hud_ped.glb` (57KB, 삼각형 3천) | 리뉴얼 HUD 3차의 보행자 아이콘 — 걷는 자세의 사람 | `blender/hud_ped.py`(둥근 덩어리를 합쳐 복셀 리메시) → `blender/hud_ped.blend` | 직접 만든 것 |
 | `models/trees.glb` (819KB, 6그루 · 그루당 삼각형 1.9 ~ 3.2천) | 모든 나무 — `src/scene/trees.js`. 가까운 나무는 모델 그대로(인스턴싱, 90 ~ 180m 구역으로 묶어 화면 밖은 안 그림), 먼 나무는 같은 모델을 한 번 찍은 그림을 붙인 엇갈린 판 | `blender/trees.py`(줄기 · 가지를 대롱으로, 잎은 잎 덩어리 판) → `blender/trees.blend` | 모양은 직접 만든 것. 재질 사진은 아래 표 |
-| `models/props.glb` (71KB) | 고속도로 가로등 `lamp_hw` · 도심 가로등 `lamp_city` · 가드레일 기둥 `rail_post` — `src/scene/props.js PROPM`(인스턴싱) | `blender/props.py` → `blender/props.blend` | 직접 만든 것(바깥에서 가져온 모양 없음) |
+| `models/props.glb` (111KB, 2026-11-17 밤에 공사 구간 소품 추가) | 고속도로 가로등 `lamp_hw` · 도심 가로등 `lamp_city` · 가드레일 기둥 `rail_post` · **라바콘 `cone` · 방호 울타리 `barricade` · 공사 표지 `work_sign`**(⑤ 공사 구간, `city.js`) — `src/scene/props.js PROPM`(인스턴싱) | `blender/props.py` → `blender/props.blend` | 직접 만든 것(바깥에서 가져온 모양 없음) |
 
 - 다시 만들기: `/Applications/Blender.app/Contents/MacOS/Blender -b --python assets/blender/<이름>.py`
 

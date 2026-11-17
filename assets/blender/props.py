@@ -2,13 +2,14 @@
 실행: /Applications/Blender.app/Contents/MacOS/Blender -b --python assets/blender/props.py → assets/models/props.glb · assets/blender/props.blend
 물체 이름 = 소품 이름(lamp_hw · lamp_city · rail_post). 재질 이름으로 코드(src/scene/props.js PROPM)가 장면 재질을 붙인다:
   galv = 아연도금 강(가드레일 · 기둥과 같은 재질) · lens = 등 렌즈(밤에 빛남) · dark = 검은 부품 · refl = 주황 반사체
+  cone = 주황 플라스틱(라바콘 · 공사 표지) · band = 흰 반사 띠 · sign = 노란 판 (2026-11-17 밤: ⑤ 공사 구간 — cone · barricade · work_sign)
 좌표: 위 = +Z, 팔은 +X(도로 쪽)로 뻗는다. 원점 = 기둥 밑동 가운데 바닥. 바깥에서 가져온 모양 없음."""
 import bpy, bmesh, math, os
 from mathutils import Vector, Matrix
 HERE = os.path.dirname(os.path.abspath(__file__))
 bpy.ops.wm.read_factory_settings(use_empty=True)
 MAT = {}
-for n in ('galv', 'lens', 'dark', 'refl'):
+for n in ('galv', 'lens', 'dark', 'refl', 'cone', 'band', 'sign'):
     m = bpy.data.materials.new(n); m.use_nodes = True; MAT[n] = m
 
 def finish(o, mat, smooth=True, bevel=0):
@@ -86,7 +87,35 @@ def rail_post():
     p.append(cyl(.011, .011, .03, (.11, 0, .62), 'dark', 6, (0, math.pi/2, 0))); p.append(cyl(.011, .011, .03, (.11, 0, .5), 'dark', 6, (0, math.pi/2, 0)))
     return join('rail_post', p)
 
-objs = [lamp_hw(), lamp_city(), rail_post()]
+def cone():
+    """라바콘: 높이 0.72m, 검은 고무 받침 + 주황 몸통 + 흰 반사 띠 2줄"""
+    p = [box((.38, .38, .035), (0, 0, .0175), 'dark', .006)]
+    seg = [(0.035, .20, .145, .112, 'cone'), (.20, .34, .112, .086, 'band'), (.34, .44, .086, .068, 'cone'), (.44, .54, .068, .050, 'band'), (.54, .72, .050, .022, 'cone')]   # (아래 z, 위 z, 아래 반지름, 위 반지름, 재질)
+    for z0, z1, r0, r1, m in seg: p.append(cyl(r0, r1, z1 - z0, (0, 0, (z0 + z1)/2), m, 14))
+    p.append(cyl(.022, .022, .012, (0, 0, .726), 'cone', 10))
+    return join('cone', p)
+
+def barricade():
+    """A자 방호 울타리: 폭 1.3m · 높이 1.0m, 노랑 · 검정 빗금 판 2장 + 위에 주황 경고등. 판이 +Y · −Y를 본다(차가 오는 쪽으로 돌려 놓는다)"""
+    p = []
+    for sx in (-.58, .58):
+        for sy, ang in ((-.16, .16), (.16, -.16)): p.append(box((.035, .035, 1.02), (sx, sy*.55, .5), 'galv', 0, (ang, 0, 0)))   # 다리 4개(앞뒤로 벌어짐)
+    for z in (.82, .47):
+        for k in range(8): p.append(box((.1625, .028, .2), (-.569 + k*.1625, 0, z), 'sign' if k % 2 == 0 else 'dark', 0))            # 빗금 대신 노랑 · 검정 칸
+        p.append(box((1.32, .02, .22), (0, 0, z), 'galv', 0))
+    p.append(cyl(.05, .05, .07, (-.45, 0, 1.0), 'refl', 10)); p.append(cyl(.05, .05, .07, (.45, 0, 1.0), 'refl', 10))                  # 경고등
+    return join('barricade', p)
+
+def work_sign():
+    """공사 주의 표지: 삼각대 위 주황 마름모 판(0.8m) + 검은 느낌표. 판이 −Y(= 장면에서 차가 오는 쪽으로 돌려 놓음)를 본다"""
+    p = []
+    for a in (0, 2.1, 4.2): p.append(box((.03, .03, 1.05), (.2*math.cos(a), .12 + .2*math.sin(a), .5), 'galv', 0, (-.2*math.sin(a), .2*math.cos(a), 0)))
+    p.append(box((.8, .02, .8), (0, 0, 1.25), 'cone', .01, (0, math.pi/4, 0)))
+    p.append(box((.86, .012, .86), (0, .012, 1.25), 'dark', 0, (0, math.pi/4, 0)))                                                       # 뒤판(검은 테)
+    p.append(box((.09, .012, .36), (0, -.014, 1.33), 'dark', 0)); p.append(box((.09, .012, .09), (0, -.014, 1.05), 'dark', 0))           # 느낌표
+    return join('work_sign', p)
+
+objs = [lamp_hw(), lamp_city(), rail_post(), cone(), barricade(), work_sign()]
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, 'props.blend'))
 out = os.path.join(HERE, '..', 'models', 'props.glb')
 bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_apply=True, export_yup=True, export_texcoords=False, export_materials='EXPORT')

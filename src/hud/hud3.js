@@ -185,7 +185,7 @@ const C3 = {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0
 function resetHud3(){
   Object.assign(C3, {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1});
   S.H3 = null; VIEW3.x = null; VIEW3.lastT = null;
-  ['cSurf', 'cLaneFill', 'cEdges', 'cDash', 'cRails', 'cSolid', 'cGate', 'cSlot', 'cQueue', 'cStop', 'cPed', 'cFrontBand', 'cLead', 'cLeadGlass', 'cDistBand', 'cFlow', 'cAhead', 'cGap', 'cGapLine', 'cZebra', 'cZebraHot', 'cTrail1', 'cTrail2', 'cRing1', 'cRing2', 'cRear', 'cRearGlass', 'cEgo', 'cEgoGlass', 'cDots'].forEach(id => $('#' + id).setAttribute('d', ''));
+  ['cSurf', 'cLaneFill', 'cEdges', 'cDash', 'cRails', 'cSolid', 'cGate', 'cSlot', 'cQueue', 'cStop', 'cPed', 'cFrontBand', 'cLead', 'cLeadGlass', 'cDistBand', 'cFlow', 'cAhead', 'cWork', 'cWorkBars', 'cGap', 'cGapLine', 'cZebra', 'cZebraHot', 'cTrail1', 'cTrail2', 'cRing1', 'cRing2', 'cRear', 'cRearGlass', 'cEgo', 'cEgoGlass', 'cDots'].forEach(id => $('#' + id).setAttribute('d', ''));
   $$('#cChev path, #cAppr path').forEach(q => q.setAttribute('d', ''));
   $('#cEdgeL').setAttribute('opacity', 0); $('#cEdgeR').setAttribute('opacity', 0); $('#cWarn').setAttribute('opacity', 0); $('#cJam').setAttribute('opacity', 0);
   $('#arHud3').dataset.state = 1; $('#mirCue').hidden = true;
@@ -214,6 +214,9 @@ function stepHud3(C, t){
   if(G){ const fx = Math.sin(EGO.psi), fz = -Math.cos(EGO.psi);
     G.cars.forEach(c => { const dx = c.x - ex, dz = c.z - ez, lon = dx*fx + dz*fz, lat = dx*(-fz) + dz*fx; if(lon <= 0 || Math.abs(lat) > HUD3.frontLat) return;
       const gap = Math.max(0, lon - c.halfL - EGO.halfL); if(!front || gap < front.gap) front = {c, gap, closing:EGO.v - c.v}; });
+    // 공사 구간(⑤): 내 차로 앞이 막혀 있으면 그 막힌 곳을 서 있는 앞차처럼 본다 — 가까워지면 06 앞쪽 위험(삼각형 + 앞쪽 간격 띠, 차 아이콘은 없음)
+    if(m.work && onMain){ const W = m.work, off = Math.abs(ex - m.laneX(W.lane)), hw = LANE/2;
+      if(off < hw && ez > W.z0){ const zb = W.z0 + W.taper*(1 - off/hw), gap = Math.max(0, ez - EGO.halfL - zb); if(!front || gap < front.gap) front = {c:{x:m.laneX(W.lane), z:zb, halfL:0, v:0, work:true}, gap, closing:EGO.v}; } }
     if(front) front.ttc = front.closing > 0 ? front.gap/front.closing : Infinity; }
   const ped = !!(m.cw && path.cwS !== null && pedBlock(S.cityT) && ex < m.cw.x0 && S.s > path.cwS - HUD3.pedDist && S.s < path.cwS);
   const gate = G ? G.gate : 'none', rearWait = !!G && (gate === 'wait' || gate === 'clearing') && !!(G.reason && G.reason.kind !== 'queue');
@@ -324,6 +327,14 @@ function drawAr3(p, f, C, k){
   const jb = $('#cJam');
   if(tail !== null){ const dj = band3(tx - 1.7, tx + 1.7, Math.min(tail, zNear), qFrontOf(m), proj); jb.setAttribute('d', dj); jb.setAttribute('opacity', dj ? (.45*soft).toFixed(2) : '0'); }
   else jb.setAttribute('opacity', '0');
+  /* 공사로 막힌 차로(⑤, maps.js work) — 주황(조심): 좁아지는 곳은 삼각형, 막힌 구간은 옅은 바탕 + 비스듬한 줄, 시작 자리엔 가로 막대. 실제 라바콘 자리 그대로 같은 투영으로 */
+  let wk = '', wkb = '';
+  if(m.work && onMain){ const W = m.work, xc = m.laneX(W.lane), hw = LANE/2 - .15, zA = Math.min(W.z0, zNear);
+    if(zA > W.z1) wk += band3(xc - hw, xc + hw, zA, W.z1, proj);
+    wk += gpoly3(proj, [[xc, W.z0 + W.taper], [xc + hw, W.z0], [xc - hw, W.z0]]);
+    for(let z = W.z0 - 3; z > W.z1 + 5; z -= 8) wkb += gpoly3(proj, [[xc - hw, z], [xc + hw, z - 3.4], [xc + hw, z - 5], [xc - hw, z - 1.6]]);
+    wkb += quadZ(xc - hw, xc + hw, W.z0 + .55, W.z0 - .55, proj); }
+  set('cWork', wk); $('#cWork').setAttribute('fill-opacity', (.2*soft).toFixed(3)); set('cWorkBars', wkb); $('#cWorkBars').setAttribute('fill-opacity', (.8*soft).toFixed(3));
   set('cSlot', tail !== null && p.z > tail + 14 ? quadZ(tx - 1.3, tx + 1.3, tail + 10, tail + 5, proj) : ''); $('#cSlot').setAttribute('opacity', (.7 + .3*Math.sin(now/260)).toFixed(2));
   let qd = '';
   if(tail !== null) queueCars.filter(c => c.visible).sort((a, b) => Math.abs(a.position.z - p.z) - Math.abs(b.position.z - p.z)).slice(0, 16).forEach(c => {
@@ -456,7 +467,7 @@ function drawAr3(p, f, C, k){
   let ld = null, fb = '';
   if(wa > .01 && H.front && H.kind === 'lead'){
     const c = H.front.c, ry = c.ref && c.ref.rotation ? c.ref.rotation.y : 0, cf = [-Math.sin(ry), -Math.cos(ry)];
-    ld = slab3(proj, c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW); if(ld) car3Put(c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW, HUD3.icon, T.warn, wa);
+    if(!c.work){ ld = slab3(proj, c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW); if(ld) car3Put(c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW, HUD3.icon, T.warn, wa); }   // 공사 구간이면 차 아이콘 없이 간격 띠만(막힌 곳은 아래 빗금으로 이미 보임)
     const ax = ex + ef.x*DRV.carL/2, az = p.z + ef.z*DRV.carL/2, bx2 = c.x - cf[0]*c.halfL, bz2 = c.z - cf[1]*c.halfL, rx = -ef.z, rz = ef.x, w = .95;
     if(Math.hypot(bx2 - ax, bz2 - az) > .4) fb = quadW([[ax - rx*w, az - rz*w], [ax + rx*w, az + rz*w], [bx2 + rx*w, bz2 + rz*w], [bx2 - rx*w, bz2 - rz*w]], proj);
   }
