@@ -91,7 +91,7 @@ function drawInfo(){
   g.textAlign = 'left'; g.fillStyle = '#c9d2dc'; g.font = `600 24px ${CF}`; g.fillText('22.0°', 28, H - 16); g.textAlign = 'right'; g.fillText('22.0°', W - 28, H - 16);
   g.textAlign = 'center'; g.fillStyle = '#e6ebf0'; g.font = `500 24px ${CF}`; g.fillText(`${two(d.getHours())}:${two(d.getMinutes())}`, W/2, H - 16);
 }
-(() => { const im = new Image(); im.onload = () => { mapImg = im; drawInfo(); }; im.src = 'assets/cabin/map.jpg'; })();
+(() => { const im = new Image(); im.onload = () => { mapImg = im; drawInfo(); }; im.src = 'assets/cabin/map.webp'; })();
 drawCluster(0, 0, 80); drawInfo();
 try{ document.fonts && document.fonts.ready.then(() => { lastKmh = -1; drawInfo(); }); }catch(e){}
 

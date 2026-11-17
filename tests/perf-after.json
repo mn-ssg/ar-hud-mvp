@@ -1,14 +1,14 @@
 {
  "name": "after",
- "at": "2026-11-17T11:39:02.812Z",
+ "at": "2026-11-17T11:51:51.041Z",
  "scenes": [
   {
    "label": "고속도로 ① 주간 뒤차",
-   "frames": 1306,
-   "avgMs": 6.12,
-   "fps": 163.5,
-   "p95Ms": 11.8,
-   "worstMs": 15.4,
+   "frames": 1337,
+   "avgMs": 5.98,
+   "fps": 167.3,
+   "p95Ms": 11.3,
+   "worstMs": 16.3,
    "tier": 0,
    "tris": 1839246,
    "calls": 531,
@@ -17,11 +17,11 @@
   },
   {
    "label": "고속도로 ② 야간 정체",
-   "frames": 1262,
-   "avgMs": 6.33,
-   "fps": 157.9,
-   "p95Ms": 11.1,
-   "worstMs": 14,
+   "frames": 1250,
+   "avgMs": 6.39,
+   "fps": 156.4,
+   "p95Ms": 10.8,
+   "worstMs": 28,
    "tier": 0,
    "tris": 2414519,
    "calls": 717,
@@ -30,11 +30,11 @@
   },
   {
    "label": "일반도로 ④ 주간",
-   "frames": 1698,
-   "avgMs": 4.71,
-   "fps": 212.4,
-   "p95Ms": 5.5,
-   "worstMs": 6.6,
+   "frames": 1582,
+   "avgMs": 5.06,
+   "fps": 197.8,
+   "p95Ms": 5.9,
+   "worstMs": 8.1,
    "tier": 0,
    "tris": 1948240,
    "calls": 255,
@@ -43,11 +43,11 @@
   },
   {
    "label": "일반도로 ⑤ 야간",
-   "frames": 1654,
-   "avgMs": 4.83,
-   "fps": 206.9,
+   "frames": 1644,
+   "avgMs": 4.86,
+   "fps": 205.6,
    "p95Ms": 5.7,
-   "worstMs": 16.1,
+   "worstMs": 6.6,
    "tier": 0,
    "tris": 1597416,
    "calls": 358,
@@ -56,13 +56,9 @@
   }
  ],
  "bytes": {
-  "first": 8787225,
-  "all": 8787225,
+  "first": 7203048,
+  "all": 7203048,
   "files": [
-   [
-    "/assets/models/trees.glb",
-    818964
-   ],
    [
     "/assets/cabin/base.webp",
     597092
@@ -84,24 +80,16 @@
     438188
    ],
    [
-    "/assets/tex/grass.jpg",
-    436886
-   ],
-   [
     "/assets/models/hatch.glb",
     436588
    ],
    [
-    "/assets/tex/verge.jpg",
-    399765
+    "/assets/tex/grass.webp",
+    340318
    ],
    [
-    "/assets/tex/asphalt.jpg",
-    376313
-   ],
-   [
-    "/assets/models/hud_car.glb",
-    298268
+    "/assets/tex/verge.webp",
+    314910
    ],
    [
     "/assets/models/ped_3.glb",
@@ -114,15 +102,26 @@
    [
     "/assets/models/ped_4.glb",
     245864
+   ],
+   [
+    "/assets/tex/asphalt.webp",
+    242244
+   ],
+   [
+    "/assets/models/ped_1.glb",
+    234160
+   ],
+   [
+    "/assets/cabin/wheel.webp",
+    207022
    ]
   ]
  },
  "byType": {
   ".html": 36101,
   ".css": 29487,
-  ".webp": 1069068,
-  ".js": 460919,
-  ".glb": 4667016,
-  ".jpg": 1927542
+  ".webp": 2452484,
+  ".js": 460036,
+  ".glb": 3627848
  }
 }

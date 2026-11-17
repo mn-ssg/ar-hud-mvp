@@ -162,7 +162,8 @@ for o in objs:
     print('TREE', o.name, 'tris', sum(len(p.vertices) - 2 for p in o.data.polygons), 'size', [round(v, 1) for v in o.dimensions])
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, 'trees.blend'))
 out = os.path.join(HERE, '..', 'models', 'trees.glb')
-kw = dict(filepath=out, export_format='GLB', export_apply=True, export_yup=True, export_normals=True, export_texcoords=True, export_materials='EXPORT')
+# Draco 압축(2026-11-17 밤, 배포 전 최적화): 819KB → 약 1/4. 읽는 쪽은 scene.js GLTF(DRACOLoader)
+kw = dict(filepath=out, export_format='GLB', export_apply=True, export_yup=True, export_normals=True, export_texcoords=True, export_materials='EXPORT', export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6, export_draco_position_quantization=14, export_draco_normal_quantization=10, export_draco_texcoord_quantization=12, export_draco_color_quantization=10)
 try: bpy.ops.export_scene.gltf(export_vertex_color='ACTIVE', export_all_vertex_colors=False, **kw)
 except TypeError:
     try: bpy.ops.export_scene.gltf(export_vertex_color='ACTIVE', **kw)

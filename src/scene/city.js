@@ -24,7 +24,7 @@ facadeMat.map.needsUpdate = facadeMat.emissiveMap.needsUpdate = true;
 const cityFacades = ['#ffffff', '#e6dccb', '#cfd6dc', '#d9c9c0'].map(hex => { const m = facadeMat.clone(); m.color = lin(hex); facadeMats.push(m); return m; });
 // 보도: Higgsfield 생성 보도 블록 (한 장 ≈ 1.8m, 세계 좌표로 깔아 이음새 없이). 불러오기 전엔 단색
 worldUV(cityMats.walk, 1/1.8);
-loadTex('assets/tex/sidewalk.jpg', t => { cityMats.walk.map = t; cityMats.walk.color = lin('#d8d6d0'); cityMats.walk.needsUpdate = true; });
+loadTex('assets/tex/sidewalk.webp', t => { cityMats.walk.map = t; cityMats.walk.color = lin('#d8d6d0'); cityMats.walk.needsUpdate = true; });
 // 길바닥 화살표 (흰 칠, 앞 = 위): S ↑ · L ↰ · R ↱ · SR ↑↱
 const arrowMats = {};
 ['S', 'L', 'R', 'SR'].forEach(k => {

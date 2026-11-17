@@ -87,7 +87,7 @@ const VEH = {
      on:false면 실제 값 그대로(tests/handling-check.js ASSIST=0) */
   assist: {on:true, up:1.8, back:3, ayHold:[[0, 3.2], [13.9, 3.2], [27.8, 2.6]], yawTau:.02}
 };
-const WHEELBASE = VEH.L, STEER_LOOK = 18;   // 시연 핸들: 1초 앞(18m) 경로 지점을 겨눈 곡률 → 실제 핸들 각도(drive.js swForCurv). 예전 2.5배 과장은 없앰
+const STEER_LOOK = 18;   // 시연 핸들: 1초 앞(18m) 경로 지점을 겨눈 곡률 → 실제 핸들 각도(drive.js swForCurv). 예전 2.5배 과장은 없앰
 /* ---------- 주행 테스트: 키보드 직접 운전 (D57~D60, 01_프로젝트/14_주행테스트_설계.md) ----------
    값은 Claude 판단 · 파일럿에서 조정. [가정] 표시는 근거 없는 기준값 */
 const DRV = {

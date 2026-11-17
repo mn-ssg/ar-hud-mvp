@@ -89,7 +89,6 @@ function slab3(proj, x, z, fx, fz, L, W, k = HUD3.icon){
   const win = [pt(-hl*.84, -hw*.72, h), pt(-hl*.84, hw*.72, h), pt(-hl*.42, hw*.68, h), pt(-hl*.42, -hw*.68, h)], ctr = pt(0, 0, h/2), hu = hull3(c);
   return {d:poly3(hu), glass:win.every(Boolean) ? poly3(win) : '', c:ctr, top:Math.min(...hu.map(q => q[1])), pts:hu};
 }
-const grow3 = (S, k) => poly3(S.pts.map(q => [S.c[0] + (q[0] - S.c[0])*k, S.c[1] + (q[1] - S.c[1])*k]));
 
 /* ---------- 차 아이콘 3D 층 (2026-11-17 사용자: '차 모양 품질을 높여') ----------
    Blender로 만든 세단(assets/models/hud_car.glb — 차체 · 유리 · 미등 · 전조등 · 타이어 · 휠이 재질로 나뉨, 원본 assets/blender/hud_car.py · .blend)을
@@ -107,7 +106,7 @@ const CAR3_FRAG = `uniform vec3 uCol; uniform float uA, uFill, uRim, uOut; varyi
   if(!HUD3.carModel || !THREE.GLTFLoader) return;
   try{ CAR3.r = new THREE.WebGLRenderer({canvas:$('#hudCars'), alpha:true, antialias:true, premultipliedAlpha:true}); }catch(e){ console.warn('HUD 차 아이콘 층을 만들지 못함 → 상자 아이콘', e); return; }
   CAR3.r.setClearColor(0x000000, 0); CAR3.scene = new THREE.Scene(); CAR3.cam = new THREE.PerspectiveCamera(58, 1, 5, 800);
-  const load = (url, key, done) => new THREE.GLTFLoader().load(url, g => {
+  const load = (url, key, done) => GLTF.load(url, g => {   // Draco 압축본(2026-11-17 밤) — scene.js의 공용 로더
     const parts = []; g.scene.updateMatrixWorld(true);
     g.scene.traverse(o => { if(o.isMesh){ const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); parts.push({geo, name:o.material.name}); } });
     const sz = new THREE.Box3().setFromObject(g.scene).getSize(new THREE.Vector3());

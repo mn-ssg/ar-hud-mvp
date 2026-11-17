@@ -45,5 +45,5 @@ for p in body.data.polygons: p.use_smooth = True
 print('HUD_PED tris', sum(len(p.vertices) - 2 for p in body.data.polygons), 'size', [round(v, 3) for v in body.dimensions])
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, 'hud_ped.blend'))
 out = os.path.join(HERE, '..', 'models', 'hud_ped.glb')
-bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_apply=True, export_yup=True, export_texcoords=False)
+bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_apply=True, export_yup=True, export_texcoords=False, export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6, export_draco_position_quantization=14, export_draco_normal_quantization=10, export_draco_texcoord_quantization=12, export_draco_color_quantization=10)   # Draco 압축(2026-11-17 밤)
 print('HUD_PED wrote', os.path.getsize(out))

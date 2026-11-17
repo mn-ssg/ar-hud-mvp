@@ -532,7 +532,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
 
   /* ---------- 9. 화면 · 에셋 · 콘솔 ---------- */
   {
-    const tex = await E(() => ({asphalt:!!(asphalt.map && asphalt.map.image && asphalt.map.image.src && /asphalt\.jpg/.test(asphalt.map.image.src)), facade:/facade\.jpg/.test((facadeMat.map.image || {}).src || '')}));
+    const tex = await E(() => ({asphalt:!!(asphalt.map && asphalt.map.image && asphalt.map.image.src && /asphalt\.webp/.test(asphalt.map.image.src) && asphalt.map.image.naturalWidth === 1024), facade:/facade\.webp/.test((facadeMat.map.image || {}).src || '')}));
     check('Higgsfield 재질(아스팔트 · 건물 벽)이 실제로 불러와짐', tex.asphalt && tex.facade, JSON.stringify(tex));
     check('콘솔 오류 · 깨진 경로 없음', errors.filter(e => !/favicon/.test(e)).length === 0, errors.slice(0, 5).join(' | '));
   }

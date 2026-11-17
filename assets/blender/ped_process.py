@@ -2,7 +2,8 @@
 입력: Higgsfield로 만든 사람 모델 — ① 사람 사진(gpt_image_2_6, A자세) → ② Tripo H3.1 image-to-3D(텍스처 포함)
        → ②' Tripo 모델은 옆(+x)을 보고 나온다. 리깅 도구는 정면(+z)을 본다고 가정하므로 그대로 넣으면 뼈대가 90° 어긋나 게걸음이 된다
             → assets/blender/ped_orient.py로 정면을 보게 돌리고 · 키를 맞추고 · 발을 바닥에 둔 glb를 올려서
-       → ③ Meshy 리깅 + 걷는 동작(Casual_Walk, 24개 뼈대). 그 결과 glb를 assets/blender/src/ped_<번호>_rig.glb로 둔다(원본 보관).
+       → ③ Meshy 리깅 + 걷는 동작(Casual_Walk, 24개 뼈대). 그 결과 glb를 assets/blender/src/ped_<번호>_rig.glb로 둔다.
+       (2026-11-17 밤, 배포 전 정리: 그 원본 glb 4개(5.2MB)는 저장소에서 뺐다 — 같은 내용이 가공된 장면 ped_<번호>.blend에 들어 있고, 원본은 git 기록 b8b16de에 있다. 다시 돌리려면 거기서 꺼내 src/에 둔다)
 하는 일: 쓸모없는 물체(리깅 도구가 넣은 구) 삭제 · 텍스처 2048 → 1024 JPEG · 키를 1.7m 안팎으로 맞춤(뼈대째) · 메시는 Draco 압축 → assets/models/ped_<번호>.glb, 고친 장면은 assets/blender/ped_<번호>.blend
 실행: /Applications/Blender.app/Contents/MacOS/Blender -b --python assets/blender/ped_process.py -- 1 1.74   (번호, 키 m)"""
 import bpy, os, sys

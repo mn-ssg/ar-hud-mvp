@@ -148,7 +148,7 @@ const grassTex = canvasTex(256, 256, (g,w,h) => {
 }, true);
 const terrainMat = (() => { const tex = grassTex.clone(); tex.needsUpdate = true; tex.repeat.set(280, 280); return new THREE.MeshStandardMaterial({map:tex, vertexColors:true, roughness:.96}); })();
 // 2026-11-07 (D105): 위에서 본 잔디 사진 텍스처(assets/tex/grass.jpg, 한 장 7m, 반 칸 밀어 겹치기로 이음새 제거) — 넓은 면의 반복은 vertexColors 색 변화(fbm)와 곱해져 가려짐. 못 불러오면 위 코드 잔디
-loadTex('assets/tex/grass.jpg', t => { t.repeat.set(2200/7, 2200/7); terrainMat.map = t; terrainMat.needsUpdate = true; });
+loadTex('assets/tex/grass.webp', t => { t.repeat.set(2200/7, 2200/7); terrainMat.map = t; terrainMat.needsUpdate = true; });
 function ribbonGeo(n){
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n*6),3));
@@ -187,14 +187,14 @@ const asphalt = worldUV(new THREE.MeshStandardMaterial({map:asphaltTex, roughnes
 const verge = worldUV(new THREE.MeshStandardMaterial({map:grassTex, color:lin('#53683a'), roughness:.97, side:THREE.DoubleSide,
   polygonOffset:true, polygonOffsetFactor:2, polygonOffsetUnits:2}), .15);
 // 길가 띠(콘크리트 띠 바깥 3.3 ~ 3.6m): 흙 · 자갈 사진 텍스처(assets/tex/verge.jpg, 한 장 ≈ 5m) — 잔디 언덕과 포장 사이의 갓길 흙 (D105)
-loadTex('assets/tex/verge.jpg', t => { verge.map = t; verge.color = lin('#cfc8b8'); verge.needsUpdate = true; });
+loadTex('assets/tex/verge.webp', t => { verge.map = t; verge.color = lin('#cfc8b8'); verge.needsUpdate = true; });
 const paint = new THREE.MeshStandardMaterial({color:lin('#e9e9e3'), emissive:lin('#d8dbd4'), emissiveIntensity:0, roughness:.55, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});   // 밤엔 재귀반사처럼 살짝 빛남(setSceneLight)
 const trackMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.06, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
 // 가는 물체(가로등·표지판 기둥·가드레일)는 그림자를 드리우지 않는다: 도로 위에 선·띠 그림자가 생기면 부자연스럽고 차선으로 오인될 수 있음
 const steel = worldUV(new THREE.MeshStandardMaterial({color:lin('#c3c8ce'), metalness:.8, roughness:.35, side:THREE.DoubleSide}), .5);   // 가드레일 W빔: 세계 좌표 2m 한 장
 const galv = new THREE.MeshStandardMaterial({color:lin('#8e949b'), metalness:.6, roughness:.5});
 // 2026-11-07 (D105): 아연도금 강판 사진 텍스처(assets/tex/galv.jpg) — 가드레일 빔(세계 좌표) · 가로등 기둥 · 지주 · 문형 표지 기둥(UV). 밤 반사체(reflMat)는 그대로
-loadTex('assets/tex/galv.jpg', t => { steel.map = t; steel.color = lin('#d8dde2'); steel.metalness = .55; steel.roughness = .42; steel.needsUpdate = true;
+loadTex('assets/tex/galv.webp', t => { steel.map = t; steel.color = lin('#d8dde2'); steel.metalness = .55; steel.roughness = .42; steel.needsUpdate = true;
   const t2 = t.clone(); t2.needsUpdate = true; t2.repeat.set(1, 4); galv.map = t2; galv.color = lin('#b9bec4'); galv.metalness = .5; galv.needsUpdate = true; });
 const reflMat = new THREE.MeshStandardMaterial({color:lin('#ffb347'), emissive:lin('#ff9a1f'), emissiveIntensity:.35});
 const lampMat = new THREE.MeshStandardMaterial({color:lin('#e8eef2'), emissive:lin('#fff6e0'), emissiveIntensity:.15, roughness:.3});
@@ -221,7 +221,7 @@ const goreMats = (() => {
   });
   const yellow = new THREE.MeshStandardMaterial({color:lin('#f2c230'), roughness:.6}), face = new THREE.MeshStandardMaterial({map:stripes, roughness:.6});
   // 2026-11-07 (D105): 칸이 나뉜 실제 제품처럼 — 오염된 노랑 · 검정 사선 사진 텍스처(assets/tex/gore.jpg). 앞면 + 옆면(세로로 늘려)
-  loadTex('assets/tex/gore.jpg', t => { face.map = t; face.color = lin('#ffffff'); face.roughness = .7; face.needsUpdate = true; const ts = t.clone(); ts.needsUpdate = true; ts.repeat.set(2.5, 1); yellow.map = ts; yellow.color = lin('#ffffff'); yellow.roughness = .7; yellow.needsUpdate = true; });
+  loadTex('assets/tex/gore.webp', t => { face.map = t; face.color = lin('#ffffff'); face.roughness = .7; face.needsUpdate = true; const ts = t.clone(); ts.needsUpdate = true; ts.repeat.set(2.5, 1); yellow.map = ts; yellow.color = lin('#ffffff'); yellow.roughness = .7; yellow.needsUpdate = true; });
   return [yellow,yellow,yellow,yellow,face,yellow];
 })();
 // 나무는 trees.js (2026-11-17: 사진을 붙인 판 나무 treeKinds 삭제 — 모든 나무가 Blender 모델)
@@ -245,7 +245,7 @@ function facadeBox(w, h, d, tile = FACADE_TILE){
 
 /* ---------- Higgsfield 생성 재질 (2026-10-29, 출처 · 프롬프트 assets/README.md) ----------
    아스팔트(이음새 없게 처리) · 보도 블록 · 건물 벽. 불러오기 전 · 실패 시엔 위 코드 텍스처 그대로 → 주행 판정과 무관(그림만) */
-loadTex('assets/tex/asphalt.jpg', t => { asphalt.map = t; asphalt.color = lin('#d2d6da'); asphalt.needsUpdate = true; });
+loadTex('assets/tex/asphalt.webp', t => { asphalt.map = t; asphalt.color = lin('#d2d6da'); asphalt.needsUpdate = true; });
 // 밤 창: 같은 그림에서 유리(어두운 곳)만, 창 칸(6 × 7)마다 30% 켬. lumMax: 유리로 볼 밝기 한계(유리 외벽은 밝아서 높게)
 // 2026-11-17: 켜진 칸을 한 색으로 칠하던 것을 → 원래 그림의 밝기 무늬(커튼 · 창틀 · 유리 반사)를 살리고 칸마다 밝기를 다르게. 유리 외벽은 칸 전체가 유리라 가까이서 큰 네모 조각으로 보였다(gain으로 낮춤)
 function facadeNight(img, lumMax = 95, gain = 1){
@@ -258,7 +258,7 @@ function facadeNight(img, lumMax = 95, gain = 1){
   g.putImageData(d, 0, 0);
   const em = new THREE.CanvasTexture(c); em.encoding = THREE.sRGBEncoding; em.wrapS = em.wrapT = THREE.RepeatWrapping; return em;
 }
-loadTex('assets/tex/facade.jpg', t => { const em = facadeNight(t.image); facadeMats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
+loadTex('assets/tex/facade.webp', t => { const em = facadeNight(t.image); facadeMats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
 /* 건물 종류 (2026-10-29, Higgsfield 생성 입면 — 창 6열 × 7층, 한 장 크기 = 층 높이에 맞춤):
    사무(facadeMat · 층 3m) · 아파트(층 2.8m) · 유리 업무(층 3.5m) + 1층 상가(높이 4.2m, 한 장 18m = 가게 3칸) + 지붕 테 · 옥상 설비 */
 const BUILD = {
@@ -268,9 +268,9 @@ const BUILD = {
   shop:new THREE.MeshStandardMaterial({color:lin('#ffffff'), roughness:.6, emissive:lin('#ffffff'), emissiveIntensity:0}),
   roof:new THREE.MeshStandardMaterial({color:lin('#8b8d8a'), roughness:.92})
 };
-loadTex('assets/tex/facade_apt.jpg', t => { const em = facadeNight(t.image, 110); BUILD.apt.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
-loadTex('assets/tex/facade_glass.jpg', t => { const em = facadeNight(t.image, 175, .5); BUILD.glass.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
-loadTex('assets/tex/shopfront.jpg', t => { BUILD.shop.map = t; BUILD.shop.emissiveMap = t; BUILD.shop.needsUpdate = true; });
+loadTex('assets/tex/facade_apt.webp', t => { const em = facadeNight(t.image, 110); BUILD.apt.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
+loadTex('assets/tex/facade_glass.webp', t => { const em = facadeNight(t.image, 175, .5); BUILD.glass.mats.forEach(m => { m.map = t; m.emissiveMap = em; m.needsUpdate = true; }); });
+loadTex('assets/tex/shopfront.webp', t => { BUILD.shop.map = t; BUILD.shop.emissiveMap = t; BUILD.shop.needsUpdate = true; });
 
 /* ---------- 잔디 덩어리 (D105): 길가 흙 띠 바깥 1 ~ 6m에 낮은 풀 판(엇갈린 2장)을 인스턴스로 — 멀리는 지형 텍스처만 ---------- */
 const tuftTex = canvasTex(128, 64, (g, w, h) => {
@@ -704,14 +704,6 @@ function alignModelGeo(geo, L, W){
   geo.computeBoundingBox(); let b = geo.boundingBox, s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3());
   geo.translate(-c.x, -b.min.y, -c.z); const sx = W/s.x, sz = L/s.z; geo.scale(sx, Math.sqrt(sx*sz), sz); geo.computeBoundingBox(); geo.computeBoundingSphere();
   return geo;
-}
-// 모델 차의 등화: 코드 차의 큰 등 상자(.46 × .12)는 GLB에 구워진 등 위에 떠 보여 → 얇은 띠(.34 × .06)로 바꿔 표면에 살짝 붙임 (미등 ↔ 브레이크 재질 바꿔 끼우기는 그대로)
-const modelLampCache = {};
-function modelLamps(type){
-  if(modelLampCache[type]) return modelLampCache[type]; const T = CAR_TYPES[type]; if(!T) return null;
-  const at = (x, y, z) => M4().makeTranslation(x, y, z), box = (w, h, d) => new THREE.BoxGeometry(w, h, d), lamp = [], head = [];
-  for(const sx of [-1, 1]){ lamp.push([box(.34, .06, .04), at(sx*(T.W/2 - .33), T.tail + .02, T.tz + .005)]); head.push([box(.3, .07, .04), at(sx*(T.W/2 - .33), T.hy + .01, T.hz - .005)]); }
-  return modelLampCache[type] = {lamp:merge(lamp), head:merge(head)};
 }
 /* ---------- 등화 (2026-11-07, D110): 모델 차체 표면 자체가 빛난다 ----------
    코드 메시로 붙이던 등 상자(몸체 밖에 뜬 납작한 네모)를 버리고, 차체 재질 셰이더에 등 영역을 심는다.

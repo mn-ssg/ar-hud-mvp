@@ -69,7 +69,7 @@ const PROPM = (() => {
     const pm = group.userData.pm || (group.userData.pm = {}); (pm[name] = pm[name] || []).push(d.matrix.clone());
     dirty.add(group); if(ready && !timer) timer = setTimeout(flush, 0);
   }
-  if(THREE.GLTFLoader) new THREE.GLTFLoader().load('assets/models/props.glb', g => {
+  if(GLTF) GLTF.load('assets/models/props.glb', g => {   // Draco 압축본(2026-11-17 밤)
     g.scene.updateMatrixWorld(true);
     g.scene.traverse(o => { if(!o.isMesh) return; const name = o.parent && o.parent.isGroup && o.parent !== g.scene ? o.parent.name : o.name.replace(/_\d+$/, ''); const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); (models[name] = models[name] || []).push({geo, mat:o.material.name}); });
     ready = true; flush();

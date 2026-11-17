@@ -37,7 +37,7 @@ src/
 assets/
   tex/                노면 · 벽 · 잔디 · 금속 · 나무 재질 (코드가 읽음). 참고 시안은 ../04_리서치/assets/
   models/             차량 · 버스 GLB 5개(Higgsfield Tripo, 2026-11-07 · Draco 압축 2026-11-17) · 나무 · 가로등 · 가드레일 기둥(Blender) · 보행자 4명(Higgsfield + 리깅) · HUD 아이콘 2개. 못 불러오면 코드 메시
-  blender/            Blender 원본(.blend)과 만드는 스크립트(.py), 보행자 리깅 원본(src/)
+  blender/            Blender 원본(.blend)과 만드는 스크립트(.py)
   cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js

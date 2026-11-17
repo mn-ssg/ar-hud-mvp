@@ -118,5 +118,5 @@ def work_sign():
 objs = [lamp_hw(), lamp_city(), rail_post(), cone(), barricade(), work_sign()]
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, 'props.blend'))
 out = os.path.join(HERE, '..', 'models', 'props.glb')
-bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_apply=True, export_yup=True, export_texcoords=False, export_materials='EXPORT')
+bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_apply=True, export_yup=True, export_texcoords=False, export_materials='EXPORT', export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6, export_draco_position_quantization=14, export_draco_normal_quantization=10, export_draco_texcoord_quantization=12, export_draco_color_quantization=10)   # Draco 압축(2026-11-17 밤)
 print('PROP wrote', os.path.getsize(out))

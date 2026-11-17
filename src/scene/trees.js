@@ -18,7 +18,7 @@ const TREES = (() => {
   const depth = {leaf_zelkova:new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, alphaTest:.42}), leaf_pine:new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, alphaTest:.38})};
   const tex = (url, names, rep) => loadTex(url, t => { if(rep){ t.wrapS = t.wrapT = THREE.RepeatWrapping; } else t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
     names.forEach(n => { M[n].map = t; M[n].color.set(0xffffff); M[n].needsUpdate = true; if(depth[n]){ depth[n].map = t; depth[n].needsUpdate = true; } }); rebake(); });
-  tex('assets/tex/bark_zelkova.jpg', ['bark_zelkova'], true); tex('assets/tex/bark_pine.jpg', ['bark_pine'], true);
+  tex('assets/tex/bark_zelkova.webp', ['bark_zelkova'], true); tex('assets/tex/bark_pine.webp', ['bark_pine'], true);
   tex('assets/tex/leaves.webp', ['leaf_zelkova']); tex('assets/tex/needles_pine.webp', ['leaf_pine']);
 
   const models = {}, queue = [], cards = {};   // models[이름] = {wood, leaf, box}, cards[이름] = {geo, mat, tex}
@@ -45,7 +45,7 @@ const TREES = (() => {
     cards[name] = {geo, mat, rt, depth:new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking, map:rt.texture, alphaTest:.5})};
   }
   function rebake(){ if(ready) Object.keys(models).forEach(bake); }
-  if(THREE.GLTFLoader) new THREE.GLTFLoader().load('assets/models/trees.glb', g => {
+  if(GLTF) GLTF.load('assets/models/trees.glb', g => {   // Draco 압축본(2026-11-17 밤) — scene.js의 공용 로더
     g.scene.updateMatrixWorld(true);
     g.scene.traverse(o => { if(!o.isMesh) return; const mm = /^(.+)_(wood|leaf)$/.exec(o.name); if(!mm) return; const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld);
       (models[mm[1]] = models[mm[1]] || {})[mm[2]] = {geo, mat:o.material.name}; });

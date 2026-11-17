@@ -53,3 +53,10 @@
 - 지운 파일: `tex/tree_pine.png` · `tex/tree_zelkova.png` · `tex/leaves.png`(나무를 모델로 바꿔 안 씀) · `tex/tire.jpg`(쓰는 곳 없음)
 - Draco 압축본을 읽으려면 `DRACOLoader`가 필요(index.html, three r128 CDN). 보행자 뼈대 복제는 `SkeletonUtils`.
 - 페이지 로딩 용량: 13.02MB → 8.72MB. 성능 수치는 `tests/perf-before.json` · `perf-after.json`(`node tests/perf-check.js after`)
+
+## 배포 전 정리 · 최적화 (2026-11-17 밤)
+
+- **텍스처 JPG → WebP**: `tex/*.jpg` 12장과 `cabin/map.jpg`를 WebP로 바꿨다(이 문서 위쪽 표의 `.jpg` 이름은 지금 모두 `.webp`). 아스팔트 · 잔디 · 길가 흙(1024px)은 품질 68, 나머지는 82 — 2배 확대 비교에서 차이가 보이지 않음. 1,882KB → 1,313KB
+- **모델 Draco 압축**: 직접 만든 모델 4개도 압축해 내보낸다(`blender/*.py`의 내보내기 옵션). `trees.glb` 819 → 171KB · `props.glb` 111 → 29KB · `hud_car.glb` 298 → 37KB · `hud_ped.glb` 57 → 11KB. 읽는 쪽은 모두 `scene.js`의 공용 로더(`GLTF`, DRACOLoader)
+- **저장소에서 뺀 것**: `blender/src/ped_N_rig.glb` 4개(5.2MB, 리깅 원본 — 같은 내용이 `blender/ped_N.blend`에 있음, git 기록 b8b16de) · 안 쓰는 코드(`modelLamps` · `grow3` · `WHEELBASE` · `KEY_ARROW` · `KEY_WORD`)
+- 페이지 로딩 용량은 `tests/perf-after.json`
