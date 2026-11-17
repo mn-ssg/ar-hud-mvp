@@ -348,6 +348,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         let guard = 0;
         while(SES.on && guard++ < 40){
           const st = SES.steps[SES.i];
+          if(TOUR.state().on){ (window.__tours = window.__tours || []).push(pid + ':' + SES.i + ':' + TOUR.state().id); TOUR.go(TOUR.scenes.length); continue; }   // 안내 모션그래픽: 끝까지 넘김(→ 첫 주행)
           if(!$('#sess').hidden && $('#rate')){ setRate(4); if($('#choice')) setWait(0); (window.__qCards = window.__qCards || []).push({hud:st.hud, two:!!$('#choice'), text:$('#sesBody').innerText.slice(0, 60)}); $('#sesBtn').click(); continue; }
           if(!$('#sess').hidden){ if(/연습/.test($('#sesEyebrow').textContent) && /성공|다른 출구|충돌|시간 초과/.test($('#sesTitle').textContent)) window.__practiceCard = $('#sesTitle').textContent; $('#sesBtn').click(); continue; }
           // 주행 중: 카운트다운 건너뛰고 자동 운전
@@ -358,17 +359,16 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         sessions[pid] = {rows:SES.rows.map(r => ({hud:r.hud, scn:r.scn, seq:r.seq, order:r.order, ver:r.ver, env:r.env, ev:(r.events || []).length, practice:r.practice, lcState:r.lcState})), qs:SES.qs.length, qd:SES.qs.map(q => ({hud:q.hud, rate:q.rate, wait:q.wait, q2:!!q.q2})), prs:SES.prs.length, mode:S.mode, testing:S.testing};
       }
       const stored = loadArr(DKEY);
-      return {sessions, practiceCard:window.__practiceCard || null, storedN:stored.length, oldKept:stored.some(r => r.p === 'P_OLD'), practiceN:loadArr(PKEY).length, practiceInDrives:stored.some(r => r.practice),
+      return {sessions, tours:window.__tours || [], step0:buildSteps('ALT')[0].kind, practiceCard:window.__practiceCard || null, storedN:stored.length, oldKept:stored.some(r => r.p === 'P_OLD'), practiceN:loadArr(PKEY).length, practiceInDrives:stored.some(r => r.practice),
         sheets:book && book.map(([n, a]) => [n, a.length, a[0].length]), head:book && book.find(([n]) => n === '기록')[1][0], oldRowCells:rowCells(old).length};
     });
     const p1 = s.sessions.P1, p2 = s.sessions.P2;
     check('세션: 참가자마다 본 주행 6판 기록', p1.rows.length === 6 && p2.rows.length === 6, `P1 ${p1.rows.length} · P2 ${p2.rows.length}`);
-    check('세션: 연습 기록은 본 기록에 섞이지 않음 (따로 저장)', s.practiceN === 2 && !s.practiceInDrives && p1.prs === 1, `연습 ${s.practiceN}`);
+    check('세션(2026-11-17 밤): 맨 앞은 연습 주행이 아니라 안내 모션그래픽 — 참가자마다 한 번 뜨고(0번째 단계), 끝내면 바로 첫 주행. 연습 기록은 안 생김', s.step0 === 'tour' && JSON.stringify(s.tours) === JSON.stringify(['P1:0:start', 'P2:0:start']) && s.practiceN === 0 && !s.practiceInDrives && p1.prs === 0, JSON.stringify({tours:s.tours, practice:s.practiceN}));
     const alt = rows => rows.map(r => r.hud).join(',') === 'nav,ar3,nav,ar3,nav,ar3' && rows.map(r => r.seq).join('') === '123456';
     check('세션(3차, 피그마 3차 검증 계획): 연습 뒤 현대 · 리뉴얼을 판마다 교대(현대 먼저, 번호와 상관없이) · 순서 칸 ALT', alt(p1.rows) && alt(p2.rows) && p1.rows[0].order === 'ALT' && p2.rows[0].order === 'ALT', `${p1.rows.map(r => r.hud).join(',')} / ${p2.rows.map(r => r.hud).join(',')}`);
     check('세션: 같은 장면이 연달아 나오지 않음(두 HUD의 같은 장면 사이에 다른 판이 낌)', [p1, p2].every(q => q.rows.every((r, i) => i === 0 || r.scn !== q.rows[i-1].scn)), JSON.stringify(p1.rows.map(r => r.scn)));
     check('세션: HUD 버전 칸 — 현대 3.5 · 리뉴얼 3.2', p1.rows.filter(r => r.hud === 'ar3').length === 3 && p1.rows.filter(r => r.hud === 'ar3').every(r => r.ver === '리뉴얼 3.2') && p1.rows.filter(r => r.hud === 'nav').every(r => r.ver === '현대 3.5'), JSON.stringify(p1.rows.map(r => r.ver)));
-    check('세션: 연습이 끝나면 결과 카드 없이 바로 첫 주행(연습 기록 1 · 카드에 결과 글 없음)', p1.prs === 1 && !s.practiceCard, JSON.stringify(s.practiceCard));
     const pairOk = rows => { const by = {}; rows.forEach(r => (by[r.scn] = by[r.scn] || []).push(r.hud)); return Object.values(by).every(h => h.length === 2 && h[0] !== h[1]); };
     check('세션: 같은 시나리오 ID를 두 HUD가 한 번씩 (교통 · 목적지 · 시간대 고정)', pairOk(p1.rows) && pairOk(p2.rows), JSON.stringify(p1.rows.map(r => r.scn)));
     check('세션: 새 필드(시나리오 · HUD 버전 · 환경 · 순서 · 이벤트) 기록', p1.rows.every(r => r.scn && r.ver && r.env && r.order && r.ev > 0), JSON.stringify(p1.rows[0]));
@@ -406,6 +406,29 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('시연 일시정지 중 진행도가 움직이지 않음', r.paused, '');
     check('재시작하면 대기 · 이동 판단 기록이 처음부터', r.after.log <= 1 && r.after.s === 40, JSON.stringify(r.after));
     check('HUD 바꾸면 한 HUD만 보임', r.navVis, '');
+  }
+
+  /* ---------- 7-1. 안내 모션그래픽 (intro.js TOUR, 2026-11-17 밤) ---------- */
+  {
+    const t = await E(() => { const o = {}; let done = 0;
+      TOUR.show(() => done++); o.n = TOUR.scenes.length; o.ids = TOUR.scenes.map(q => q.id).join(',');
+      const texts = () => [...document.querySelectorAll('#tour svg > g')].map(g => +g.getAttribute('opacity'));
+      // 장면마다 끝 시각으로 옮겨 그려 보고(오류 없이), 보이는 장면은 하나뿐
+      o.one = TOUR.scenes.every((q, i) => { TOUR.seek(i, q.hold ? 3 : q.dur - .05); const v = texts(); return v[i] === 1 && v.filter(x => x > 0).length === 1; });
+      // 조작 장면: 속도 글자가 50 → 80 근처 → 22 근처 → 50으로 바뀜
+      const spd = tt => { TOUR.seek(1, tt); return +document.querySelector('#tour .t-speed').textContent; }; o.speed = [spd(1), spd(5.2), spd(7.5), spd(10)];
+      // 눌러 보기: 방향키 4개 + Q · E를 누르면 6/6, 그 전에는 저절로 안 넘어감. 누른 키는 운전 입력(KEYS)으로 새지 않음
+      TOUR.go(2); const press = c => dispatchEvent(new KeyboardEvent('keydown', {code:c, key:c.replace('Arrow', 'Arrow'), bubbles:true, cancelable:true}));
+      ['ArrowLeft', 'ArrowRight', 'ArrowUp'].forEach(press); TOUR.seek(2, 30); o.half = {n:TOUR.scenes[2].draw.state().n, at:TOUR.state().id, leak:Object.values(KEYS).some(Boolean)};
+      ['ArrowDown', 'KeyQ', 'KeyE'].forEach(press); TOUR.seek(2, 31); TOUR.seek(2, 32.5); o.full = {at:TOUR.state().id};
+      // Enter로 다음 · 마지막 장면에서 Enter(= 주행 시작)면 닫히고 done 한 번
+      TOUR.go(5); const before = done; dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', bubbles:true, cancelable:true})); o.end = {done:done - before, hidden:document.querySelector('#tour').hidden, on:TOUR.state().on};
+      // HUD 표시의 뜻은 알려 주지 않음(대기 · 이동 같은 말 · HUD 색 설명이 없음)
+      o.words = /기다려|대기|이동하세요|청록|빨간 점|꺾쇠/.test(document.querySelector('#tour').textContent);
+      return o; });
+    check('안내 모션그래픽: 장면 6개(시작 · 조작 · 눌러 보기 · 할 일 · 기록 · 준비)가 오류 없이 그려지고 한 번에 한 장면만 보임, 조작 장면의 속도가 50 → 가속 → 브레이크 → 50으로 바뀜', t.n === 6 && t.ids === 'start,keys,try,task,data,ready' && t.one && t.speed[0] === 50 && t.speed[1] > 70 && t.speed[2] < 35 && Math.abs(t.speed[3] - 50) < 6, JSON.stringify({n:t.n, one:t.one, speed:t.speed}));
+    check('안내 모션그래픽: 눌러 보기는 여섯 키를 다 눌러야 넘어가고(3개만 누르면 그대로) 운전 입력으로 새지 않음, 마지막 장면에서 Enter면 닫히며 주행으로 넘어감(한 번만)', t.half.n === 3 && t.half.at === 'try' && !t.half.leak && t.full.at === 'task' && t.end.done === 1 && t.end.hidden && !t.end.on, JSON.stringify({half:t.half, full:t.full, end:t.end}));
+    check('안내 모션그래픽: HUD 표시의 뜻(기다려 · 이동 · 색)은 알려 주지 않음 — 조작 · 할 일 · 기록 항목만', !t.words, '');
   }
 
   /* ---------- 8-1. 화면 구조: HUD 선택은 현대 · 우리 두 개 · 버전 선택 없음 · 리뉴얼 HUD에 설명 글자 없음 ---------- */

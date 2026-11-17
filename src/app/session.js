@@ -1,6 +1,6 @@
 /* ============================================================
    session.js — 주행 테스트 진행 · 기록 · 내보내기 (2026-10-29 개편, 예전 D60 · D64 · D65 · D68 · D70 위에)
-   흐름(3차, 2026-11-17 ~): 참가자 정보 → 연습 주행(HUD 없음) → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해) → 요약 + 엑셀 자동 저장
+   흐름(3차, 2026-11-17 밤 ~): 참가자 정보 → 안내 모션그래픽(intro.js — 연습 주행 대신, EXP.practice) → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해) → 요약 + 엑셀 자동 저장
    흐름(2차까지): 참가자 정보 → (연습 주행) → HUD A 3회 → 질문 → HUD B 3회 → 질문 → 요약 + 엑셀 자동 저장
    · 비교 (2026-11-03 두 번째 개정, 2차 실험): 현대 HUD(nav, 1차 그대로) 3회 · 리뉴얼 HUD 2차(ar2, 2.1) 3회. 순서는 늘 현대 → 2차로 고정 (2026-11-04 사용자: 참가자 번호 홀수 · 짝수 교대를 없앰).
      1차 HUD(ar, v1.9)는 실험 조건에서 빠지고 시연에서만 열어 볼 수 있음. 'HUD 버전' 칸: 현대 3.3 · 리뉴얼 2.1-A/B (1차 기록의 '리뉴얼 HUD'는 빈칸 = v1.7~1.9)
@@ -39,7 +39,8 @@ const envName = () => `환경 ${ENV_VER} · 미러 ${MIR.on ? '켬' : '끔'}`;
 
 /* ---------- 실험 설정 ---------- */
 // 비교 쌍 A = 현대 · B = 2차. 연습 주행은 늘 한다(2026-11-07: 연구자 설정의 '연습 주행' 체크박스 · localStorage 저장 삭제 — 순서는 늘 연습 → 블록 1 → 블록 2)
-const EXP = {pair:['nav', 'ar3'], alternate:true};   // 3차 실험(2026-11-17 ~): 현대 HUD 3회 · 리뉴얼 HUD(3.0) 3회
+// practice (2026-11-17 밤, 사용자: '쓸데없는 연습 주행보다 모션그래픽으로'): false면 맨 앞에 연습 주행 대신 안내 모션그래픽(intro.js TOUR — 조작 방법 · 직접 눌러 보기 · 할 일 · 기록하는 것). true면 예전처럼 연습 주행
+const EXP = {pair:['nav', 'ar3'], alternate:true, practice:false};   // 3차 실험(2026-11-17 ~): 현대 HUD 3회 · 리뉴얼 HUD(3.0) 3회
 // 제시 순서: 늘 현대 먼저('AB'). 2026-11-03엔 참가자 번호 홀수 AB · 짝수 BA로 교대했으나 2026-11-04 사용자가 고정을 택함 (짝수 참가자에게 2차가 먼저 나와 혼란). 순서 효과는 상쇄되지 않으므로 분석 때 참고
 // 3차 실험(2026-11-17, 피그마 '3차 검증 계획'): **판마다 교대**('ALT') — 연습 → 현대 → 리뉴얼 → 현대 → 리뉴얼 → 현대 → 리뉴얼. 2차의 한계였던 '현대 3판 뒤 리뉴얼 3판'(익숙해진 효과가 리뉴얼에 몰림)을 없애려는 것.
 // 첫 판은 모든 참가자 현대 HUD [가정 — 참가자마다 첫 HUD를 바꿀지는 사용자 판단]. 예전 블록 방식은 EXP.alternate = false
@@ -77,9 +78,9 @@ function buildSteps(order){
     // 판마다 교대. 두 HUD가 같은 장면 3개를 한 번씩 — 같은 장면이 연달아 나오지 않게 둘째 HUD의 순서는 첫째를 두 칸 민 것(X Z Y X Z Y)
     const a = shuffle(scns.slice()), b = [a[2], a[0], a[1]], runs = [];
     a.forEach((p, i) => { runs.push({kind:'run', hud:EXP.pair[0], block:1, no:i + 1, ...p}); runs.push({kind:'run', hud:EXP.pair[1], block:2, no:i + 1, ...b[i]}); });
-    return [{kind:'practice'}, ...runs, {kind:'survey', hud:EXP.pair[0], block:1}, {kind:'survey', hud:EXP.pair[1], block:2}, {kind:'done'}];
+    return [{kind:EXP.practice ? 'practice' : 'tour'}, ...runs, {kind:'survey', hud:EXP.pair[0], block:1}, {kind:'survey', hud:EXP.pair[1], block:2}, {kind:'done'}];
   }
-  return [{kind:'practice'}, ...block(h1, 1), {kind:'survey', hud:h1, block:1}, ...block(h2, 2), {kind:'survey', hud:h2, block:2}, {kind:'done'}];
+  return [{kind:EXP.practice ? 'practice' : 'tour'}, ...block(h1, 1), {kind:'survey', hud:h1, block:1}, ...block(h2, 2), {kind:'survey', hud:h2, block:2}, {kind:'done'}];
 }
 function runCfg(st){ return {map:mapById(st.map), leaf:st.leaf, lane:st.lane, type:st.type, jam:st.jam, seed:st.seed, sigT:st.sigT}; }
 
@@ -119,6 +120,7 @@ function nextStep(){
   const st = SES.steps[++SES.i];
   if(st.kind === 'run') runStep(st);
   else if(st.kind === 'practice') practiceCard();
+  else if(st.kind === 'tour'){ hideCard(); $('#abortBtn').hidden = true; TOUR.show(nextStep); }   // 안내 모션그래픽 — 마지막 장면의 '주행 시작'에서 첫 판으로
   else if(st.kind === 'survey') surveyCard(st);
   else doneSession();
 }
@@ -139,7 +141,7 @@ function runStep(st){
   const cfg = runCfg(st); SES.cur = {st, cfg};
   setMode(st.hud); setLight(st.light);
   startDrive(cfg);
-  countdown(false);   // 키 안내는 연습 주행에서 끝까지 보여 줬으므로 본 주행에선 3 · 2 · 1 동안만
+  countdown(!EXP.practice && SES.seq === 0);   // 키 안내: 연습 주행을 했으면 3 · 2 · 1 동안만. 연습 없이 안내 모션그래픽만 봤으면 첫 판은 끝까지 보여 준다
 }
 
 /* 연습 주행: HUD 없이 ① IC 오른쪽 진출, 앞차 · 옆 차로 차 + 옮길 차로 뒤차 2대(가까운 차는 깜빡이를 켜면 반드시 양보 — D103) (급정거 · 뒤차 무리 · 정체 없음). 기록은 따로 */
@@ -244,7 +246,7 @@ function doneSession(){
     btn:['다음 참가자', openSession], btn2:['엑셀 다시 저장', () => exportBook(rows, name, qs, prs)]});
 }
 function endSession(){
-  clearTimeout(SES.timer); SES.on = false; SES.cur = null; S.testing = false;
+  clearTimeout(SES.timer); SES.on = false; SES.cur = null; S.testing = false; TOUR.hide();
   stopDrive(); D.frozen = false; $('#count').hidden = true; $('#keyHint').hidden = true; $('#abortBtn').hidden = true;
   lockUi(false); setMode(SES.prevMode || 'ar3'); if(SES.prevLight) setLight(SES.prevLight); prepDemo(); update(1);
 }
@@ -255,6 +257,7 @@ function abortRun(){
   goHome();
 }
 $('#testBtn').onclick = openSession;
+$('#tourBtn').onclick = () => { stopDemo(); TOUR.show(null); };   // 처음 화면에서 미리 보기(기록 · 진행과 무관)
 $('#practiceBtn').onclick = () => { stopDemo(); SES.pid = $('#pid').value; SES.order = '-'; practiceCard(); };
 $('#abortBtn').onclick = abortRun;
 
