@@ -33,15 +33,19 @@ function view3(p, f, onMainStraight, t){
   const dt = V.lastT === null ? 0 : clamp(t - V.lastT, 0, .1), first = V.x === null || V.lastT === null || t < V.lastT; V.lastT = t;
   const k = sec => first ? 1 : 1 - Math.exp(-dt/sec);
   if(!ST.on){ Object.assign(V, {x:p.x, psi:carPsi, w:1, ax:p.x, az:p.z, hx:f.x, hz:f.z, ex:p.x, efx:f.x, efz:f.z}); return V; }
-  // 지금 차로(선을 15cm 넘어야 바뀜 — 선 위에서 왔다 갔다 하지 않게)
-  if(first || Math.abs(p.x - m.laneX(V.lane)) > LANE/2 + .15) V.lane = laneOf(m, p.x);
-  const laneC = m.laneX(V.lane);
-  V.x = first ? laneC : V.x + (laneC - V.x)*k(ST.slide);
+  /* 좌우 기준 자리 V.x (2026-11-17 밤 개정 — 사용자: 차로를 바꿀 때 미니 도로가 '툭툭 끊기면서' 움직임).
+     예전(저녁): 차가 선을 넘는 순간 새 차로 가운데로 옮기기 시작 + 내 차 아이콘은 따로 움직임 → 아이콘이 먼저 가고 도로가 뒤늦게 따라와 두 번 움직였다.
+     지금: 기준 자리를 내 차 옆 위치의 **이어진 함수**로 — 차로 가운데에서 ST.dead m 안이면 가운데에 그대로(차로 안 흔들림은 안 보임), 그보다 벗어나면 옆 차로 가운데까지 S자 곡선 한 번으로 넘어가고,
+           새 차로 가운데에 가까워지면 그 가운데에 붙는다. 차로를 옮기는 동안 한 번에 매끄럽게 넘어가고 끊기는 순간이 없다. 내 차 아이콘은 늘 이 기준 자리(상자 가운데 줄)에 그린다 */
+  // 이웃한 두 차로 가운데 사이(3.5m)를 0 ~ 1로 보고, 양 끝 ST.dead m는 0 · 1에 붙이고 그 사이는 S자 곡선 한 번으로(차선 위에서 가장 빠르고 멈칫하지 않음). 바깥 차로 가운데보다 더 바깥이면 그 가운데에 그대로
+  const q = clamp((p.x - m.laneX(0))/LANE, 0, m.lanes - 1), i0 = Math.min(m.lanes - 2, Math.floor(q)), d = ST.dead/LANE;
+  const tgt = m.lanes < 2 ? m.laneX(0) : m.laneX(i0) + LANE*smooth3(q - i0, d, 1 - d);
+  V.x = first ? tgt : V.x + (tgt - V.x)*k(ST.slide);
   V.w = first ? (onMainStraight ? 0 : 1) : V.w + clamp((onMainStraight ? 0 : 1) - V.w, -dt/ST.blend, dt/ST.blend);
   const w = smooth3(V.w, 0, 1); V.psi = wrap3(carPsi)*w;   // 본선의 도로 방향 = 0(-z). 꺾는 구간(w = 1)은 장면 카메라와 똑같이 — 늦게 따라가게 하면 미니 도로가 실제 도로보다 늦게 꺾인다(3차에서 고친 '투시 맞추기'가 깨짐)
   V.ax = V.x + (p.x - V.x)*w; V.az = p.z; V.hx = Math.sin(V.psi); V.hz = -Math.cos(V.psi);
-  // 내 차 아이콘: 차로 가운데에서 ST.dead[0]m 안이면 가운데에 그대로, ST.dead[1]m 넘게 벗어나면 실제 자리(그 사이는 이어지게). 방향도 조금 틀어진 것은 감춘다
-  const e = p.x - V.x, es = e*smooth3(Math.abs(e), ST.dead[0], ST.dead[1]); V.ex = p.x + (V.x + es - p.x)*(1 - w);
+  V.ex = V.ax;   // 내 차 아이콘 = 기준 자리
+  // 아이콘 방향: 조금 틀어진 것은 감춘다
   const pe = wrap3(carPsi - V.psi), ps = V.psi + pe*(w + (1 - w)*smooth3(Math.abs(pe), ST.deadPsi[0]*Math.PI/180, ST.deadPsi[1]*Math.PI/180)); V.efx = Math.sin(ps); V.efz = -Math.cos(ps);
   return V;
 }

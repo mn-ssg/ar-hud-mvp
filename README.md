@@ -41,7 +41,7 @@ assets/
   cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
-  drive-regression.js 브라우저 자동 운전 회귀 134항목  node drive-regression.js (Chrome 필요)
+  drive-regression.js 브라우저 자동 운전 회귀 137항목  node drive-regression.js (Chrome 필요)
   capture-states.js   리뉴얼 HUD 3차 상태 6가지 캡처(주간 · 야간, 현대 HUD 줄 포함) + 대비 측정   node capture-states.js <폴더>
   handling-check.js   조작감 점검(보조 켬 → handling-check-assist.json · ASSIST=0 이면 실제 값 → handling-check.json) — 새 조작 모델을 키 입력으로 돌려 차로 변경 시간 · 우회전 핸들 각도 · 가속 · 제동을 실제 값과 견줌(결과 handling-check.json)
   perf-check.js       성능 재기 — 장면 4개 프레임 시간 · 삼각형 · 그리기 호출 · 로딩 용량   node perf-check.js after (결과 perf-after.json, 그래픽 작업 전 값 perf-before.json)
@@ -56,7 +56,7 @@ tests/
 
 - 열기: `index.html`을 정적 서버로 연다 (파일로 직접 열면 재질 이미지가 막힐 수 있음). 예: `python3 -m http.server` 뒤 `http://localhost:8000/`
 - 테스트: `cd tests && npm i && npm test`
-- 조작: ← → 핸들 · ↑ 가속 · ↓ 브레이크 · Q E 깜빡이(차로 변경이 끝나면 자동으로 꺼짐). 차 움직임은 아반떼(CN7) 제원 · 실측 기준(`config.js VEH`): 키를 누르고 있는 동안 핸들이 점점 돌아가고(빠를수록 덜), 떼면 가운데로 돌아옴. ↓는 누르고 있을수록 세게. 키보드 운전이 어려운 부분은 조작 보조(`VEH.assist`)가 덜어 줌 — 핸들이 더 빨리 돌고, 떼면 금방 가운데로 오고, 떼고 있으면 도로 방향으로 스스로 곧게 섬(차로 가운데로 끌지는 않음).
+- 조작: ← → 핸들 · ↑ 가속 · ↓ 브레이크 · Q E 깜빡이(차로 변경이 끝나면 자동으로 꺼짐). 차 움직임은 아반떼(CN7) 제원 · 실측 기준(`config.js VEH`): 키를 누르고 있는 동안 핸들이 점점 돌아가고(빠를수록 덜), 떼면 가운데로 돌아옴. ↓는 누르고 있을수록 세게. 키보드 운전이 어려운 부분은 조작 보조(`VEH.assist`)가 덜어 줌 — 2차 실험 때의 조작 느낌: 누르면 0.55초에 끝 각도, 떼면 0.33초에 가운데. 핸들이 스스로 움직이는 보정은 없음(2026-11-17 밤).
 - 주행 테스트 순서(3차): 연습(HUD 없음) → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해). `session.js EXP.alternate`
 - 느린 기기: 화소 배율이 최대 1.5이고, 프레임이 자주 25ms를 넘으면 1.25 → 1로 내려가며 룸미러는 두 프레임에 한 번 갱신된다(`scene.js PERF`). 캡처처럼 선명하게 고정하려면 `?dpr=2`
 - WebGL 컨텍스트가 끊기면(사파리가 오래 둔 탭에서 거둬 감) 안내를 띄우고 복구, 4초 안에 안 되면 새로고침한다(`scene.js`)

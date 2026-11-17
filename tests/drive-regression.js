@@ -556,12 +556,16 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       fresh(0); D.cruise = 0; let t = 0; while(D.v < 100/3.6 - .01 && t < 30){ keys(0, 0, 1); stepPlayer(dt); t += dt; } o.t100 = +t.toFixed(1);
       fresh(65/3.6); const z0 = D.z; t = 0; while(D.v > .01 && t < 10){ keys(0, 0, 0, 1); stepPlayer(dt); t += dt; } o.stop65 = +(z0 - D.z).toFixed(1);
       fresh(65/3.6); for(let k = 0; k < 18; k++){ keys(0, 0, 0, 1); stepPlayer(dt); } o.tapBrake = +((65/3.6 - D.v)*3.6).toFixed(1);
-      // 조작 보조(VEH.assist, 2026-11-17 저녁): 켜면 ① 떼었을 때 핸들이 금방 가운데로 ② 키 한 번(옆으로 1.2m 갈 때까지 누르고 뗌)으로 옆 차로에 곧게 섬 ③ 누르고 있는 동안 닿는 각도는 그대로 ④ 교차로 안(도로 방향 모름)에서는 방향 맞춤 없음
+      /* 조작 보조(VEH.assist, 2026-11-17 밤 — 2차 실험 때의 조작 느낌): 누르면 0.55초에 끝 각도 · 떼면 0.33초에 가운데(일정한 빠르기),
+         핸들이 스스로 움직이지 않음(떼고 나면 방향이 틀어져 있어도 0에 그대로), 2차 조작 식(입력 × 옆 가속 3.2 한도, 요 속도 = v/L·tan)과 같은 궤적 */
       VEH.assist.on = true;
-      { const b100 = press(100, 1); o.as = {sw100:+b100[b100.length - 1].toFixed(1)};
-        fresh(20/3.6); for(let k = 0; k < 60; k++){ keys(0, 1); D.v = 20/3.6; stepPlayer(dt); } const pk = D.sw; D.roadPsi = null; let tt = null; for(let k = 0; k < 240; k++){ keys(); D.v = 20/3.6; stepPlayer(dt); if(tt === null && D.sw < pk*.1) tt = (k + 1)*dt; } o.as.t10 = +tt.toFixed(2); o.as.noAlignSw = +D.sw.toFixed(2); o.as.noAlignPsi = +(D.psi*180/Math.PI).toFixed(1);
-        const one = (kmh, on) => { VEH.assist.on = on; fresh(kmh/3.6); D.roadPsi = 0; let rel = false; for(let k = 0; k < 60*8; k++){ if(!rel && D.x > 1.2) rel = true; keys(0, !rel); D.v = kmh/3.6; stepPlayer(dt); } return {x:+D.x.toFixed(2), psi:+(D.psi*180/Math.PI).toFixed(2)}; };
-        o.as.one100 = one(100, true); o.as.one65 = one(65, true); o.as.off100 = one(100, false); VEH.assist.on = true; }
+      { const A = VEH.assist, run = (kmh, pressS, totalS, old) => { fresh(kmh/3.6); const v = kmh/3.6; let st = 0, tr = []; for(let k = 0; k < totalS*60; k++){ const on = k < pressS*60; keys(0, on); D.v = v;
+            if(old){ const rate = on ? 1.8 : 3; st += clamp((on ? 1 : 0) - st, -rate*dt, rate*dt); const dMax = Math.min(.5, Math.atan(3.2*VEH.L/Math.max(v*v, .01))); D.psi += v/VEH.L*Math.tan(st*dMax)*dt; D.x += Math.sin(D.psi)*v*dt; D.z -= Math.cos(D.psi)*v*dt; tr.push(st); }
+            else { stepPlayer(dt); tr.push(D.sw); } }
+          return {tr, x:D.x, psi:D.psi*180/Math.PI}; };
+        const a = run(50, 1, 4, false), hold = swForCurv(Infinity, 50/3.6, tabAt(A.ayHold, 50/3.6)), tUp = (a.tr.findIndex(q => q >= hold*.999) + 1)*dt, tDown = (a.tr.slice(60).findIndex(q => q <= 1e-6) + 1)*dt;
+        const after = a.tr.slice(60 + Math.round(.4*60)), o2 = run(50, 1, 4, true), n100 = run(100, .6, 4, false), o100 = run(100, .6, 4, true);
+        o.as = {tUp:+tUp.toFixed(2), tDown:+tDown.toFixed(2), selfMove:+Math.max(...after.map(Math.abs)).toFixed(3), psiLeft:+a.psi.toFixed(1), x50:[+a.x.toFixed(1), +o2.x.toFixed(1)], psi50:[+a.psi.toFixed(1), +o2.psi.toFixed(1)], x100:[+n100.x.toFixed(1), +o100.x.toFixed(1)]}; }
       keys(); stopDrive(); S.testing = false;
       // 키 배치는 그대로: 방향키 4개 · Q · E
       S.testing = true; S.drive = true; const ev = (type, key, code) => dispatchEvent(new KeyboardEvent(type, {key, code, bubbles:true, cancelable:true}));
@@ -569,13 +573,43 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       o.keys = dn.left && dn.up && !dn.right && !dn.down && dn2.right && dn2.down && !dn2.left && !Object.values(KEYS).some(Boolean); S.testing = false; S.drive = false; setMode('ar3'); goHome();
       o.veh = {L:VEH.L, ratio:VEH.ratio, lock:VEH.lock, wheelMax:+(VEH.lock/VEH.ratio).toFixed(1)};
       return o; });
-    check('조작 보조: 켜면 키 한 번으로 옆 차로에 곧게 서고(100km/h 옆 3.5m 안팎 · 65km/h 옆 차로 폭 안 · 방향 0.5° 안), 끄면 그대로 비스듬히 계속 감. 떼면 핸들이 0.6초 안에 10% 아래. 누르고 있을 때 닿는 각도는 그대로, 교차로 안에서는 방향을 안 건드림', Math.abs(h.as.one100.x - 3.5) < .9 && Math.abs(h.as.one100.psi) < .5 && h.as.one65.x > 1.75 && h.as.one65.x < 5.25 && Math.abs(h.as.one65.psi) < .5 && h.as.off100.x > 8 && h.as.t10 < .6 && Math.abs(h.as.sw100 - h.sw100) < 1.5 && Math.abs(h.as.noAlignSw) < .5 && Math.abs(h.as.noAlignPsi) > 20, JSON.stringify(h.as));
+    check('조작 보조(2차 조작 느낌): 누르면 0.55초에 끝 각도 · 떼면 0.33초에 가운데, 뗀 뒤에는 방향이 틀어져 있어도 핸들이 스스로 안 움직임(0 그대로), 50km/h 1초 누름의 궤적이 2차 조작 식과 5% 안으로 같음(100km/h는 옆 가속 2.6이라 2차보다 덜 꺾임)', Math.abs(h.as.tUp - .56) < .04 && Math.abs(h.as.tDown - .34) < .04 && h.as.selfMove === 0 && Math.abs(h.as.psiLeft) > 5 && Math.abs(h.as.x50[0] - h.as.x50[1]) < Math.abs(h.as.x50[1])*.05 + .2 && Math.abs(h.as.psi50[0] - h.as.psi50[1]) < Math.abs(h.as.psi50[1])*.05 + .3 && h.as.x100[0] < h.as.x100[1] && h.as.x100[0] > h.as.x100[1]*.7, JSON.stringify(h.as));
     check('조작감: 핸들 각도와 앞바퀴 각을 따로 계산(앞바퀴 = 핸들 ÷ 기어비 12.7) · 화면 속 핸들이 실제 핸들 각도 그대로 돎', h.wheelLink && Math.abs(h.wheelImg - h.swNow) < .11 && h.swNow > 20 && h.veh.ratio === 12.7 && h.veh.lock === 446, JSON.stringify({img:h.wheelImg, sw:h.swNow, veh:h.veh}));
     check('조작감(보조 끔 = 실제 값): 키를 누르고 있는 동안 핸들이 점점 돌아가고(누른 직후는 느리게), 빠를수록 같은 입력에 덜 돎 — 1초 누름 100km/h 수 도 · 20km/h 150° 넘게, 톡 누르면(0.15초) 1° 안', h.grows && h.sw100 > 5 && h.sw100 < 14 && h.sw20 > 150 && h.tap100 < 1, JSON.stringify({sw100:h.sw100, sw20:h.sw20, tap100:h.tap100}));
     check('조작감(보조 끔 = 실제 값): 키를 떼면 핸들이 끊기지 않고 가운데로(매 프레임 줄어듦 · 한 프레임에 3% 넘게 안 뜀 · 2.5초 안에 10% 아래)', h.ret.mono && h.ret.maxStepPct < 3 && h.ret.t10 < 2.5 && h.ret.t10 > .8 && Math.abs(h.ret.end) < 2, JSON.stringify(h.ret));
     check('조작감: 같은 핸들 각도에 100km/h는 30km/h보다 덜 꺾임(곡률 비 0.4 ~ 0.6, 언더스티어)', h.gain > .4 && h.gain < .6, `${h.gain}`);
     check('조작감: ↑ 0 → 100km/h 10.3초 안팎(아반떼 1.6 실측 10.27초) · ↓ 계속 누르면 65km/h에서 20 ~ 25m에 섬(예전 7m/s² 고정 23m와 비슷) · 0.3초 톡 누르면 5km/h 안 줄어듦', Math.abs(h.t100 - 10.3) < .5 && h.stop65 > 20 && h.stop65 < 25 && h.tapBrake < 5, JSON.stringify({t100:h.t100, stop65:h.stop65, tapBrake:h.tapBrake}));
     check('조작감: 키 배치 그대로(← → ↑ ↓)', h.keys, '');
+  }
+
+  /* ---------- 10-1. 2026-11-17 밤: ⑤ 보행자 시작을 내 차 위치에 맞춤 · 차로 변경 때 미니 도로가 한 번에 매끄럽게 ---------- */
+  {
+    const r = await E(() => { const o = {};
+      const m = mapById('CRT'), leaf = m.leaves.findIndex(l => l.dest === '종합병원');
+      // 일찍 닿는 경우(순항 100km/h로 버스를 지나쳐 감)와 보통(50km/h) 모두: 횡단보도 45m 앞에 왔을 때 건너려 하거나 건너는 사람이 있어야 함
+      const one = (cruise, seed) => { let before = null, trig = null, near = null, hud = null;
+        runDrive({map:m, leaf, lane:1, type:'city', jam:0, seed, sigT:0}, {hud:'ar3', secs:40, ap:{},
+          setup:() => { D.cruise = cruise; D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); before = !!(S.pedPlan && S.pedPlan.pending) && pedsAt(0).length === 0; },
+          sample:() => { if(trig === null && S.pedPlan && !S.pedPlan.pending) trig = {t:+D.t.toFixed(2), z:+D.z.toFixed(0), t0:S.pedPlan.map(p => +(p.t0 - D.t).toFixed(1))};
+            if(near === null && D.z < CZ.near + 30){ near = pedsAt(D.t).filter(p => p.phase !== 'done').length; hud = S.H3 ? S.H3.state : null; } }});
+        const ev = D.events.filter(e => e.type === 'peds').length; return {before, trig, near, hud, ev}; };
+      o.fast = one(27.8, 777); o.norm = one(13.9, 778);
+      // 미니 도로 좌우 기준: 차가 차로 가운데에서 옆 차로 가운데까지 일정하게 옮겨 갈 때 한 방향으로만 · 한 프레임에 조금씩만 움직이고, 가운데 ±0.5m 안에서는 안 움직임
+      const mm = mapById('ICR'); runDrive({map:mm, leaf:mm.leaves.findIndex(l => l.dest === '용인·기흥'), lane:1, type:'rear', jam:0, seed:777, sigT:0}, {hud:'ar3', secs:1, keep:true, ap:{}});
+      const x0 = mm.laneX(1), xs = []; D.frozen = true; let t = D.t;
+      for(let k = 0; k < 60; k++){ D.x = x0; D.psi = 0; D.t = t += 1/60; update(0); }   // 먼저 차로 가운데에 자리 잡게
+      for(let k = 0; k <= 240; k++){ D.x = x0 + LANE*k/240; D.psi = 0; D.t = t += 1/60; update(0); xs.push(VIEW3.ax); }
+      for(let k = 0; k < 60; k++){ D.t = t += 1/60; update(0); } xs.push(VIEW3.ax);
+      const steps = xs.slice(1).map((v, i) => v - xs[i]); o.view = {mono:steps.every(d => d >= -1e-6), maxStep:+Math.max(...steps).toFixed(3), still:+(xs[30] - xs[0]).toFixed(3), end:+(xs[xs.length - 1] - mm.laneX(2)).toFixed(2), mid:+(xs[120] - x0).toFixed(2), ego:Math.abs(VIEW3.ex - VIEW3.ax) < 1e-9};
+      // 충돌 판정: 내 차가 우회전하며 72° 틀어져 서 있고 버스가 7.9m 옆을 곧게 지나감 → 충돌 아님. 같은 버스가 내 차 꼬리에 닿으면 충돌. 나란한 앞차는 예전 식과 같은 거리에서 충돌
+      { const m5 = mapById('CRT'); runDrive({map:m5, leaf:m5.leaves.findIndex(l => l.dest === '종합병원'), lane:1, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', secs:1, keep:true, ap:{}}); S.pedPlan = [];
+        const keep = D.cars; const mk = (x, z, kind, len, w) => ({x, z, tx:0, tz:-1, kind, len, w, mesh:{userData:{L:len, W:w}}});
+        const bus = mk(3.5, -241.1, 'bus', 11.4, 2.5); D.cars = [bus]; D.x = 11.4; D.z = -241.7; D.psi = 72*Math.PI/180; o.hit = {far:hit()};
+        bus.x = 8.2; o.hit.touch = hit(); D.psi = 0; D.x = 0; D.z = -100; const car = mk(0, -104.4, 'rear', 4.6, 1.85); D.cars = [car]; o.hit.gap = hit(); car.z = -104.3; o.hit.alignedHit = hit(); car.z = -100; car.x = 1.75; o.hit.side = hit(); car.x = 1.65; o.hit.sideHit = hit(); D.cars = keep; }
+      stopDrive(); S.testing = false; goHome(); return o; });
+    check('충돌 판정: 두 차를 각자 방향의 직사각형으로 — 비스듬히 선 내 차 옆 7.9m를 곧게 지나가는 버스는 충돌 아님 · 꼬리에 닿으면 충돌 · 나란한 차는 예전과 같은 거리(앞뒤 4.35m · 옆 1.70m)에서 충돌', r.hit.far === '' && /버스/.test(r.hit.touch) && r.hit.gap === '' && /앞을 받음/.test(r.hit.alignedHit) && r.hit.side === '' && /옆/.test(r.hit.sideHit), JSON.stringify(r.hit));
+    check('⑤ 보행자: 건너기 시작은 내 차가 교차로 70m 앞에 온 순간부터(첫 사람 2 ~ 4.5초 뒤) — 100km/h로 일찍 닿아도 50km/h로 닿아도 교차로 30m 앞에서 건너려 하거나 건너는 사람이 있고 리뉴얼 HUD가 06 앞쪽 위험, 기록에 이벤트 1줄', [r.fast, r.norm].every(q => q.before && q.trig && q.trig.t0[0] >= 1.9 && q.trig.t0[0] <= 4.6 && q.near >= 1 && q.hud === 6 && q.ev === 1), JSON.stringify(r.fast) + ' / ' + JSON.stringify(r.norm));
+    check('3차 미니 도로: 차로를 옮기는 동안 좌우 기준이 한 방향으로 매끄럽게(프레임당 0.05m 아래) 넘어가고, 차로 가운데 0.5m 안에서는 안 움직이며, 옆 차로 가운데에 정확히 닿음. 내 차 아이콘은 늘 그 기준 자리', r.view.mono && r.view.maxStep < .05 && Math.abs(r.view.still) < 1e-6 && Math.abs(r.view.end) < .02 && r.view.ego, JSON.stringify(r.view));
   }
 
   /* ---------- 11. 그래픽 에셋 (2026-11-17, 3회차 MVP 작업 3): 나무 · 가로등 · 가드레일 기둥(Blender) · 보행자(Higgsfield + 리깅) · 차량 압축 ---------- */

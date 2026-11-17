@@ -358,10 +358,15 @@ function buildMapScene(m){
   [m, ...m.segs.filter(e => e.node).map(e => e.node)].forEach(nd => nd.exits.forEach(e => sibs.set(e, nd.exits.filter(f => f !== e))));
   const sepU = (e, side) => {   // 출구 e의 side(−1 왼쪽 · 1 오른쪽) 포장 가장자리가 형제 출구 포장에서 떨어지는 u
     const L = e.vis.getLength(), fs = sibs.get(e) || [];
-    for(let i = 0; i <= 400; i++){ const u = i/400, p = e.vis.getPointAt(u), t = e.vis.getTangentAt(u), l = Math.hypot(t.x, t.z) || 1, x = p.x - t.z/l*side*(e.half + .3), z = p.z + t.x/l*side*(e.half + .3);
-      if(fs.every(f => { let d2 = Infinity; for(const q of samp(f)){ const dd = (q.x - x)**2 + (q.z - z)**2; if(dd < d2) d2 = dd; } return Math.sqrt(d2) > f.half + .1; })) return u; if(u*L > 160) return u; }
-    return 1;
+    // 2026-11-17 밤: '처음으로 떨어진 곳'이 아니라 '마지막으로 겹친 곳 다음' — ③의 두 번째 갈림처럼 두 출구가 같은 자리에서 시작하면 시작점에서는 가장자리가 형제 포장 바로 밖이라
+    // 0을 돌려줬고, 그 뒤 형제 출구가 휘어 들어오며 띠 · 선이 형제 노면을 가로질렀다(사용자: '갈림길에서 선이 난잡')
+    let last = -1;
+    for(let i = 0; i <= 400; i++){ const u = i/400; if(u*L > 160) break; const p = e.vis.getPointAt(u), t = e.vis.getTangentAt(u), l = Math.hypot(t.x, t.z) || 1, x = p.x - t.z/l*side*(e.half + .3), z = p.z + t.x/l*side*(e.half + .3);
+      if(!fs.every(f => { let d2 = Infinity; for(const q of samp(f)){ const dd = (q.x - x)**2 + (q.z - z)**2; if(dd < d2) d2 = dd; } return Math.sqrt(d2) > f.half + .1; })) last = i; }
+    return Math.min(1, (last + 1)/400);
   };
+  // 형제 출구와 같은 자리에서 시작하나(한 차로가 둘로 갈라지는 갈림) — 그러면 안쪽 가장자리 실선도 두 포장이 떨어진 곳부터 긋는다
+  const sameStart = e => (sibs.get(e) || []).some(f => { const a = e.vis.getPointAt(0), b = f.vis.getPointAt(0); return Math.hypot(a.x - b.x, a.z - b.z) < 1; });
 
   /* 도로까지 거리 → 지형 높이 */
   const BUCKET = 70, buckets = new Map();
@@ -417,7 +422,8 @@ function buildMapScene(m){
     for(const s of [-1,1]){ const u0 = (s < 0 ? e.outerL : e.outerR) ? 0 : sepU(e, s); if(u0 < 1) addMesh(fillRibbon(ribbonGeo(300), c, u0, 1, s*(e.half + .05), s*(e.half + .5), .006 + e.layer*.002), PROPS.concrete); }
     // 가장자리 실선(폭 .16): 본선 가장자리 선과 같은 차로 끝 + .15 (2026-11-07 D108 — 예전 + .5는 본선 선과 0.35m 어긋나 갈림에서 두 겹으로 보였음).
     // 갈림 안쪽 선은 u = 0(차로 경계 ± .075)부터 바깥쪽으로 .15까지 10m에 걸쳐 벌어져 두 출구의 선이 V자를 이룸(예전엔 30m 뒤부터 갑자기 시작)
-    for(const [sgn, outer] of [[-1, e.outerL], [1, e.outerR]]) addMesh(fillRibbonFn(ribbonGeo(300), c, 0, 1, u => { const o = outer ? hw + .15 : hw + .075 + .075*clamp(u*Lv/10); return [sgn*(o - .08), sgn*(o + .08)]; }, .013), paint);
+    for(const [sgn, outer] of [[-1, e.outerL], [1, e.outerR]]){ const split = !outer && sameStart(e), u0 = split ? sepU(e, sgn) : 0; if(u0 >= 1) continue;
+      addMesh(fillRibbonFn(ribbonGeo(300), c, u0, 1, u => { const o = outer || split ? hw + .15 : hw + .075 + .075*clamp(u*Lv/10); return [sgn*(o - .08), sgn*(o + .08)]; }, .013), paint); }
     for(let i=1;i<e.k;i++){
       const off = -hw + i*LANE;
       for(let s=8; s<Lv-3; s+=9){

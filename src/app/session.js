@@ -293,7 +293,7 @@ const sumCells = (rows, qs) => HUDS_IN(rows).flatMap(h => [null, '고속도로 �
   return [modeName(h), k || '전체', s.n, s.rate ?? '', s.wrong, s.crash, s.risky, s.sig, s.ped, s.off, r1(s.margin), s.react === null ? '' : Math.round(s.react*100)/100, k ? '' : r1(s.sure), s.waitMoves ?? '', k ? '' : (summarize(rows, h, qs).waitOk || '')]; }));
 const Q_HEAD = ['참가자','HUD','질문','답 (1 전혀 ~ 5 매우)','질문 2','답 2','HUD 버전','제시 순서'];
 const qCells = q => [q.p, modeName(q.hud), Q_TEXT, q.rate, q.wait ? (q.q2 || Q2_TEXT) : '', q.wait ? `${'ABCD'[q.wait - 1]} ${q.waitText}` : '', q.ver ?? '', orderText(q.order)];
-const EV_NAME = {h3:'리뉴얼 HUD 상태', gate:'판단 상태', hazardOn:'위험 발생', hazardOff:'위험 해소', lcStart:'차로 변경 시작', lcDone:'차로 변경 완료', lcAbort:'차로 변경 취소', cutIn:'옆 차로 진입', crash:'충돌', blink:'깜빡이', blinkResp:'뒤차 반응'};
+const EV_NAME = {h3:'리뉴얼 HUD 상태', gate:'판단 상태', hazardOn:'위험 발생', hazardOff:'위험 해소', lcStart:'차로 변경 시작', lcDone:'차로 변경 완료', lcAbort:'차로 변경 취소', cutIn:'옆 차로 진입', crash:'충돌', blink:'깜빡이', blinkResp:'뒤차 반응', peds:'보행자 건너기 시작 시각 정함'};
 const GATE_NAME = {none:'없음', wait:'대기', clearing:'확인', go:'이동'};
 const EV_HEAD = ['참가자','HUD','시나리오 ID','판 순서','시각 (초)','이벤트','내용'];
 const evDetail = e => e.type === 'h3' ? `${h3Label(e.from)} → ${h3Label(e.to)}${e.shown ? '' : ' (화면에 안 보임)'}` : e.type === 'gate' ? `${GATE_NAME[e.from]} → ${GATE_NAME[e.to]}${e.rel ? ' · 이유 ' + ({rear:'뒤차', side:'옆 차', front:'앞 간격'})[e.rel] : ''}${e.side ? ' · ' + (e.side > 0 ? '오른쪽' : '왼쪽') : ''}${e.shown ? '' : ' (화면에 안 보임)'}`
@@ -343,16 +343,7 @@ function exportBook(rows, name, qs = [], prs = []){
   }
   download('﻿' + sheets.map(([, aoa]) => toCsv(aoa)).join('\n\n'), name + '.csv', 'text/csv;charset=utf-8'); return false;
 }
-// 예전 클릭 판단 테스트 기록(6주까지) — 새 기록과 섞지 않고 따로 CSV로
-function oldCsv(){
-  const jamName = j => ({0:'없음',1:'보통',2:'심함'})[j] ?? '-', rows = [['참가자','HUD','시간대','맵','상황','정답','선택','선택지 수','결과','판단시간(초)','기록시각']];
-  loadArr(OLD_KEY).forEach(t => {
-    const dg = t.type === 'danger';
-    rows.push([t.p, modeName(t.mode), t.light === 'night' ? '야간' : '주간', mapLabel(t.map), dg ? '뒤차' : jamName(t.jam), dg ? (t.rearDanger ? '대기' : '이동') : KEY_WORD[t.target],
-      dg ? (t.choice === 'wait' ? '대기' : '이동') : KEY_WORD[t.choice], t.n, t.correct ? '정답' : '오답', (t.ms/1000).toFixed(3), t.at]);
-  });
-  return rows;
-}
+// 예전 클릭 판단 테스트 기록(6주까지, localStorage 'hud-mvp-trials-v2')을 CSV로 내보내던 버튼은 2026-11-17에 없앰(사용자: 안 씀). 브라우저에 남은 그 기록은 건드리지 않는다
 
 /* ---------- 기록 서랍 ---------- */
 function renderLog(){
@@ -364,12 +355,10 @@ function renderLog(){
   }).join('');
   $('#summary').innerHTML = HUDS_IN(drives).map(h => { const s = summarize(drives, h);
     return `<div><strong>${modeShort(h)}</strong>${s.n}판 · 성공 <em>${s.rate === null ? '-' : s.rate + '%'}</em><br>위험 <em>${s.risky}</em> · 충돌 <em>${s.crash}</em></div>`; }).join('');
-  $('#oldCsv').hidden = !loadArr(OLD_KEY).length;
 }
 $('#logBtn').onclick = () => $('#drawer').classList.toggle('open');
 $('#closeDrawer').onclick = () => $('#drawer').classList.remove('open');
 $('#allXlsx').onclick = () => exportBook(drives, `주행테스트_전체_${today()}`, surveys, practices);
-$('#oldCsv').onclick = () => download('﻿' + toCsv(oldCsv()), `판단테스트_클릭기록_${today()}.csv`, 'text/csv;charset=utf-8');
 $('#clearLog').onclick = () => { if(confirm('주행 테스트 기록을 모두 지울까요? (연습 · 예전 클릭 기록은 그대로)')){ drives = []; surveys = []; saveArr(DKEY, drives); saveArr(QKEY, surveys); renderLog(); } };
 
 /* ---------- 방향키 · 단축키 ---------- */
