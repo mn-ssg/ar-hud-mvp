@@ -70,6 +70,8 @@
 #arHud3 .c-slot{ fill:var(--h2-route); fill-opacity:.2; stroke:var(--h2-route); stroke-width:var(--h2-w1); stroke-linejoin:round; }
 #arHud3 .c-queue{ fill:none; stroke:var(--h2-warn); stroke-width:calc(var(--h2-w1)*1.4); stroke-linejoin:round; }
 #arHud3 .c-stop{ fill:var(--h2-warn); }
+#arHud3 .c-zebra{ fill:var(--h2-neutral); fill-opacity:calc(var(--h2-op-ctx)*1.5); }
+#arHud3 .c-zebra-hot{ fill:var(--h2-warn); fill-opacity:.9; }
 #arHud3 .c-frontband{ fill:var(--h2-warn); }
 #arHud3 .c-flow{ fill:var(--h2-neutral); }
 #arHud3 .c-car{ stroke-width:2.4; stroke-linejoin:round; }

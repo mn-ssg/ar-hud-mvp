@@ -61,7 +61,7 @@ const grow3 = (S, k) => poly3(S.pts.map(q => [S.c[0] + (q[0] - S.c[0])*k, S.c[1]
    미니 도로와 똑같은 가상 카메라(장면 카메라의 방향 · 화각, 자리만 뒤 · 위)로 #hudCars 캔버스에 그린다. 카메라의 보는 범위를 HUD 상자만큼만 잘라(setViewOffset) 상자 좌표와 1:1.
    빛으로 그린 그림처럼: 면은 상태 색, 가장자리(보는 방향과 비스듬한 곳)는 더 밝게, 유리 · 타이어는 어둡게(= 비쳐 보임). 등은 차체와 같은 색으로 더 밝게 — 빨강 · 주황을 장식으로 쓰지 않는다.
    모델을 못 불러오면 SVG 상자 아이콘이 그대로 보인다 */
-const CAR3 = {ready:false, r:null, cam:null, scene:null, parts:null, pool:[], n:0, size:[4.71, 1.82, 1.435], w:0, h:0, pr:0};
+const CAR3 = {ready:false, r:null, cam:null, scene:null, models:{}, size:[4.71, 1.82, 1.435], w:0, h:0, pr:0};
 const CAR3_PART = {body:[1, 1], glass:[.1, .9], lamp_tail:[1.7, .6], lamp_head:[1.5, .6], tire:[.14, .45], rim:[.5, .7]};   // 재질 이름 → [면 밝기, 가장자리 빛]
 const CAR3_VERT = 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix*vec4(position, 1.0); vN = normalMatrix*normal; vV = -mv.xyz; gl_Position = projectionMatrix*mv; }';
 const CAR3_FRAG = `uniform vec3 uCol; uniform float uA, uFill, uRim, uOut; varying vec3 vN; varying vec3 vV;
@@ -72,27 +72,31 @@ const CAR3_FRAG = `uniform vec3 uCol; uniform float uA, uFill, uRim, uOut; varyi
   if(!HUD3.carModel || !THREE.GLTFLoader) return;
   try{ CAR3.r = new THREE.WebGLRenderer({canvas:$('#hudCars'), alpha:true, antialias:true, premultipliedAlpha:true}); }catch(e){ console.warn('HUD 차 아이콘 층을 만들지 못함 → 상자 아이콘', e); return; }
   CAR3.r.setClearColor(0x000000, 0); CAR3.scene = new THREE.Scene(); CAR3.cam = new THREE.PerspectiveCamera(58, 1, 5, 800);
-  new THREE.GLTFLoader().load(HUD3.carModel, g => {
+  const load = (url, key, done) => new THREE.GLTFLoader().load(url, g => {
     const parts = []; g.scene.updateMatrixWorld(true);
     g.scene.traverse(o => { if(o.isMesh){ const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); parts.push({geo, name:o.material.name}); } });
-    const box = new THREE.Box3().setFromObject(g.scene), sz = box.getSize(new THREE.Vector3()); CAR3.size = [sz.z, sz.x, sz.y];
-    CAR3.parts = parts; CAR3.ready = true; $('#arHud3').classList.add('model');
-  }, undefined, () => console.warn('HUD 차 모델을 못 불러옴 → 상자 아이콘'));
+    const sz = new THREE.Box3().setFromObject(g.scene).getSize(new THREE.Vector3());
+    CAR3.models[key] = {parts, size:[sz.z, sz.x, sz.y], pool:[], n:0}; if(done) done(sz);
+  }, undefined, () => console.warn('HUD 모델을 못 불러옴:', url));
+  load(HUD3.carModel, 'car', sz => { CAR3.size = [sz.z, sz.x, sz.y]; CAR3.ready = true; $('#arHud3').classList.add('model'); });
+  if(HUD3.pedModel) load(HUD3.pedModel, 'ped');   // 보행자: 걷는 자세 한 명(assets/blender/hud_ped.py)
 })();
-// 차 한 대 놓기: 자리 (x, z) · 앞 방향 (fx, fz) · 길이 L · 폭 W · 축척 k · 색 · 밝기 a · out = 1이면 테두리만(정체 줄 차)
-function car3Put(x, z, fx, fz, L, W, k, col, a, out = 0){
-  if(!CAR3.ready || a <= .004) return;
-  let g = CAR3.pool[CAR3.n];
+// 모델 하나 놓기: key 'car' · 'ped', 자리 (x, z) · 앞 방향 (fx, fz) · 축척 (sx 옆, sy 높이, sz 앞뒤) · 색 · 밝기 a · out = 1이면 테두리만(정체 줄 차)
+function mdl3Put(key, x, z, fx, fz, sx, sy, sz, col, a, out = 0){
+  const M = CAR3.models[key]; if(!CAR3.ready || !M || a <= .004) return false;
+  let g = M.pool[M.n];
   if(!g){ g = new THREE.Group();
-    g.userData.mats = CAR3.parts.map(pt => { const P = CAR3_PART[pt.name] || [1, 1], m = new THREE.ShaderMaterial({uniforms:{uCol:{value:new THREE.Color()}, uA:{value:1}, uFill:{value:P[0]}, uRim:{value:P[1]}, uOut:{value:0}}, vertexShader:CAR3_VERT, fragmentShader:CAR3_FRAG}); g.add(new THREE.Mesh(pt.geo, m)); return m; });
-    CAR3.scene.add(g); CAR3.pool.push(g); }
-  CAR3.n++; g.visible = true; g.position.set(x, 0, z); g.rotation.y = Math.atan2(-fx, -fz); g.scale.set(W*k/CAR3.size[1], k, L*k/CAR3.size[0]);
+    g.userData.mats = M.parts.map(pt => { const P = CAR3_PART[pt.name] || [1, 1], m = new THREE.ShaderMaterial({uniforms:{uCol:{value:new THREE.Color()}, uA:{value:1}, uFill:{value:P[0]}, uRim:{value:P[1]}, uOut:{value:0}}, vertexShader:CAR3_VERT, fragmentShader:CAR3_FRAG, side:THREE.DoubleSide}); g.add(new THREE.Mesh(pt.geo, m)); return m; });
+    CAR3.scene.add(g); M.pool.push(g); }
+  M.n++; g.visible = true; g.position.set(x, 0, z); g.rotation.y = Math.atan2(-fx, -fz); g.scale.set(sx, sy, sz);
   g.userData.mats.forEach(m => { m.uniforms.uCol.value.set(col); m.uniforms.uA.value = a; m.uniforms.uOut.value = out; });
+  return true;
 }
+// 차 한 대: 길이 L · 폭 W · 축척 k
+const car3Put = (x, z, fx, fz, L, W, k, col, a, out = 0) => mdl3Put('car', x, z, fx, fz, W*k/CAR3.size[1], k, L*k/CAR3.size[0], col, a, out);
 function car3Render(){
   if(!CAR3.ready) return;
-  for(let i = CAR3.n; i < CAR3.pool.length; i++) CAR3.pool[i].visible = false;
-  CAR3.n = 0;
+  Object.values(CAR3.models).forEach(M => { for(let i = M.n; i < M.pool.length; i++) M.pool[i].visible = false; M.n = 0; });
   const L = LAY, r = CAR3.r, c = CAR3.cam, V = HUD3.view, pr = Math.min(window.devicePixelRatio || 1, 2), w = Math.round(L.hud.w), h = Math.round(L.hud.h);
   if(w !== CAR3.w || h !== CAR3.h || pr !== CAR3.pr){ r.setPixelRatio(pr); r.setSize(w, h, false); CAR3.w = w; CAR3.h = h; CAR3.pr = pr; }
   const f = _p3.f.set(0, 0, -1).applyQuaternion(camera.quaternion), hl = Math.hypot(f.x, f.z) || 1;
@@ -118,12 +122,35 @@ function gframe3(proj, xa, xb, z0, z1, dashed){
   return d;
 }
 
+/* 띠 그리기 — hud.js strip · bandX · lineX · lineC와 같은 일을 하되, 투영 범위 밖(카메라 뒤 · 너무 먼 곳)으로 나간 점에서 띠를 **끊는다**.
+   (hud.js strip은 빠진 점을 건너뛰고 남은 점끼리 이어 버려서, 교차로에서 돌 때 지나온 도로의 선이 엉뚱한 점과 이어져 미니 도로가 뒤틀려 보였다 — 2026-11-17 사용자 지적, ⑤ 우회전) */
+function strip3(L, R){
+  let d = '', a = [], b = [];
+  const flush = () => { if(a.length > 1) d += 'M' + a.map(fmt).join('L') + 'L' + b.slice().reverse().map(fmt).join('L') + 'Z'; a = []; b = []; };
+  L.forEach((q, i) => { if(q && R[i]){ a.push(q); b.push(R[i]); } else flush(); }); flush();
+  return d;
+}
+const band3 = (x0, x1, z0, z1, proj, step = 4) => { const L = [], R = []; for(let z = z0; z > z1; z -= step){ L.push(proj(x0, z)); R.push(proj(x1, z)); } L.push(proj(x0, z1)); R.push(proj(x1, z1)); return strip3(L, R); };
+const line3 = (x, z0, z1, hw, proj) => band3(x - hw, x + hw, z0, z1, proj);
+const line3C = (c, u0, u1, off, hw, proj, n = 40) => strip3(offsetPts(c, u0, u1, off - hw, proj, n), offsetPts(c, u0, u1, off + hw, proj, n));
+// 들어갈 차로 한 줄 띠 — hud2.js laneRibbon과 같은 모양(본선 구간 + 갈림 뒤 경로, 끝 18m는 뾰족하게), 끊김만 strip3로
+function laneRibbon3(zNear, onMain, offFn, proj){
+  const R = S.route, tx = R.tx, bc = R.afterCurve, L = R.afterL, bh = R.leaf.path[0].road ? 1.75 : R.leaf.path[0].k === 1 ? 2.3 : 1.75;
+  const lastS = path.nodeS[path.nodeS.length - 1], bu = clamp((lastS + ROUTE_END - path.nodeS[0])/L), A = [], B = [];
+  if(onMain) for(let z = zNear; z > FORK_Z; z -= 2){ const [o1, o2] = offFn(1.75); A.push(proj(tx + o1, z)); B.push(proj(tx + o2, z)); }
+  const u0 = Math.min(bu, clamp((S.s - path.nodeS[0] - 8)/L)), n = Math.max(24, Math.ceil((bu - u0)*L/2));   // 갈림을 지난 뒤에는 내 차 뒤 8m부터만 — 지나온 회전 구간이 차 뒤로 갈고리처럼 남지 않게
+  for(let i = 0; i <= n; i++){ const u = u0 + (bu - u0)*i/n, s = u*L, q = bc.getPointAt(u), t = bc.getTangentAt(u), l = Math.hypot(t.x, t.z) || 1, nx = -t.z/l, nz = t.x/l;
+    const f = clamp((bu*L - s)/18), [o1, o2] = offFn(1.75 + (bh - 1.75)*clamp(s/20)).map(o => o*f);
+    A.push(proj(q.x + nx*o1, q.z + nz*o1)); B.push(proj(q.x + nx*o2, q.z + nz*o2)); }
+  return strip3(A, B);
+}
+
 /* ---------- 상태 ---------- */
 const C3 = {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1};
 function resetHud3(){
   Object.assign(C3, {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1});
   S.H3 = null;
-  ['cSurf', 'cLaneFill', 'cEdges', 'cDash', 'cRails', 'cSolid', 'cGate', 'cSlot', 'cQueue', 'cStop', 'cPed', 'cFrontBand', 'cLead', 'cLeadGlass', 'cDistBand', 'cFlow', 'cAhead', 'cGap', 'cGapLine', 'cTrail1', 'cTrail2', 'cRing1', 'cRing2', 'cRear', 'cRearGlass', 'cEgo', 'cEgoGlass', 'cDots'].forEach(id => $('#' + id).setAttribute('d', ''));
+  ['cSurf', 'cLaneFill', 'cEdges', 'cDash', 'cRails', 'cSolid', 'cGate', 'cSlot', 'cQueue', 'cStop', 'cPed', 'cFrontBand', 'cLead', 'cLeadGlass', 'cDistBand', 'cFlow', 'cAhead', 'cGap', 'cGapLine', 'cZebra', 'cZebraHot', 'cTrail1', 'cTrail2', 'cRing1', 'cRing2', 'cRear', 'cRearGlass', 'cEgo', 'cEgoGlass', 'cDots'].forEach(id => $('#' + id).setAttribute('d', ''));
   $$('#cChev path, #cAppr path').forEach(q => q.setAttribute('d', ''));
   $('#cEdgeL').setAttribute('opacity', 0); $('#cEdgeR').setAttribute('opacity', 0); $('#cWarn').setAttribute('opacity', 0); $('#cJam').setAttribute('opacity', 0);
   $('#arHud3').dataset.state = 1; $('#mirCue').hidden = true;
@@ -217,34 +244,47 @@ function drawAr3(p, f, C, k){
     ring.setAttribute('y', barY - 5.5); ring.setAttribute('height', 17); ring.setAttribute('rx', 8.5); ring.setAttribute('width', (Math.max(w, 6) + 11).toFixed(1)); ring.setAttribute('opacity', emph ? .95 : 0);
   }
 
-  /* ① 미니 도로 — 실제 차선 좌표 그대로(3D 도로와 같은 점선 자리 · 가장자리 · 출구 곡선)를 같은 카메라 투영으로. 일반도로는 백색실선(마감선 ~ 정지선)도 실제대로 */
-  const zNear = Math.min(p.z + HUD3.behind, 40);
-  let surf = bandX(-m.edgeX, m.edgeX, zNear, -232, proj), edges = lineX(-m.edgeX, zNear, -228, .08, proj) + lineX(m.edgeX, zNear, -228, .08, proj), dash = '';
+  /* ① 미니 도로 — 실제 차선 좌표 그대로(3D 도로와 같은 점선 자리 · 가장자리 · 출구 곡선)를 같은 카메라 투영으로. 일반도로는 백색실선(마감선 ~ 정지선) · 횡단보도 줄무늬도 실제대로.
+     갈림(정지선)을 지난 뒤에는 **내 경로의 도로만** 그린다 — 지나온 본선과 가지 않는 출구는 뺀다(회전 중 옆 · 뒤로 지나가는 선이 뒤엉켜 보였음, 2026-11-17).
+     일반도로 출구의 가장자리 선 · 점선은 교차로 안(출구 시작 16m)에는 긋지 않는다 — 실제 교차로 안에는 차선이 없다 */
+  const zNear = Math.min(p.z + HUD3.behind, 40), past = !onMain || p.z < FORK_Z - 1, myPath = R.leaf.path;
+  let surf = '', edges = '', dash = '', zebra = '', zebraHot = '';
+  if(!past){
+    surf += band3(-m.edgeX, m.edgeX, zNear, -232, proj); edges += line3(-m.edgeX, zNear, -228, .08, proj) + line3(m.edgeX, zNear, -228, .08, proj);
+    for(let i = 1; i < m.lanes; i++){ const x = m.laneX(i) - LANE/2;
+      if(m.city){ for(let z = 40; z > m.changeEnd; z -= 9){ if(z > zNear + 3) continue; dash += quadZ(x - .075, x + .075, z, Math.max(z - 3, m.changeEnd), proj); } dash += line3(x, Math.min(m.changeEnd, zNear), FORK_Z, .075, proj); }
+      else dash += dashX(x, .075, zNear, proj); }
+  }
   m.segs.forEach(s => {
+    if(past && !myPath.includes(s)) return;
     const c = s.curve, rd = s.road, nL = rd ? rd.n : s.k, hw = rd && rd.w ? rd.w/2 - .15 : nL*LANE/2, half = rd ? (rd.w ? rd.w/2 : hw + .55) : s.half, off = rd ? ((rd.n - 1)/2 - rd.i - (s.k - 1)/2)*LANE : 0;
-    surf += strip(offsetPts(c, 0, 1, off - half, proj, 40), offsetPts(c, 0, 1, off + half, proj, 40));
-    edges += lineC(c, 0, 1, off - (hw + .15), .08, proj) + lineC(c, 0, 1, off + hw + .15, .08, proj);
-    for(let i = 1; i < nL; i++) for(let q = 8; q < s.L - 3; q += 9) dash += strip(offsetPts(c, q/s.L, (q + 3)/s.L, off - hw + i*LANE - .075, proj, 2), offsetPts(c, q/s.L, (q + 3)/s.L, off - hw + i*LANE + .075, proj, 2));
+    const inBox = m.city && s.depth === 0 ? 16 : 0, e0 = clamp(inBox/s.L);
+    surf += strip3(offsetPts(c, 0, 1, off - half, proj, 60), offsetPts(c, 0, 1, off + half, proj, 60));
+    edges += line3C(c, e0, 1, off - (hw + .15), .08, proj, 60) + line3C(c, e0, 1, off + hw + .15, .08, proj, 60);
+    for(let i = 1; i < nL; i++) for(let q = Math.max(8, inBox + 1); q < s.L - 3; q += 9) dash += strip3(offsetPts(c, q/s.L, (q + 3)/s.L, off - hw + i*LANE - .075, proj, 2), offsetPts(c, q/s.L, (q + 3)/s.L, off - hw + i*LANE + .075, proj, 2));
   });
-  for(let i = 1; i < m.lanes; i++){ const x = m.laneX(i) - LANE/2;
-    if(m.city){ for(let z = 40; z > m.changeEnd; z -= 9){ if(z > zNear + 3) continue; dash += quadZ(x - .075, x + .075, z, Math.max(z - 3, m.changeEnd), proj); } dash += lineX(x, Math.min(m.changeEnd, zNear), FORK_Z, .075, proj); }
-    else dash += dashX(x, .075, zNear, proj); }
-  set('cSurf', surf); set('cEdges', edges); set('cDash', dash);
-  // 들어갈 차로: 2차와 같은 한 줄 띠(hud2.js laneRibbon). 색은 늘 청록 — 차로를 다 옮겨도 · 경로 끝에서도 초록으로 바꾸지 않는다(초록 = 옮겨도 됨). 앞쪽 위험이면 흐리게, 모양은 그대로
+  // 횡단보도 줄무늬(실제 자리: 폭 0.5m · 1m 간격): 내 쪽 정지선 앞(-232 ~ -236) · ⑤ 우회전해 들어가는 가로 도로(m.cw). 보행자가 건너거나 건너려 하면 그 횡단보도가 주황으로
+  if(m.city){
+    const xC = -m.lanes*LANE/2, xR = m.lanes*LANE/2;
+    if(!past) for(let x = xC + .5; x < xR - .4; x += 1) zebra += quadZ(x, x + .5, -232, -236, proj);
+    if(m.cw && myPath[0].key === 'R'){ let zz = ''; for(let z = CZ.far + .5; z < CZ.near - .4; z += 1) zz += gpoly3(proj, [[m.cw.x0, z], [m.cw.x0 + 4, z], [m.cw.x0 + 4, z + .5], [m.cw.x0, z + .5]]); if(H.ped) zebraHot = zz; else zebra += zz; }
+  }
+  set('cSurf', surf); set('cEdges', edges); set('cDash', dash); set('cZebra', zebra); set('cZebraHot', zebraHot);
+  // 들어갈 차로: 2차와 같은 한 줄 띠. 색은 늘 청록 — 차로를 다 옮겨도 · 경로 끝에서도 초록으로 바꾸지 않는다(초록 = 옮겨도 됨). 앞쪽 위험이면 흐리게, 모양은 그대로
   S.fill += ((st === 1 ? .85 : 1) - S.fill)*k;
   const lf = S.fill*(1 - .62*dim);
-  set('cLaneFill', laneRibbon(zNear, onMain, w => [-w, w], proj)); $('#cLaneFill').setAttribute('opacity', lf.toFixed(3));
-  set('cRails', laneRibbon(zNear, onMain, w => [-w - .1, -w + .1], proj) + laneRibbon(zNear, onMain, w => [w - .1, w + .1], proj)); $('#cRails').setAttribute('opacity', lf.toFixed(3));
+  set('cLaneFill', laneRibbon3(zNear, onMain, w => [-w, w], proj)); $('#cLaneFill').setAttribute('opacity', lf.toFixed(3));
+  set('cRails', laneRibbon3(zNear, onMain, w => [-w - .1, -w + .1], proj) + laneRibbon3(zNear, onMain, w => [w - .1, w + .1], proj)); $('#cRails').setAttribute('opacity', lf.toFixed(3));
 
   // 마감선(흰 가로선) + 그 뒤 실선 구간: 점선은 옮길 수 있는 곳, 실선부터는 옮길 수 없는 곳. 정체면 줄 끝 10m 뒤에 가로선만
   const next = G && G.side ? G.next : null, laneX = next !== null && next >= 0 && next < m.lanes ? m.laneX(next) : tx, side = (G && G.side) || Math.sign(tx - p.x) || sgn || 1;   // 차로 선을 막 넘은 뒤(판단의 옮길 쪽이 0)에도 들어갈 차로 쪽
   const showGate = needMove && !besideQueue, dlOp = ((wait ? 1 : .72)*soft).toFixed(3);
   set('cGate', showGate ? quadZ(tx - 1.75, tx + 1.75, gateZ + .45, gateZ - .45, proj) : ''); $('#cGate').setAttribute('fill-opacity', dlOp);
-  set('cSolid', showGate && tail === null ? lineX(laneX - side*1.75, Math.min(gateZ, zNear), FORK_Z, .11, proj) : ''); $('#cSolid').setAttribute('fill-opacity', dlOp);
+  set('cSolid', showGate && tail === null ? line3(laneX - side*1.75, Math.min(gateZ, zNear), FORK_Z, .11, proj) : ''); $('#cSolid').setAttribute('fill-opacity', dlOp);
 
   /* 정체 — 2차와 같음(빗금 · 설 칸 · 줄 차 주황 테). 줄 차는 같은 투영의 차 아이콘 테두리 */
   const jb = $('#cJam');
-  if(tail !== null){ const dj = bandX(tx - 1.7, tx + 1.7, Math.min(tail, zNear), qFrontOf(m), proj); jb.setAttribute('d', dj); jb.setAttribute('opacity', dj ? (.45*soft).toFixed(2) : '0'); }
+  if(tail !== null){ const dj = band3(tx - 1.7, tx + 1.7, Math.min(tail, zNear), qFrontOf(m), proj); jb.setAttribute('d', dj); jb.setAttribute('opacity', dj ? (.45*soft).toFixed(2) : '0'); }
   else jb.setAttribute('opacity', '0');
   set('cSlot', tail !== null && p.z > tail + 14 ? quadZ(tx - 1.3, tx + 1.3, tail + 10, tail + 5, proj) : ''); $('#cSlot').setAttribute('opacity', (.7 + .3*Math.sin(now/260)).toFixed(2));
   let qd = '';
@@ -298,24 +338,22 @@ function drawAr3(p, f, C, k){
     const ringOn = lvl === 3 && blinkOn && !front;
     const rl = cand.c.halfL*rk, rw = DRV.carW/2*rk, rq = g => gpoly3(proj, [[-rl - g*1.6, -rw - g], [-rl - g*1.6, rw + g], [rl + g*1.6, rw + g], [rl + g*1.6, -rw - g]].map(([a, b]) => [xCar + hd[0]*a - hd[1]*b, zCar + hd[1]*a + hd[0]*b]));   // 뒤차 바닥 둘레의 사각형(도로 면) 두 겹
     set('cRing1', ringOn ? rq(.35) : ''); set('cRing2', ringOn ? rq(.85) : ''); $('#cRing2').setAttribute('opacity', .55);
-    // 접근 속도 꺾쇠(주의부터, 뒤에 있을 때): 뒤차 지붕 위에 뜬 표지 1 ~ 3개, 내 차 쪽(위)을 가리킴. 노면에 눕히면 낮은 각도라 뒤차 차체에 가려져서(뒤차 앞 노면 = 화면에서 차체 뒤) 이것만 차에 붙은 표지로 둔다 — 크기는 그 자리의 축척
-    const cl = cand.cl, n = lvl >= 2 && cand.behind && cand.gap >= 1 && cl > 0 && !front ? (cl < HUD3.chevronV[0] ? 1 : cl < HUD3.chevronV[1] ? 2 : 3) : 0, u = 8.5*rs.c[2], w2 = 3.2*rs.c[2];
-    apprEls.forEach((q, i) => { const y0 = rs.top - 5 - i*u*.95; q.setAttribute('d', i < n ? `M${(rs.c[0] - u).toFixed(1)} ${y0.toFixed(1)}L${rs.c[0].toFixed(1)} ${(y0 - u*.72).toFixed(1)}L${(rs.c[0] + u).toFixed(1)} ${y0.toFixed(1)}L${(rs.c[0] + u).toFixed(1)} ${(y0 + w2).toFixed(1)}L${rs.c[0].toFixed(1)} ${(y0 - u*.72 + w2).toFixed(1)}L${(rs.c[0] - u).toFixed(1)} ${(y0 + w2).toFixed(1)}Z` : ''); q.setAttribute('fill', col); q.setAttribute('opacity', op.toFixed(3)); });
-    // 지난 위치(주의, 다가오는 중): 뒤로 한 대 · 두 대 길이 자리에 옅은 흔적
-    const trail = lvl === 2 && cand.behind && cand.gap >= 1 && cl > 0 && !front;
-    [['cTrail1', 5.4, .26], ['cTrail2', 10.4, .12]].forEach(([id, dz, o]) => { const s = trail ? slab3(proj, xCar, zCar + dz, 0, -1, cand.c.halfL*2, DRV.carW, rk) : null; const el = $('#' + id); el.setAttribute('d', s ? s.d : ''); el.setAttribute('fill', col); el.setAttribute('stroke', col); el.setAttribute('opacity', (o*C3.alpha).toFixed(3));
-      if(s) car3Put(xCar, zCar + dz, 0, -1, cand.c.halfL*2, DRV.carW, rk, col, o*C3.alpha); });
+    // 접근 속도(주의부터, 뒤에 있을 때): 뒤차 **뒤 노면**에 앞(내 차 쪽)을 가리키는 꺾쇠 1 ~ 3개 — 빠르게 다가올수록 많이. 같은 투영으로 눕힘.
+    // (처음엔 지붕 위에 뜬 표지 → '하늘로 올라가 있다'(2026-11-17 사용자). 뒤차 앞 노면은 이 낮은 각도에선 뒤차 차체에 가려져 뒤쪽에 둔다. 반투명 차로 그리던 '지난 위치'는 이 꺾쇠가 대신한다)
+    const cl = cand.cl, n = lvl >= 2 && cand.behind && cand.gap >= 1 && cl > 0 && !front ? (cl < HUD3.chevronV[0] ? 1 : cl < HUD3.chevronV[1] ? 2 : 3) : 0, zb = zCar + cand.c.halfL*rk + 1.3;
+    apprEls.forEach((q, i) => { q.setAttribute('d', i < n ? gfwd3(proj, xCar, zb + i*2.5, .78, .85, 1.25) : ''); q.setAttribute('fill', col); q.setAttribute('opacity', (op*[1, .7, .45][i]).toFixed(3)); });
+    set('cTrail1', ''); set('cTrail2', '');
   } else { rearEl.setAttribute('d', ''); ['cRearGlass', 'cRing1', 'cRing2', 'cTrail1', 'cTrail2'].forEach(id => set(id, '')); apprEls.forEach(q => q.setAttribute('d', '')); }
   // 거리 구간: 내 차 뒤부터 뒤차까지 옮길 차로를 칠함 — 가까울수록 짧고 진하게, 색은 단계
   let band = '', bandOp = 0;
   if(rs && cand.behind && cand.gap >= 1){
     const z1 = p.z + 2.4, z0 = Math.max(zCar - 2, z1 + 1);
-    if(z0 - z1 > .3){ band = bandX(laneX - 1.55, laneX + 1.55, z0, z1, proj, 1); bandOp = (REAR2.bandOp[0] + (REAR2.bandOp[1] - REAR2.bandOp[0])*(1 - clamp(C3.gapDraw/HUD3.detect)))*(lvl === 1 ? .5 : 1); }
+    if(z0 - z1 > .3){ band = band3(laneX - 1.55, laneX + 1.55, z0, z1, proj, 1); bandOp = (REAR2.bandOp[0] + (REAR2.bandOp[1] - REAR2.bandOp[0])*(1 - clamp(C3.gapDraw/HUD3.detect)))*(lvl === 1 ? .5 : 1); }
   }
   const db = $('#cDistBand'); db.setAttribute('d', band); db.setAttribute('fill', col); db.setAttribute('fill-opacity', (bandOp*C3.alpha*(1 - .6*dim)).toFixed(3));
   // 뒤에 더 오는 차가 있으면 옮길 차로 아래쪽에 위로 흐르는 옅은 띠
   let flow = '';
-  if(rs && cand.behind && H.others.length && C3.gapDraw !== null) for(let i = 0; i < 3; i++){ const g = C3.gapDraw + 6 + ((i*7 - now/1000*6) % 21 + 21) % 21; if(g > HUD3.detect) continue; const zf = zOfGap(g); flow += bandX(laneX - 1.1, laneX + 1.1, zf + .35, zf - .35, proj, .5); }
+  if(rs && cand.behind && H.others.length && C3.gapDraw !== null) for(let i = 0; i < 3; i++){ const g = C3.gapDraw + 6 + ((i*7 - now/1000*6) % 21 + 21) % 21; if(g > HUD3.detect) continue; const zf = zOfGap(g); flow += band3(laneX - 1.1, laneX + 1.1, zf + .35, zf - .35, proj, .5); }
   set('cFlow', flow); $('#cFlow').setAttribute('fill-opacity', (REAR2.flowOp*C3.alpha*(1 - .6*dim)).toFixed(3));
   // 옮길 차로 앞쪽 차(방금 지나간 차 포함): 실제 자리에 무채색으로 작고 옅게 — 틈이 어디까지인지
   let ad = '';
@@ -364,8 +402,11 @@ function drawAr3(p, f, C, k){
     if(onMain && p.z > FORK_Z - 1 && sigOf(e1.key, ct) === 'red') cs += quadZ(m.laneX(e1.lanes[0]) - 1.75, m.laneX(e1.lanes[e1.k-1]) + 1.75, FORK_Z + .7, FORK_Z - .7, proj);
     if(m.cw){
       if(pedBlock(ct) && p.x < m.cw.x0) cs += quadW([[m.cw.x0 - 1.7, CZ.near], [m.cw.x0 - .4, CZ.near], [m.cw.x0 - .4, CZ.mid], [m.cw.x0 - 1.7, CZ.mid]], proj);
-      pedsAt(ct).forEach(q => { if(q.phase === 'done') return; const c = proj(q.x, q.z, .9); if(!c) return; const r = Math.max(2.2, 5.5*c[2]);
-        pd += `M${(c[0] - r).toFixed(1)} ${c[1].toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2*r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2*r).toFixed(1)} 0Z`; });
+      // 보행자: 걷는 사람 모델(같은 가상 카메라, 실제 키). 0.45초마다 좌우를 뒤집어 걷는 것처럼. 건너거나 건너려 하는 사람은 주황, 모델을 못 불러오면 점
+      pedsAt(ct).forEach(q => { if(q.phase === 'done') return; const c = proj(q.x, q.z, .9); if(!c) return;
+        const flip = q.walking && Math.floor(ct/.45 + q.i*.5) % 2 ? -1 : 1, fz = q.dir > 0 ? -1 : 1;
+        if(mdl3Put('ped', q.x, q.z, 0, fz, flip*1.25, 1.25, 1.25, H.ped ? T.warn : T.neutral, H.ped ? 1 : .8)) return;
+        const r = Math.max(2.2, 5.5*c[2]); pd += `M${(c[0] - r).toFixed(1)} ${c[1].toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2*r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2*r).toFixed(1)} 0Z`; });
     }
   }
   set('cStop', cs); set('cPed', pd); $('#cPed').setAttribute('fill', H.ped ? T.warn : T.neutral); $('#cPed').setAttribute('fill-opacity', H.ped ? 1 : .9);

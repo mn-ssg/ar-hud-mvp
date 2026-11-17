@@ -206,8 +206,8 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
         if(cs.fill === c || cs.stroke === c) out.push(el.id || el.parentNode.id); }); $$('.eg3').forEach(st => { if(st.getAttribute('stop-color').toLowerCase() === hex && [...'LR'].some(k => +$('#cEdge' + k).getAttribute('opacity') > .01)) out.push('cEdge'); });
         return [...new Set(out)]; };
       const sm = () => { const H = S.H3, n = id => ($('#' + id).getAttribute('d') || '').length;
-        return {t:+D.t.toFixed(2), st:H.state, base:H.base, gate:S.G ? S.G.gate : '-', chev:[...document.querySelectorAll('#cChev path')].filter(q => q.getAttribute('d')).length, dots:n('cDots') > 0, gap:n('cGapLine') > 0 && +$('#cGapLine').getAttribute('opacity') > .5, gapFill:n('cGap') > 0 ? 'fill' : 'none', gapDash:$('#cGapLine').dataset.line === 'dash' ? 'dash' : 'none', cars:CAR3.ready ? CAR3.pool.filter(g => g.visible).length : -1,
-          rear:n('cRear') > 0 ? +$('#cRear').getAttribute('opacity') : 0, rearCol:$('#cRear').getAttribute('fill'), ring:n('cRing1') > 0, trail:n('cTrail1') > 0, edgeR:+$('#cEdgeR').getAttribute('opacity'), edgeW:+$('#cEdgeR').getAttribute('width'), edgeL:+$('#cEdgeL').getAttribute('opacity'),
+        return {t:+D.t.toFixed(2), st:H.state, base:H.base, gate:S.G ? S.G.gate : '-', chev:[...document.querySelectorAll('#cChev path')].filter(q => q.getAttribute('d')).length, dots:n('cDots') > 0, gap:n('cGapLine') > 0 && +$('#cGapLine').getAttribute('opacity') > .5, gapFill:n('cGap') > 0 ? 'fill' : 'none', gapDash:$('#cGapLine').dataset.line === 'dash' ? 'dash' : 'none', cars:CAR3.ready ? CAR3.models.car.pool.filter(g => g.visible).length : -1,
+          rear:n('cRear') > 0 ? +$('#cRear').getAttribute('opacity') : 0, rearCol:$('#cRear').getAttribute('fill'), ring:n('cRing1') > 0, appr:[...document.querySelectorAll('#cAppr path')].filter(q => q.getAttribute('d')).length, edgeR:+$('#cEdgeR').getAttribute('opacity'), edgeW:+$('#cEdgeR').getAttribute('width'), edgeL:+$('#cEdgeL').getAttribute('opacity'),
           warn:+$('#cWarn').getAttribute('opacity'), lead:n('cLead') > 0, fband:n('cFrontBand') > 0, lane:+$('#cLaneFill').getAttribute('opacity'), laneCol:getComputedStyle($('#lg3A')).stopColor, icon:+$('#cAct').getAttribute('opacity'), barRing:+$('#cCdRing').getAttribute('opacity'), barW:+$('#cCdBar').getAttribute('width'), barX:+$('#cCdBar').getAttribute('x'),
           red:using(RED), green:using(GRN), cue:$('#mirCue').hidden ? 'hidden' : ($('#mirCue').dataset.cue || '') + '/' + ($('#mirCue').dataset.lamp || ''), text:$$('#arHud3 text').length}; };
       window.__jumped = false;
@@ -222,9 +222,9 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const a = await stage3(80, 2, 2), al = last(a);
     check('3차 01 안전: 뒤차가 주의 거리 밖 → 상태 1 · 초록 꺾쇠 2개 · 점 없음 · 뒤차 표시 없음 · 가장자리 빛 없음 · 빨강 없음', a.samples.every(s => s.st === 1 && s.chev === 2 && !s.dots && s.rear < .01 && s.edgeR < .01 && s.red.length === 0) && al.green.join() === 'cChev', JSON.stringify(al));
     const a2 = await stage3(45, 1, 2), a2l = last(a2);
-    check('3차 01 안전: 멀리 있는 뒤차(45m)는 작고 옅게(무채색) · 상태는 그대로 1', a2l.st === 1 && a2l.rear > .2 && a2l.rear < .6 && !a2l.trail && a2l.edgeR < .01 && a2l.red.length === 0, JSON.stringify(a2l));
+    check('3차 01 안전: 멀리 있는 뒤차(45m)는 작고 옅게(무채색) · 상태는 그대로 1', a2l.st === 1 && a2l.rear > .2 && a2l.rear < .6 && a2l.appr === 0 && a2l.edgeR < .01 && a2l.red.length === 0, JSON.stringify(a2l));
     const b = await stage3(20, 2.5, 2), bl = last(b);
-    check('3차 02 주의: 상태 2 · 주황 뒤차 + 지난 위치 · 오른쪽 가장자리 주황 빛 · 꺾쇠는 계속 흐름(아직 옮길 수 있음) · 빨강 없음', bl.st === 2 && bl.rearCol.toLowerCase() === '#ffb020' && bl.trail && bl.edgeR > .3 && bl.edgeL < .01 && bl.chev === 2 && !bl.dots && bl.red.length === 0, JSON.stringify(bl));
+    check('3차 02 주의: 상태 2 · 주황 뒤차 + 뒤 노면의 접근 꺾쇠 · 오른쪽 가장자리 주황 빛 · 꺾쇠는 계속 흐름(아직 옮길 수 있음) · 빨강 없음', bl.st === 2 && bl.rearCol.toLowerCase() === '#ffb020' && bl.appr >= 1 && bl.edgeR > .3 && bl.edgeL < .01 && bl.chev === 2 && !bl.dots && bl.red.length === 0, JSON.stringify(bl));
     const c = await stage3(7, 4, 2), cs = c.samples.filter(s => s.st === 3), cl = cs[cs.length - 1];
     check('3차 03 대기: 상태 3 · 꺾쇠가 빨간 점 세 개로 멈춤 · 빨간 뒤차 · 가장자리 빛 넓게 · 남은 거리 막대에 테두리(밝아짐) · 들어갈 차로는 그대로 · 초록 없음', cs.length > 30 && cs.every(s => s.dots && s.chev === 0 && s.rearCol.toLowerCase() === '#ff4d4d' && s.green.length === 0) && cl.lane > .84 && cl.barRing > .9 && cl.edgeW > 80 && cl.icon < .5, JSON.stringify(cl));
     check('3차 03 대기: 빨강을 쓰는 것은 기다려 점 · 뒤차(접근 꺾쇠 · 깜빡임 테두리 포함) · 가장자리 빛뿐', cs.every(s => s.red.every(id => ['cDots', 'cRear', 'cAppr', 'cRing1', 'cRing2', 'cEdge'].includes(id))) && cs.some(s => s.ring) && cs.some(s => !s.ring), JSON.stringify([...new Set(cs.flatMap(s => s.red))]));
@@ -239,12 +239,19 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     const g = await stage3(7, 4, 1.6, {lead:[13, -6]}), gs = g.samples.filter(s => s.st === 6 && s.base === 3), gl = gs[gs.length - 1];
     check('3차 06: 대기 중에도 앞쪽 위험이 먼저 — 삼각형이 뜨고 뒤차 · 기다려 점은 남되 깜빡임 · 가장자리 빛은 꺼짐', gs.length > 10 && gl.warn > .9 && gl.dots && !gl.ring && gl.edgeR < .05 && gl.rear > .2 && gl.rear < .7, JSON.stringify(gl));
     check('3차: HUD 안에 글자 없음', [al, cl, fl].every(s => s.text === 0), '');
+    // ⑤ 우회전: 정지선을 지난 뒤에는 내 경로의 도로만(도로면 한 덩어리 · 가장자리 두 줄) — 지나온 본선 · 다른 출구의 선이 섞이지 않음. 보행자는 사람 모델 · 건너는 횡단보도는 주황 줄무늬
+    const rt = await E(() => { const m = mapById('CRT'), leaf = m.leaves.findIndex(l => l.dest === '종합병원'); const runs = id => (($('#' + id).getAttribute('d') || '').match(/M/g) || []).length; let n = 0, bad = 0, peds = 0, hot = 0, pre = 0;
+      runDrive({map:m, leaf, lane:2, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', secs:22, ap:{}, setup:() => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); },
+        sample:() => { if(D.z > FORK_Z - 1){ if(runs('cSurf') >= 4) pre++; return; } n++; if(runs('cSurf') > 1 || runs('cEdges') > 2) bad++;
+          if(S.H3.ped){ if(CAR3.models.ped && CAR3.models.ped.pool.some(g => g.visible)) peds++; if(runs('cZebraHot') > 5) hot++; } }}); return {n, bad, peds, hot, pre}; });
+    check('3차 ⑤ 우회전: 정지선을 지나면 미니 도로에 내 경로의 도로만(지나온 본선 · 다른 출구 없음, 끊긴 띠를 이어 붙이지 않음), 그 전에는 본선 + 출구 셋', rt.n > 60 && rt.bad === 0 && rt.pre > 60, JSON.stringify(rt));
+    check('3차 ⑤: 건너는 보행자는 사람 모델(주황), 그 횡단보도 줄무늬가 주황으로', rt.peds > 10 && rt.hot > 10, JSON.stringify(rt));
     // 왼쪽으로 옮기는 맵(④): 차로 선을 넘는 내내 꺾쇠 · 점이 들어갈 차로 쪽(왼쪽 = 내 차 아이콘보다 화면 왼쪽)에 있음
     const lt = await E(() => { const m = mapById('CL2'), leaf = m.leaves.findIndex(l => l.dest === '전통시장'); let n = 0, bad = 0;
       runDrive({map:m, leaf, lane:2, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', secs:9, ap:{}, sample:() => { const ch = [...document.querySelectorAll('#cChev path')].find(q => q.getAttribute('d')), dt = $('#cDots').getAttribute('d'), el = ch || (dt ? $('#cDots') : null);
         if(!el || !S.H3.needMove || !$('#cEgo').getAttribute('d')) return; const a = el.getBBox(), e = $('#cEgo').getBBox(); n++; if(a.x + a.width/2 > e.x + e.width/2) bad++; }}); return {n, bad}; });
     check('3차: 왼쪽으로 옮길 때 꺾쇠 · 점이 내 차 왼쪽(들어갈 차로 쪽)에 — 차로 선을 넘는 중에도', lt.n > 20 && lt.bad === 0, JSON.stringify(lt));
-    check('3차 차 아이콘: Blender 세단 모델(hud_car.glb)을 불러와 같은 가상 카메라로 그림 — 안전 1대(내 차) · 주의 4대(내 차 + 뒤차 + 지난 위치 2) · 앞쪽 위험 2대 이상(내 차 + 앞차)', al.cars === 1 && bl.cars === 4 && fl.cars >= 2, `${al.cars} · ${bl.cars} · ${fl.cars}`);
+    check('3차 차 아이콘: Blender 세단 모델(hud_car.glb)을 불러와 같은 가상 카메라로 그림 — 안전 1대(내 차) · 주의 2대(내 차 + 뒤차) · 앞쪽 위험 2대 이상(내 차 + 앞차)', al.cars === 1 && bl.cars === 2 && fl.cars >= 2, `${al.cars} · ${bl.cars} · ${fl.cars}`);
     // 현대 HUD로 달려도 같은 상태가 계산되고(화면엔 안 보임) 이벤트로 남음
     const nv = await stage3(7, 4, 4, {jumpAt:1, hud:'nav'});
     check('3차 상태는 현대 HUD로 달릴 때도 같게 계산 · 기록(이벤트 h3, 화면에 안 보임 표시)', nv.samples.map(s => s.st).filter((v, i, arr) => i === 0 || v !== arr[i-1]).join('') === order && nv.events.filter(e => e.type === 'h3').length >= 2 && nv.events.filter(e => e.type === 'h3').every(e => e.shown === false) && d.events.filter(e => e.type === 'h3').every(e => e.shown === true), JSON.stringify(nv.events.filter(e => e.type === 'h3')));

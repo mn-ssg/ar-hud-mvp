@@ -143,6 +143,7 @@ const HUD3 = {
   behind: 15,                        // 내 차 뒤 이 m까지 그린다
   rearZone: [2, 13], detect: 60,     // 뒤차 자리: 범퍼 간격 0 ~ detect m를 내 차 뒤 2 ~ 13m 자리로 눌러 그림(2차와 같은 방식 — 뒤 60m를 상자에 다 담을 수 없어서). 옆 · 앞에 있으면 실제 자리
   icon: .8, slabH: .5,               // 차 아이콘: 실제 차 크기 × icon. slabH = 모델을 못 불러왔을 때 쓰는 납작한 상자 높이(m)
+  pedModel: 'assets/models/hud_ped.glb',   // 보행자 아이콘 3D 모델(assets/blender/hud_ped.py)
   carModel: 'assets/models/hud_car.glb',   // 차 아이콘 3D 모델(Blender, assets/blender/hud_car.py) — 미니 도로와 같은 가상 카메라로 그린다. ''이면 상자 아이콘
   blink: .4, blinkDuty: .5,          // 03 대기 깜빡임(뒤차 테두리 · 가장자리 빛): 2.5Hz — 2차와 같은 값(초당 3회 아래)
   fade: .3,                          // 나타남 · 사라짐(초)

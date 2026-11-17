@@ -312,6 +312,8 @@
             <!-- ③ 마감선(흰 가로선)과 그 뒤 실선 구간(차로를 옮길 수 없는 곳). 대기 중엔 밝아진다 -->
             <path id="cSolid" class="c-deadline"/>
             <path id="cGate" class="c-deadline" filter="url(#glow2)"/>
+            <!-- 횡단보도 줄무늬(실제 자리). 보행자가 건너거나 건너려 하는 횡단보도는 주황(#cZebraHot) -->
+            <path id="cZebra" class="c-zebra"/><path id="cZebraHot" class="c-zebra-hot" filter="url(#glow2)"/>
             <path id="cSlot" class="c-slot"/>
             <path id="cQueue" class="c-queue"/>
             <!-- 일반도로: 멈출 곳(빨간불 정지선 · 보행자 앞)은 주황 — 빨강은 '지금 옮기지 마'에만 -->
