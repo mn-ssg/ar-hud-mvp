@@ -4,7 +4,7 @@
    ============================================================ */
 
 /* ============================================================
-   우리 HUD 2.1 (개선 후, 2026-11-03) 디자인 토큰 — 개선 후 HUD(#arHud2)만 쓴다. 개선 전(#arHud)은 1차 실험 그대로(아래 V1 규칙 · hud.js 안 값).
+   리뉴얼 HUD 2.1 (개선 후, 2026-11-03) 디자인 토큰 — 개선 후 HUD(#arHud2)만 쓴다. 개선 전(#arHud)은 1차 실험 그대로(아래 V1 규칙 · hud.js 안 값).
    근거: 04_리서치/2026-11-03_데스크리서치_양산AR-HUD_시각마감.md (양산 AR-HUD 3종 · 국내 HUD 시인성 연구 2편 · AR-HUD 주의 연구)
    · 색: 역할별 4가지(안내 route · 이동/해소 go · 주의 warn · 위험 danger) + 무채색 2(감지 · 도로 윤곽 neutral / 대기 중 막대 idle). 같은 역할은 모든 요소가 같은 값. 거리 구간 · 흐름 띠 투명도는 config.js REAR2(bandOp · flowOp)
    · 선 굵기 3단계(w1 윤곽 · w2 막대 · w3 경계/멈춤) · 모서리 2단계 · 투명도는 역할별 토큰 · 빛 번짐은 glow 하나(JS가 #glow2에 넣음)
@@ -32,7 +32,7 @@
 /* 2.2 (2026-11-07, D107 — 사용자 선택 시안 B '면 중심 · 먼 곳 소실'): 내 차 · 뒤차 아이콘은 위에서 본 실루엣(앞유리 · 뒤창), 들어갈 차로 채움을 진하게(.7 → 먼 곳 .04), 윤곽은 더 흐리게, 먼 곳 마스크를 y 80 → 128로 길게(index.html #roadMask2). 안 고른 시안 A · C 코드는 삭제 */
 #arHud2 .b-rear-glass{ fill:#0b0d10; fill-opacity:.5; }
 #arHud2 #bLim{ font-weight:600; }
-/* 마감은 B(선명) 하나 — 2026-11-04 사용자: 'A 절제'를 없애고 선명만. 위 토큰이 예전 B 값(1차의 채도 높은 청록 · 굵은 선 · 센 번짐). 기록의 HUD 버전은 '우리 2.1-B' 그대로 */
+/* 마감은 B(선명) 하나 — 2026-11-04 사용자: 'A 절제'를 없애고 선명만. 위 토큰이 예전 B 값(1차의 채도 높은 청록 · 굵은 선 · 센 번짐). 기록의 HUD 버전은 '리뉴얼 2.1-B' 그대로 */
 
 /* 개선 후 HUD 요소 — 정적인 색 · 굵기 · 투명도만 여기서. 상태에 따라 바뀌는 값은 hud2.js가 토큰을 읽어 넣는다 */
 #arHud2 .b-surf{ fill:var(--h2-neutral); fill-opacity:.04; }
@@ -53,6 +53,51 @@
 #arHud2 .b-chev path{ fill:none; stroke-width:var(--h2-w2); stroke-linecap:round; stroke-linejoin:round; }
 #arHud2 .b-flow{ fill:var(--h2-neutral); }   /* 뒤에 더 오는 차가 있을 때의 흐름 띠 (4-C) */
 /* 개선 후 HUD 야간: 토큰이 이미 낮춤 — 개선 전처럼 요소별 규칙 없음 */
+
+/* ============================================================
+   리뉴얼 HUD 3차 (3.0, 2026-11-17) — 색 · 굵기 토큰은 2차와 같은 것(--h2-*)을 쓴다. 색 하나에 뜻 하나:
+   청록 route = 길 안내(들어갈 차로 · 갈 방향, 상태가 바뀌어도 그대로) / 초록 go = 옮겨도 됨(이동 꺾쇠 · 채워진 틈) /
+   주황 warn = 조심(다가오는 뒤차 · 앞쪽 간격 · 앞쪽 경고 · 멈출 곳 · 정체) / 빨강 danger = 지금 옮기지 마(기다려 점 · 옆에 붙은 뒤차 · 가장자리 빛) /
+   무채색 neutral · core = 도로 윤곽 · 내 차 · 마감선 · 남은 거리 막대 · 틈 테두리(확인).
+   상태에 따라 바뀌는 값(색 · 투명도)은 hud3.js가 넣는다
+   ============================================================ */
+#lg3A{ stop-opacity:var(--h2-op-fill); } #lg3B{ stop-opacity:calc(var(--h2-op-fill)*.42); } #lg3C{ stop-opacity:.05; }
+#arHud3 .c-surf{ fill:var(--h2-neutral); fill-opacity:.07; }
+#arHud3 .c-edges{ fill:var(--h2-neutral); fill-opacity:calc(var(--h2-op-ctx)*1.9); }   /* 3차: 실제 선 폭(0.16m)이라 2차보다 가늘다 → 더 밝게 */
+#arHud3 .c-dash{ fill:var(--h2-neutral); fill-opacity:calc(var(--h2-op-ctx)*1.6); }
+#arHud3 .c-rails{ fill:var(--h2-route); }
+#arHud3 .c-deadline{ fill:var(--h2-core); }
+#arHud3 .c-slot{ fill:var(--h2-route); fill-opacity:.2; stroke:var(--h2-route); stroke-width:var(--h2-w1); stroke-linejoin:round; }
+#arHud3 .c-queue{ fill:none; stroke:var(--h2-warn); stroke-width:calc(var(--h2-w1)*1.4); stroke-linejoin:round; }
+#arHud3 .c-stop{ fill:var(--h2-warn); }
+#arHud3 .c-frontband{ fill:var(--h2-warn); }
+#arHud3 .c-flow{ fill:var(--h2-neutral); }
+#arHud3 .c-car{ stroke-width:2.4; stroke-linejoin:round; }
+#arHud3 .c-lead{ fill:var(--h2-warn); stroke:var(--h2-warn); }
+#arHud3 .c-ahead{ fill:var(--h2-neutral); stroke:var(--h2-neutral); }
+#arHud3 .c-ego{ fill:var(--h2-core); fill-opacity:var(--h2-op-ego); stroke:var(--h2-core); stroke-width:2.4; stroke-linejoin:round; }
+#arHud3 .c-glass{ fill:#0b0d10; fill-opacity:.5; }
+#arHud3 .c-ring{ fill:none; stroke:var(--h2-danger); stroke-width:1.8; stroke-linejoin:round; }
+#arHud3 .c-appr path{ fill:none; stroke-width:var(--h2-w2); stroke-linecap:round; stroke-linejoin:round; }
+#arHud3 .c-gap{ stroke-width:2.2; stroke-linejoin:round; }
+#arHud3 .c-chev path{ fill:none; stroke:var(--h2-go); stroke-linecap:round; stroke-linejoin:round; }
+#arHud3 .c-dots{ fill:var(--h2-danger); stroke:var(--h2-core); stroke-width:.8; stroke-opacity:.7; }
+#arHud3 .c-icon{ stroke:var(--h2-route); stroke-width:var(--h2-icon-w); }
+#arHud3 #cCdBg{ fill:var(--h2-neutral); fill-opacity:.16; }
+#arHud3 #cCdBar{ fill:var(--h2-neutral); }
+#arHud3 #cCdRing{ fill:none; stroke:var(--h2-core); stroke-width:1.5; }
+#hudSvgTop{ position:absolute; inset:0; width:100%; height:100%; display:block; overflow:hidden; pointer-events:none; filter:drop-shadow(0 0 3px rgba(255,176,32,.55)); }
+#hudSvgTop.screen{ mix-blend-mode:screen; }
+#cWarn .c-warn-tri{ fill:var(--h2-warn); stroke:var(--h2-warn); stroke-width:5; stroke-linejoin:round; }
+#cWarn .c-warn-mark{ fill:#0b0d10; fill-opacity:.9; }
+.cab.night #hudSvgTop{ filter:brightness(.9) drop-shadow(0 0 2px rgba(255,176,32,.4)); }
+/* 거울 표시 (3차): 룸미러 테두리 + 경고등. HUD 상자 밖 — config.js HUD3.mirrorCue로 끔 */
+#mirCue{ position:absolute; z-index:2; pointer-events:none; box-sizing:border-box; border:2px solid transparent; border-radius:999px; transition:border-color .18s, box-shadow .18s; }
+#mirCue[data-cue="check"]{ border-color:#fff; box-shadow:0 0 10px rgba(255,255,255,.75), inset 0 0 8px rgba(255,255,255,.35); }
+#mirCue i{ position:absolute; bottom:14%; width:9px; height:9px; margin-left:-4.5px; border-radius:50%; opacity:0; transition:opacity .15s; }
+#mirCue[data-lamp="warn"] i{ opacity:1; background:var(--h2-warn); box-shadow:0 0 8px var(--h2-warn); }
+#mirCue[data-lamp="danger"] i{ opacity:1; background:var(--h2-danger); box-shadow:0 0 9px var(--h2-danger); }
+#mirCue[data-side="1"] i{ left:88%; } #mirCue[data-side="-1"] i{ left:12%; }
 
 /* ---------- 운전석 영역 ---------- */
 .cab{ position:relative; flex:1; min-width:0; min-height:0; border-radius:12px; overflow:hidden; background:#0b0d10; }
@@ -88,10 +133,10 @@
 #hudWrap{ position:absolute; left:50%; bottom:32.6%; transform:translateX(-50%); transform-origin:50% 100%; width:230px; pointer-events:none; transition:transform .35s ease; }   /* 폭 · bottom은 cabin.js layoutCabin이 각도(config.js HUD_DEG)로 매번 덮어씀 (D114). 예전 clamp(230px, 19%, 410px) · 대시보드 윗선 + 2.5% */
 #hudSvg{ display:block; width:100%; height:auto; overflow:hidden; mix-blend-mode:screen; filter:drop-shadow(0 0 3px rgba(255,255,255,.16)); }
 .tnum{ font-variant-numeric:tabular-nums; }
-/* 야간: HUD 전체 밝기 · 채도 · 빛 번짐을 낮춤 — 우리 HUD · 기존 HUD 똑같이 (실제 순정 HUD의 밤 자동 감광처럼).
+/* 야간: HUD 전체 밝기 · 채도 · 빛 번짐을 낮춤 — 리뉴얼 HUD · 기존 HUD 똑같이 (실제 순정 HUD의 밤 자동 감광처럼).
    빛 번짐 반경은 main.js setLight가 #glow 흐림(2.4 → 1.1)으로 줄임 */
 .cab.night #hudSvg{ filter:brightness(.9) saturate(.9) drop-shadow(0 0 1.5px rgba(255,255,255,.05)); }
-/* 우리 HUD 야간: 맥락(도로 윤곽) · 보조(표지) · 내 차를 더 낮춤. 경로 · 위험 · 이동은 그대로 */
+/* 리뉴얼 HUD 야간: 맥락(도로 윤곽) · 보조(표지) · 내 차를 더 낮춤. 경로 · 위험 · 이동은 그대로 */
 .cab.night #roadEdges{ fill-opacity:.34; }
 .cab.night #roadDash{ fill-opacity:.22; }
 .cab.night #roadSurf{ fill-opacity:.03; }
@@ -161,7 +206,7 @@ kbd{ display:inline-grid; place-items:center; min-width:24px; height:24px; paddi
 
 
 
-/* ---------- 우리 HUD 애니메이션 (V1 그대로): 옮길 화살표 흐름 ---------- */
+/* ---------- 리뉴얼 HUD 애니메이션 (V1 그대로): 옮길 화살표 흐름 ---------- */
 @keyframes hudFlow{ to{ stroke-dashoffset:-52; } }   /* hud.js 흐름 점선 '12 14'의 2주기 */
 #moveArrow.flow, #bMove.flow{ animation: hudFlow .7s linear infinite; }
 

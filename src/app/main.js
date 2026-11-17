@@ -59,7 +59,7 @@ function navCtx(s){
 
 /* ---------- 상태 ---------- */
 // testing = 주행 테스트 진행 중(결과 카드 · 쉬는 화면 포함, 설정 잠금) · drive = 내 차를 키보드로 모는 중 (drive.js D)
-const S = {mode:'ar2', tone:'B', map:null, route:null, target:0, startLane:1, running:false, paused:false, s:40, testing:false, drive:false,
+const S = {mode:'ar3', tone:'B', map:null, route:null, target:0, startLane:1, running:false, paused:false, s:40, testing:false, drive:false,
   fill:0, danger:0, car:null, jam:0, speedFactor:1, q:null, jamHoldT:0,
   rearGap:56, rearActive:false, rearBlock:false, threatCar:null, bswL:false, bswR:false, demoMap:'ICR', demoTarget:1, demoJam:0, light:'day',
   cityT:0, sigT:0, pedPlan:null, cityLim:Infinity};   // 일반도로(D69): 판 시작부터 시간 · 좌회전 화살표 켜지는 시각 · 보행자 계획 · 시연에서 설 곳(s)
@@ -82,7 +82,7 @@ function setTarget(i, lane){
   path = buildPath(S.route, S.drive ? 0 : S.jam); S.s = path.sStart;
   S.fill = 0; S.danger = 0; S.jamHoldT = 0;
   S.car = null; otherCar.visible = false;
-  resetHud(); resetHud2(); resetGuide();
+  resetHud(); resetHud2(); resetHud3(); resetGuide();
 }
 // 주간 · 야간: 3D 장면(scene.js) + HUD 밤 밝기(hud.css .night) + 페이지 다크 테마(styles.css [data-light])
 function setLight(l){
@@ -93,13 +93,14 @@ function setLight(l){
   $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임
   $$('#lightSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.light === l)));
 }
-// HUD 세 가지: 'nav' 현대 HUD(대조군) · 'ar' 우리 HUD 개선 전(1차 실험 v1.9, hud.js drawAr) · 'ar2' 우리 HUD 개선 후(2.1, hud2.js drawAr2). 'off' = 연습 주행(HUD 없음)
+// HUD 네 가지: 'nav' 현대 HUD(대조군) · 'ar3' 리뉴얼 HUD 3차(3.0, hud3.js drawAr3 — 3차 실험 조건) · 'ar2' 리뉴얼 HUD 2차(2.4, hud2.js) · 'ar' 리뉴얼 HUD 1차(v1.9, hud.js drawAr). 'off' = 연습 주행(HUD 없음)
 // HUD_VER는 기록 식별용(엑셀 'HUD 버전' 칸). 개선 후는 마감(A · B)을 뒤에 붙인다(session.js). 1차 실험 기록은 이 칸이 비어 있음
-const HUD_VER = {nav:'현대 3.5', ar:'우리 1.9', ar2:'우리 2.4'};   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용. 2.2 (2026-11-07, D107): 그래픽만 바뀜(실루엣 아이콘 · 채움 · 먼 곳 소실). 3.4 · 2.3 (2026-11-07 저녁, D113 · D114): 상자 크기 · 자리를 각도로(10° × 5.2°, 둘 다 같음) + 2차 HUD 일반도로 갈림 뒤 도로 전체 폭. 3.5 · 2.4 (같은 날 밤, D116): 상자를 장면 각도 14° × 7.3°로(사용자 결정)
+const HUD_VER = {nav:'현대 3.5', ar:'리뉴얼 1.9', ar2:'리뉴얼 2.4', ar3:'리뉴얼 3.0'};   // 3.0 (2026-11-17): 3차 실험 조건은 nav · ar3. ar · ar2는 시연 전용. 2차 실험 기록의 이 칸은 예전 이름('우리 2.4-B') 그대로 남아 있음 —   // nav · ar2가 2차 실험 조건, ar(1차)은 시연 전용. 2.2 (2026-11-07, D107): 그래픽만 바뀜(실루엣 아이콘 · 채움 · 먼 곳 소실). 3.4 · 2.3 (2026-11-07 저녁, D113 · D114): 상자 크기 · 자리를 각도로(10° × 5.2°, 둘 다 같음) + 2차 HUD 일반도로 갈림 뒤 도로 전체 폭. 3.5 · 2.4 (같은 날 밤, D116): 상자를 장면 각도 14° × 7.3°로(사용자 결정)
 function setMode(m){
   S.mode = m;
   $('#arHud').style.display = m==='ar' ? '' : 'none';
   $('#arHud2').style.display = m==='ar2' ? '' : 'none';
+  $('#arHud3').style.display = m==='ar3' ? '' : 'none'; if(m !== 'ar3'){ $('#mirCue').hidden = true; $('#cWarn').setAttribute('opacity', 0); }
   $('#navHud').style.display = m==='nav' ? '' : 'none';
   $$('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode===m)));
 }
@@ -230,7 +231,7 @@ function updateWheel(p, f, dt){
 
 /* ---------- 안내 판단 (guide.js) ----------
    내 차 자세(EGO)와 실제 차(시연: 옆 차로 뒤차 · 정체 줄 / 주행: D.cars)로 매 프레임 S.G를 만든다.
-   우리 HUD가 그리고, 주행 테스트에서는 어느 HUD든 같은 판단을 기록한다(현대 HUD엔 보이지 않음 — 비교용 잠재 상태).
+   리뉴얼 HUD가 그리고, 주행 테스트에서는 어느 HUD든 같은 판단을 기록한다(현대 HUD엔 보이지 않음 — 비교용 잠재 상태).
    미러(mirrors.js)도 같은 EGO · 같은 차를 쓴다 → HUD에 그린 차 = 판단에 쓴 차 = 미러에 보이는 차 */
 const EGO = {x:0, z:0, psi:0, v:0, halfL:DRV.carL/2};
 const GS = {gate:makeGate(), needWas:false, doneAt:-9, hazard:null};
@@ -262,7 +263,7 @@ function guideStep(t, C){
   const tail = qz.length ? Math.max(...qz) : null;
   const jam = tail !== null ? {tail, beside:EGO.z < tail + 2*EGO.halfL + 3} : null;
   const r = GS.gate.reason, dir = r && r.car ? relDir(EGO, r.car) : null;
-  // 일반도로: 지금 차로에서 멈춰야 하는 이유 (차로 변경 대기와 다른 신호 — 우리 HUD는 지금 차로를 가로지르는 막대)
+  // 일반도로: 지금 차로에서 멈춰야 하는 이유 (차로 변경 대기와 다른 신호 — 리뉴얼 HUD는 지금 차로를 가로지르는 막대)
   let stop = null;
   if(m.city && C.i === 0){
     const e1 = R.leaf.path[0], dStop = EGO.z - FORK_Z;
@@ -274,7 +275,7 @@ function guideStep(t, C){
   S.G = {need, side, next, tl, my, A, gate:GS.gate.state, since:GS.gate.since, reason:r, dir, jam, stop:stop && (!need || stop.kind === 'ped') ? stop : null, cars, intent, doneAt:GS.doneAt};
   // 기록 (주행 테스트): 판단 상태가 바뀐 시점 · 위험 발생/해소
   if(S.drive && D.events){
-    if(GS.gate.state !== prev) D.events.push({t:+t.toFixed(2), type:'gate', from:prev, to:GS.gate.state, rel:r ? r.rel : '', side:dir ? dir.side : 0, shown:S.mode === 'ar'});
+    if(GS.gate.state !== prev) D.events.push({t:+t.toFixed(2), type:'gate', from:prev, to:GS.gate.state, rel:r ? r.rel : '', side:dir ? dir.side : 0, shown:S.mode === 'ar' || S.mode === 'ar2' || S.mode === 'ar3'});
     const haz = need && !A.safe;
     if(haz !== !!GS.hazard){ GS.hazard = haz || null; D.events.push({t:+t.toFixed(2), type:haz ? 'hazardOn' : 'hazardOff', lane:next, with:A.primary ? KIND_NAME[A.primary.c.kind] : ''}); }
   }
@@ -367,8 +368,9 @@ function update(dt){
   const remainKm = Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1);
 
   setEgo(p.x, p.z, Math.atan2(f.x, -f.z), S.running && !S.paused ? cruiseOf(S.map)*(S.speedFactor ?? 1) : 0);
-  guideStep(S.cityT, C);
+  guideStep(S.cityT, C); stepHud3(C, S.cityT);
   if(S.mode === 'ar') drawAr(p, f, C, k, dangerOn);
+  else if(S.mode === 'ar3') drawAr3(p, f, C, k);
   else if(S.mode === 'ar2') drawAr2(p, f, C, k);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, remainKm, dangerOn);
   // 시연 내 차 깜빡이 (D103): 옮겨야 하는 동안(guide.js need) 그쪽 — 계기판 화살표 · 똑딱
@@ -418,8 +420,9 @@ function updateDrive(dt){
   const C = navCtx(S.s), k = Math.min(1, dt*4), kmh = Math.round(D.v*3.6);
   showStage(C.st);
   setEgo(D.x, D.z, D.psi, D.v);
-  guideStep(D.t, C);
+  guideStep(D.t, C); stepHud3(C, D.t);   // 리뉴얼 HUD 3차 상태(01 ~ 06)는 어느 HUD로 달리든 계산 — 기록용
   if(S.mode === 'ar') drawAr(p, f, C, k, S.rearBlock);
+  else if(S.mode === 'ar3') drawAr3(p, f, C, k);
   else if(S.mode === 'ar2') drawAr2(p, f, C, k);
   else if(S.mode === 'nav') drawNav(p, f, C, kmh, Math.max(0, 3.4 - (S.s-40)/1000).toFixed(1), S.rearBlock);
   // 깜빡이 (D103): 계기판 화살표 + 켜짐 · 꺼짐이 바뀔 때 똑딱 소리 (시계는 D.t — 일시정지 중엔 멈춤)
@@ -485,6 +488,6 @@ addEventListener('keydown', e => {
 /* ---------- 시작 ---------- */
 $$('[data-ico]').forEach(el => el.insertAdjacentHTML('afterbegin', ico(el.dataset.ico)));   // 버튼 아이콘 채우기
 setTone('B');
-setMode('ar2'); setLight('day'); prepDemo(); update(1); setScreen('home');
+setMode('ar3'); setLight('day'); prepDemo(); update(1); setScreen('home');
 requestAnimationFrame(frame);
 prebuildMaps(() => !S.running);   // 멈춰 있을 때 나머지 맵을 미리 지어 둔다

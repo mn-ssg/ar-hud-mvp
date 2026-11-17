@@ -131,3 +131,61 @@ test('연속 분기: 첫 출구를 확정해야 다음 갈림으로 넘어감', 
   assert.equal(b.i, 1); assert.equal(b.phase, 'approach'); assert.equal(Math.round(b.d), 150);
   assert.equal(G.navPhase(nodeS, 400, 2, false).phase, 'follow');
 });
+
+
+/* ---------- 리뉴얼 HUD 3차: 상태 6가지 (h3Step) ---------- */
+const P3 = {cautionTtc:6, cautionGap:25, confirmT:.8, frontTtc:3, frontClosing:1.5, exitK:1.2, dwell:.4, frontHold:.6};
+const I3 = (o = {}) => ({need:true, gate:'go', rearWait:false, queueWait:false, queueGo:false, rear:null, front:null, ped:false, ...o});
+
+test('3차 01 안전: 옮길 차로 뒤가 비었거나 뒤차가 주의 거리 밖', () => {
+  const h = G.makeH3();
+  assert.equal(G.h3Step(h, 0, I3(), P3), 1);
+  assert.equal(G.h3Step(h, .1, I3({rear:{gap:40, ttc:20}}), P3), 1);
+  assert.equal(G.h3Step(h, .2, I3({need:false, rear:{gap:5, ttc:1}}), P3), 1);   // 옮길 일이 없으면 뒤차가 가까워도 01
+});
+
+test('3차 02 주의: 닿기까지 시간이 줄거나 간격이 좁아지면 바로, 풀릴 때는 1.2배 + 0.4초 머문 뒤', () => {
+  const h = G.makeH3();
+  assert.equal(G.h3Step(h, 0, I3({rear:{gap:40, ttc:5.9}}), P3), 2);
+  assert.equal(G.h3Step(h, .1, I3({rear:{gap:40, ttc:6.5}}), P3), 2);    // 6초 × 1.2 = 7.2초 안이면 유지
+  assert.equal(G.h3Step(h, .2, I3({rear:{gap:40, ttc:9}}), P3), 2);      // 풀렸지만 0.4초 전
+  assert.equal(G.h3Step(h, .5, I3({rear:{gap:40, ttc:9}}), P3), 1);
+  assert.equal(G.h3Step(h, .6, I3({rear:{gap:24, ttc:Infinity}}), P3), 2);   // 간격만으로도
+});
+
+test('3차 03 대기 → 04 확인 → 05 이동: 게이트를 따라가고, 한 번 기다린 뒤에만 05', () => {
+  const h = G.makeH3();
+  assert.equal(G.h3Step(h, 0, I3({gate:'wait', rearWait:true, rear:{gap:6, ttc:2}}), P3), 3);
+  assert.equal(G.h3Step(h, 1, I3({gate:'clearing', rearWait:true}), P3), 4);
+  assert.equal(G.h3Step(h, 1.8, I3({gate:'go'}), P3), 5);
+  assert.equal(G.h3Step(h, 2.5, I3({gate:'go', rear:{gap:30, ttc:5}}), P3), 2);            // 다음 차가 다가오면 주의
+  assert.equal(G.h3Step(h, 3, I3({gate:'wait', rearWait:true, rear:{gap:8, ttc:2}}), P3), 3);
+  assert.equal(G.h3Step(h, 4, I3({gate:'clearing', rearWait:true}), P3), 4);
+  assert.equal(G.h3Step(h, 4.3, I3({gate:'wait', rearWait:true, rear:{gap:8, ttc:2}}), P3), 3);   // 확인 중 다시 위험 → 바로 대기
+  assert.equal(G.h3Step(h, 6, I3({need:false, gate:'none'}), P3), 1);
+  assert.equal(G.h3Step(h, 7, I3(), P3), 1);                                                // 다시 옮겨야 해도 기다린 적 없으면 01
+});
+
+test('3차 정체 줄 옆: 틈이 없으면 03, 틈이 생기면 확인 시간만큼 04를 거쳐 05', () => {
+  const h = G.makeH3();
+  assert.equal(G.h3Step(h, 0, I3({gate:'wait', queueWait:true}), P3), 3);
+  assert.equal(G.h3Step(h, 1, I3({gate:'wait', queueGo:true}), P3), 4);
+  assert.equal(G.h3Step(h, 1.5, I3({gate:'wait', queueGo:true}), P3), 4);
+  assert.equal(G.h3Step(h, 1.9, I3({gate:'wait', queueGo:true}), P3), 5);
+  assert.equal(G.h3Step(h, 2.5, I3({gate:'wait', queueWait:true}), P3), 3);   // 틈이 닫히면 다시 대기
+});
+
+test('3차 06 앞쪽 위험: 어느 상태에서든 먼저, 풀린 뒤 0.6초 더 유지하고 밑의 상태로 돌아감', () => {
+  const h = G.makeH3();
+  assert.equal(G.h3Step(h, 0, I3({gate:'wait', rearWait:true, rear:{gap:6, ttc:2}}), P3), 3);
+  assert.equal(G.h3Step(h, .1, I3({gate:'wait', rearWait:true, rear:{gap:6, ttc:2}, front:{ttc:2.5, closing:4}}), P3), 6);
+  assert.equal(h.base, 3);                                                                  // 밑에서는 대기가 계속
+  assert.equal(G.h3Step(h, .2, I3({gate:'wait', rearWait:true, front:{ttc:3.3, closing:3}}), P3), 6);   // 3초 × 1.2 안: 아직
+  assert.equal(G.h3Step(h, .3, I3({gate:'wait', rearWait:true, front:{ttc:5, closing:2}}), P3), 6);
+  assert.equal(G.h3Step(h, .8, I3({gate:'wait', rearWait:true, front:{ttc:5, closing:2}}), P3), 6);
+  assert.equal(G.h3Step(h, .95, I3({gate:'wait', rearWait:true, front:{ttc:5, closing:2}}), P3), 3);
+  assert.equal(G.h3Step(h, 1, I3({front:{ttc:1, closing:.5}}), P3) === 6, false);           // 천천히 좁혀지는 것(1.5m/s 이하)은 위험 아님 — 정체 줄 따라가기
+  assert.equal(G.h3Step(h, 2, I3({need:false, ped:true}), P3), 6);                          // 보행자: 옮길 일이 없어도
+  assert.equal(h.frontKind, 'ped');
+  assert.deepEqual(h.log.map(l => l.to), [3, 6, 3, 5, 6]);   // 대기 → 앞쪽 위험 → 대기 → (기다린 뒤 풀림) 이동 → 보행자
+});

@@ -465,7 +465,8 @@ function trackLanes(){
     if(!D.enc[l]){
       D.enc[l] = true;
       // 차로 변경 시작: 차 옆면이 선을 넘기 시작한 순간. 그때 판단 상태(S.G — 어느 HUD든 같은 판단, 보인 건 v2뿐)를 함께
-      D.lc = {from:li, to:l, t0:D.t}; D.events.push({t:+D.t.toFixed(2), type:'lcStart', from:li, to:l, gate:S.G ? S.G.gate : '', toward:l === next});
+      // hs: 그 순간 리뉴얼 HUD 3차 상태(1 ~ 6, guide.js h3Step — 현대 HUD로 달릴 때도 같은 계산, 2026-11-17)
+      D.lc = {from:li, to:l, t0:D.t}; D.events.push({t:+D.t.toFixed(2), type:'lcStart', from:li, to:l, gate:S.G ? S.G.gate : '', toward:l === next, hs:S.H3 ? S.H3.state : null});
       cutIn(l);
     }
   });
@@ -481,7 +482,7 @@ function trackLanes(){
   else D.enterZ = null;
 }
 // 옆 차로가 지금 옮겨도 안전한가 (반응 시간의 기준, 시뮬레이터가 아는 실제 교통): 옆에 차 없음 · 뒤차는 10m 넘게 떨어지고 3.5초 안에 안 닿음 ·
-// 앞차는 4m 넘게 떨어지고 2초 안에 안 닿음. [가정] 우리 HUD '대기' 기준과 같은 값 → 우리 HUD 신호와 맞물려 유리할 수 있음 (설계 7장)
+// 앞차는 4m 넘게 떨어지고 2초 안에 안 닿음. [가정] 리뉴얼 HUD '대기' 기준과 같은 값 → 리뉴얼 HUD 신호와 맞물려 유리할 수 있음 (설계 7장)
 function laneSafe(li){
   return !D.cars.some(c => {
     if(c.lane !== li || c.z < FORK_Z - 5) return false;
@@ -508,7 +509,7 @@ function cutIn(li){
 }
 
 /* ---------- HUD에 줄 값 (hud.js가 읽음) ----------
-   우리 HUD: 옮길 쪽 옆 차로의 (줄이 아닌) 차 → S.rearActive · rearGap · rearBlock · threatCar · danger
+   리뉴얼 HUD: 옮길 쪽 옆 차로의 (줄이 아닌) 차 → S.rearActive · rearGap · rearBlock · threatCar · danger
    현대 HUD: 양쪽 후측방 경고 S.bswL · S.bswR (경로와 상관없이)
    정체 줄: 목표 차로에 줄이 있으면 S.q = {backZ, mergeNear} */
 function hudThreat(dt){

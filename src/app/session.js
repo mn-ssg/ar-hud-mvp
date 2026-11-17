@@ -1,8 +1,8 @@
 /* ============================================================
    session.js — 주행 테스트 진행 · 기록 · 내보내기 (2026-10-29 개편, 예전 D60 · D64 · D65 · D68 · D70 위에)
    흐름: 참가자 정보 → (연습 주행) → HUD A 3회 → 질문 2개 → HUD B 3회 → 질문 2개 → 요약 + 엑셀 자동 저장
-   · 비교 (2026-11-03 두 번째 개정, 2차 실험): 현대 HUD(nav, 1차 그대로) 3회 · 우리 HUD 2차(ar2, 2.1) 3회. 순서는 늘 현대 → 2차로 고정 (2026-11-04 사용자: 참가자 번호 홀수 · 짝수 교대를 없앰).
-     1차 HUD(ar, v1.9)는 실험 조건에서 빠지고 시연에서만 열어 볼 수 있음. 'HUD 버전' 칸: 현대 3.3 · 우리 2.1-A/B (1차 기록의 '우리 HUD'는 빈칸 = v1.7~1.9)
+   · 비교 (2026-11-03 두 번째 개정, 2차 실험): 현대 HUD(nav, 1차 그대로) 3회 · 리뉴얼 HUD 2차(ar2, 2.1) 3회. 순서는 늘 현대 → 2차로 고정 (2026-11-04 사용자: 참가자 번호 홀수 · 짝수 교대를 없앰).
+     1차 HUD(ar, v1.9)는 실험 조건에서 빠지고 시연에서만 열어 볼 수 있음. 'HUD 버전' 칸: 현대 3.3 · 리뉴얼 2.1-A/B (1차 기록의 '리뉴얼 HUD'는 빈칸 = v1.7~1.9)
    · 시나리오(맵 · 상황 · 시간대 · 교통 번호 · 시작 차로 · 목적지 · 신호 시각)는 짝마다 한 번 정해 두 HUD 블록이 그대로 다시 씀
      → HUD만 다르고 교통은 같다 (예전엔 블록마다 교통 번호 · 목적지를 새로 뽑았음)
    · 연습 주행은 늘 하고(2026-11-07: 끄는 설정 삭제) HUD 없이, 본 기록(hud-drive-v1)과 따로(hud-drive-practice-v1) 저장 → 결과에 섞이지 않음
@@ -15,11 +15,11 @@ const loadArr = k => { try{ const v = JSON.parse(localStorage.getItem(k) || '[]'
 const saveArr = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
 let drives = loadArr(DKEY), surveys = loadArr(QKEY), practices = loadArr(PKEY);
 const shuffle = (a, R = Math.random) => { for(let i=a.length-1;i>0;i--){ const j = Math.floor(R()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-// HUD 이름. 'ar' = 1차 실험 때 우리 HUD(개선 전) — 1차 기록의 '우리 HUD'와 같은 HUD. 'ar2' = 개선 후(2026-11-03). 'HUD 버전' 칸이 비어 있으면 1차 실험 기록
+// HUD 이름. 'ar' = 1차 실험 때 리뉴얼 HUD(개선 전) — 1차 기록의 '리뉴얼 HUD'와 같은 HUD. 'ar2' = 개선 후(2026-11-03). 'HUD 버전' 칸이 비어 있으면 1차 실험 기록
 const hudKey = h => h;
-const modeName = m => ({ar:'우리 HUD (1차)', ar2:'우리 HUD (2차)', nav:'현대 HUD', off:'HUD 없음'})[m] || m;
-const modeShort = m => ({ar:'1차', ar2:'2차', nav:'현대'})[m] || m;
-const hudVerOf = m => m === 'ar2' ? HUD_VER.ar2 + '-' + (S.tone || 'A') : HUD_VER[m] || '';   // 개선 후는 마감(A 절제 · B 선명)까지
+const modeName = m => ({ar:'리뉴얼 HUD (1차)', ar2:'리뉴얼 HUD (2차)', ar3:'리뉴얼 HUD', nav:'현대 HUD', off:'HUD 없음'})[m] || m;   // 3차 실험 조건(ar3)이 '리뉴얼 HUD'. 1 · 2차는 예전 기록 구분용
+const modeShort = m => ({ar:'1차', ar2:'2차', ar3:'리뉴얼', nav:'현대'})[m] || m;
+const hudVerOf = m => m === 'ar2' ? HUD_VER.ar2 + '-' + (S.tone || 'A') : HUD_VER[m] || '';   // 2차만 마감(A 절제 · B 선명)을 뒤에 붙임
 const orderText = (o, pair = EXP.pair) => o === 'AB' ? `${modeShort(pair[0])} → ${modeShort(pair[1])}` : o === 'BA' ? `${modeShort(pair[1])} → ${modeShort(pair[0])}` : o || '';
 const RESULT = {ok:'성공', wrong:'다른 출구', crash:'충돌', timeout:'시간 초과', signal:'신호 위반'};   // 신호 위반: 일반도로(D69)
 const CITY_SITU = {CL2:'좌회전 대기 줄 · 신호', CRT:'정류장 버스 · 보행자'};
@@ -37,7 +37,7 @@ const envName = () => `환경 ${ENV_VER} · 미러 ${MIR.on ? '켬' : '끔'}`;
 
 /* ---------- 실험 설정 ---------- */
 // 비교 쌍 A = 현대 · B = 2차. 연습 주행은 늘 한다(2026-11-07: 연구자 설정의 '연습 주행' 체크박스 · localStorage 저장 삭제 — 순서는 늘 연습 → 블록 1 → 블록 2)
-const EXP = {pair:['nav', 'ar2']};
+const EXP = {pair:['nav', 'ar3']};   // 3차 실험(2026-11-17 ~): 현대 HUD 3회 · 리뉴얼 HUD(3.0) 3회
 // 제시 순서: 늘 현대 먼저('AB'). 2026-11-03엔 참가자 번호 홀수 AB · 짝수 BA로 교대했으나 2026-11-04 사용자가 고정을 택함 (짝수 참가자에게 2차가 먼저 나와 혼란). 순서 효과는 상쇄되지 않으므로 분석 때 참고
 const orderFor = pid => { void pid; return 'AB'; };
 
@@ -165,9 +165,9 @@ function surveyCard(st){
 function setRate(n){ SES.rate = n; $$('#rate button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.r === n))); $('#sesBtn').disabled = !SES.rate; }
 
 /* 한 판에서 뽑는 새 값 (이벤트에서): 대기 표시 시간 · 대기(또는 확인) 중 옮기기 시작한 횟수 · 이동 판단 뒤 옮기기까지 · 위험 발생 횟수.
-   판단(S.G)은 어느 HUD에서든 같게 계산 — 화면에 보인 건 우리 HUD뿐(이벤트 shown) */
+   판단(S.G)은 어느 HUD에서든 같게 계산 — 화면에 보인 건 리뉴얼 HUD뿐(이벤트 shown) */
 function eventStats(ev, tEnd){
-  let waitSecs = 0, waitFrom = null, lastGo = null, goReact = null, waitMoves = 0, hazards = 0;
+  let waitSecs = 0, waitFrom = null, lastGo = null, goReact = null, waitMoves = 0, hazards = 0, lcState = null;
   ev.forEach(e => {
     if(e.type === 'gate'){
       if(e.to === 'wait' && waitFrom === null) waitFrom = e.t;
@@ -176,12 +176,13 @@ function eventStats(ev, tEnd){
     }
     if(e.type === 'hazardOn') hazards++;
     if(e.type === 'lcStart' && e.toward){
+      if(lcState === null && e.hs) lcState = e.hs;   // 목표 쪽으로 처음 옮기기 시작한 순간의 리뉴얼 HUD 상태
       if(e.gate === 'wait' || e.gate === 'clearing') waitMoves++;
       if(goReact === null && e.gate === 'go' && lastGo !== null) goReact = +(e.t - lastGo).toFixed(2);
     }
   });
   if(waitFrom !== null) waitSecs += tEnd - waitFrom;
-  return {waitSecs:+waitSecs.toFixed(2), waitMoves, goReact, hazards};
+  return {waitSecs:+waitSecs.toFixed(2), waitMoves, goReact, hazards, lcState};
 }
 
 // drive.js가 판이 끝나면 부름
@@ -199,12 +200,13 @@ function onDriveEnd(){
     waitSecs:es.waitSecs, waitMoves:es.waitMoves, goReact:es.goReact, hazards:es.hazards, lcN, riskyWith, events:ev,
     cutAhead:D.cutAhead, cutAheadGap:D.cutAheadGap, cutAheadTtc:D.cutAheadTtc,   // 2026-11-03 앞으로 끼어들기
     blinkUsed:D.blinkUsed, blinkLead:D.blinkLead, blinkResp:D.blinkResp,   // 2026-11-07 깜빡이 (D103)
+    lcState:es.lcState,   // 2026-11-17 차로를 옮기기 시작한 순간의 리뉴얼 HUD 상태(1 ~ 6)
     ppc:+SCR.ppc().toFixed(2) + (SCR.calibrated() ? '' : ' (기본값)'), dist:SCR.distCm, vfov:camera.fov, hudPx:LAY && LAY.hud ? `${Math.round(LAY.hud.w)} × ${Math.round(LAY.hud.h)} (눈에서 ${LAY.hud.eyeDegW.toFixed(1)}°)` : ''};   // 2026-11-07 밤 화면 맞추기 (D116)
   if(practice){
     // 연습은 조작 익히기 — 판정 · 결과 카드 · 요약 없이 바로 다음으로 (2026-11-03). 기록은 '연습' 시트에만
     practices.push(row); saveArr(PKEY, practices); SES.prs.push(row);
     if(SES.on){ nextStep(); return; }
-    S.testing = false; stopDrive(); setMode(SES.prevMode || 'ar2'); goHome(); return;   // 처음 화면에서 한 연습: 잠금 풀고 처음으로
+    S.testing = false; stopDrive(); setMode(SES.prevMode || 'ar3'); goHome(); return;   // 처음 화면에서 한 연습: 잠금 풀고 처음으로
   }
   drives.push(row); saveArr(DKEY, drives); SES.rows.push(row); renderLog();
   const runs = SES.steps.filter(x => x.kind === 'run'), idx = runs.indexOf(st) + 1;
@@ -223,7 +225,7 @@ function doneSession(){
 function endSession(){
   clearTimeout(SES.timer); SES.on = false; SES.cur = null; S.testing = false;
   stopDrive(); D.frozen = false; $('#count').hidden = true; $('#keyHint').hidden = true; $('#abortBtn').hidden = true;
-  lockUi(false); setMode(SES.prevMode || 'ar'); if(SES.prevLight) setLight(SES.prevLight); prepDemo(); update(1);
+  lockUi(false); setMode(SES.prevMode || 'ar3'); if(SES.prevLight) setLight(SES.prevLight); prepDemo(); update(1);
 }
 function abortRun(){
   if(!S.testing) return;
@@ -238,7 +240,7 @@ $('#abortBtn').onclick = abortRun;
 /* ---------- 요약 · 내보내기 (D70 — 디자이너가 읽을 칸만, 2026-10-29 새 칸은 뒤에) ---------- */
 const avg = a => a.length ? a.reduce((x, y) => x + y, 0)/a.length : null;
 const r1 = v => v === null ? '' : Math.round(v*10)/10;
-const HUDS_IN = rows => ['nav', 'ar', 'ar2'].filter(h => rows.some(r => hudKey(r.hud) === h));
+const HUDS_IN = rows => ['nav', 'ar', 'ar2', 'ar3'].filter(h => rows.some(r => hudKey(r.hud) === h));
 // 차로 옮긴 곳 평균은 위험한 끼어들기 0인 판만 (D65 분석 규칙)
 function summarize(rows, hud, qs = [], kind = null){
   const l = rows.filter(r => hudKey(r.hud) === hud && (!kind || kindOf(r) === kind));
@@ -257,30 +259,32 @@ function summaryHtml(rows){
 const HEAD = ['참가자','HUD','시간대','맵','상황','결과','차로 옮긴 곳 (마감선 앞 m)','안전해진 뒤 옮기기까지 (초)','위험한 끼어들기 (번)','보행자 양보 안 함 (번)','도로 벗어남 (번)',
   '시나리오 ID','HUD 버전','환경 버전','제시 순서','판 순서','대기 판단 시간 (초)','대기 · 확인 중 옮기기 시작 (번)','이동 판단 뒤 옮기기까지 (초)','위험 발생 (번)','차로 변경 완료 (번)','위험한 끼어들기 상대','충돌 상대','연습 여부','정체 줄 합류 방식','앞으로 끼어들기 (번)','그때 뒤차 간격 (m)','그때 닿기까지 (초)',
   '깜빡이 켬 (차로 변경 때)','깜빡이 → 차선 넘기 시작 (초)','옮길 차로 뒤차 반응',   // 2026-11-07 깜빡이 (D103)
-  '화면 1cm당 px','보는 거리 (cm)','장면 세로 시야각 (°)','HUD 상자 (px)'];   // 2026-11-07 밤 화면 맞추기 (D116) — HUD가 참가자 눈에 몇 도로 보였는지 되짚을 수 있게
+  '화면 1cm당 px','보는 거리 (cm)','장면 세로 시야각 (°)','HUD 상자 (px)',
+  '옮기기 시작 때 리뉴얼 HUD 상태'];   // 2026-11-17 3차: 01 안전 · 02 주의 · 03 대기 · 04 확인 · 05 이동 · 06 앞쪽 위험   // 2026-11-07 밤 화면 맞추기 (D116) — HUD가 참가자 눈에 몇 도로 보였는지 되짚을 수 있게
 // 정체 판 성공이 '줄 합류'였는지, 줄을 건너뛰고 갈림 뒤에 출구로 들어갔는지 (2026-11-03 — 자동 운전에서 후자가 '성공 · 옮긴 곳 빈칸 · 반응 빈칸'으로 남는 것을 확인, 결과 정의는 바꾸지 않고 칸만 추가)
 const jamJoinOf = r => r.type !== 'jam' ? '' : r.result !== 'ok' ? '' : /줄 합류$/.test(r.exit || '') ? '줄 합류' : '줄 건너뜀 (갈림 뒤 진입)';
 const rowCells = r => [r.p, modeName(r.hud), lightName(r.light), mapLabel(r.map), situName(r), resultName(r), marginOf(r) ?? '', r.react ?? '',
   r.risky, (mapById(r.map) || {}).cw ? (r.ped ?? '') : '', r.offroad,
   r.scn ?? '', r.ver ?? '', r.env ?? '', orderText(r.order), r.seq ?? '', r.waitSecs ?? '', r.waitMoves ?? '', r.goReact ?? '', r.hazards ?? '', r.lcN ?? '', r.riskyWith ?? '', r.crash ?? '', r.practice ? '연습' : r.scn ? '본 실험' : '', jamJoinOf(r), r.cutAhead ?? '', r.cutAheadGap ?? '', r.cutAheadTtc ?? '',
   r.blinkUsed === undefined ? '' : r.blinkUsed === null ? '(안 옮김)' : r.blinkUsed ? '켬' : '안 켬', r.blinkLead ?? '', r.blinkResp ?? '',
-  r.ppc ?? '', r.dist ?? '', r.vfov ?? '', r.hudPx ?? ''];
+  r.ppc ?? '', r.dist ?? '', r.vfov ?? '', r.hudPx ?? '', r.lcState === undefined ? '' : r.lcState === null ? '(안 옮김)' : h3Label(r.lcState)];
 const SUM_HEAD = ['HUD','판 종류','판 수','성공률 (%)','다른 출구 (판)','충돌 (판)','위험한 끼어들기 (번)','신호 위반 (판)','보행자 양보 안 함 (번)','도로 벗어남 (번)','차로 옮긴 곳 평균 (마감선 앞 m, 위험 0인 판)','안전해진 뒤 옮기기까지 평균 (초)','확신 평균 (1~5)','대기 · 확인 중 옮기기 시작 (번)','대기 이해 정답 (A / 답한 수)'];
 const sumCells = (rows, qs) => HUDS_IN(rows).flatMap(h => [null, '고속도로 뒤차', '고속도로 정체', '일반도로'].map(k => { const s = summarize(rows, h, qs, k);
   return [modeName(h), k || '전체', s.n, s.rate ?? '', s.wrong, s.crash, s.risky, s.sig, s.ped, s.off, r1(s.margin), s.react === null ? '' : Math.round(s.react*100)/100, k ? '' : r1(s.sure), s.waitMoves ?? '', k ? '' : (summarize(rows, h, qs).waitOk || '')]; }));
 const Q_HEAD = ['참가자','HUD','질문','답 (1 전혀 ~ 5 매우)','질문 2','답 2','HUD 버전','제시 순서'];
 const qCells = q => [q.p, modeName(q.hud), Q_TEXT, q.rate, q.wait ? Q2_TEXT : '', q.wait ? `${'ABCD'[q.wait - 1]} ${q.waitText}` : '', q.ver ?? '', orderText(q.order)];
-const EV_NAME = {gate:'판단 상태', hazardOn:'위험 발생', hazardOff:'위험 해소', lcStart:'차로 변경 시작', lcDone:'차로 변경 완료', lcAbort:'차로 변경 취소', cutIn:'옆 차로 진입', crash:'충돌', blink:'깜빡이', blinkResp:'뒤차 반응'};
+const EV_NAME = {h3:'리뉴얼 HUD 상태', gate:'판단 상태', hazardOn:'위험 발생', hazardOff:'위험 해소', lcStart:'차로 변경 시작', lcDone:'차로 변경 완료', lcAbort:'차로 변경 취소', cutIn:'옆 차로 진입', crash:'충돌', blink:'깜빡이', blinkResp:'뒤차 반응'};
 const GATE_NAME = {none:'없음', wait:'대기', clearing:'확인', go:'이동'};
 const EV_HEAD = ['참가자','HUD','시나리오 ID','판 순서','시각 (초)','이벤트','내용'];
-const evDetail = e => e.type === 'gate' ? `${GATE_NAME[e.from]} → ${GATE_NAME[e.to]}${e.rel ? ' · 이유 ' + ({rear:'뒤차', side:'옆 차', front:'앞 간격'})[e.rel] : ''}${e.side ? ' · ' + (e.side > 0 ? '오른쪽' : '왼쪽') : ''}${e.shown ? '' : ' (화면에 안 보임)'}`
-  : e.type === 'lcStart' ? `${e.from + 1} → ${e.to + 1}차로 · 그때 판단 ${GATE_NAME[e.gate] || '-'}${e.toward ? '' : ' (목표 반대쪽)'}` : e.type === 'lcDone' ? `${e.from + 1} → ${e.to + 1}차로 · ${e.dur}초`
+const evDetail = e => e.type === 'h3' ? `${h3Label(e.from)} → ${h3Label(e.to)}${e.shown ? '' : ' (화면에 안 보임)'}` : e.type === 'gate' ? `${GATE_NAME[e.from]} → ${GATE_NAME[e.to]}${e.rel ? ' · 이유 ' + ({rear:'뒤차', side:'옆 차', front:'앞 간격'})[e.rel] : ''}${e.side ? ' · ' + (e.side > 0 ? '오른쪽' : '왼쪽') : ''}${e.shown ? '' : ' (화면에 안 보임)'}`
+  : e.type === 'lcStart' ? `${e.from + 1} → ${e.to + 1}차로 · 그때 판단 ${GATE_NAME[e.gate] || '-'}${e.hs ? ' · 리뉴얼 HUD 상태 ' + h3Label(e.hs) : ''}${e.toward ? '' : ' (목표 반대쪽)'}` : e.type === 'lcDone' ? `${e.from + 1} → ${e.to + 1}차로 · ${e.dur}초`
   : e.type === 'cutIn' ? `${e.lane + 1}차로${e.risky ? ' · 위험 (' + e.with + ')' : ''}${e.ahead ? ' · 뒤차 앞에 끼어듦 (간격 ' + e.gap + 'm' + (e.ttc !== null && e.ttc !== undefined ? ' · ' + e.ttc + '초' : '') + ')' : ''}` : e.type === 'hazardOn' ? `${e.lane + 1}차로 · ${e.with}` : e.type === 'crash' ? e.with : e.type === 'lcAbort' ? `${e.from + 1} → ${e.to + 1}차로`
   : e.type === 'blink' ? (e.side ? (e.side < 0 ? '왼쪽 켬' : '오른쪽 켬') : (e.auto ? '자동 끔 (차로 변경 완료)' : '끔')) : e.type === 'blinkResp' ? `${e.with} · ${e.yield ? '양보' : '양보 안 함'} (${e.notice}초 뒤 알아챔)` : '';
 const evRows = rows => rows.flatMap(r => (r.events || []).map(e => [r.p, modeName(r.hud), r.scn ?? '', r.seq ?? '', e.t, EV_NAME[e.type] || e.type, evDetail(e)]));
 const EXPLAIN = [['칸','뜻','어떻게 읽나'],
-  ['HUD','현대 HUD = 지금 차에 있는 HUD(1차와 같은 대조군) · 우리 HUD (2차) = 뒤차 표현을 고친 HUD(2026-11-03) · 우리 HUD (1차) = 1차 실험 때 HUD(시연 전용). \'HUD 버전\' 칸이 빈칸이면 1차 실험 기록','2차: 같은 사람이 현대 3회 · 2차 3회. 같은 시나리오 ID끼리 짝'],
-  ['제시 순서','현대 → 2차 (모든 참가자 같음, 2026-11-04 고정)','순서 효과가 상쇄되지 않음 — 2차 HUD 결과엔 익숙해진 효과가 섞일 수 있음. 2026-11-03 이전 기록은 짝수 번호가 2차 → 현대'],
+  ['HUD','현대 HUD = 지금 차에 있는 HUD(1 · 2차와 같은 대조군) · 리뉴얼 HUD = 3차 실험의 실험군(3.0, 2026-11-17) · 리뉴얼 HUD (2차) = 2차 실험 때 HUD(2.4) · 리뉴얼 HUD (1차) = 1차 실험 때 HUD(1.9). \'HUD 버전\' 칸이 빈칸이면 1차 실험 기록, \'우리 2.4-B\'는 2차 실험 기록(그때 이름)','3차: 같은 사람이 현대 3회 · 리뉴얼 3회. 같은 시나리오 ID끼리 짝'],
+  ['옮기기 시작 때 리뉴얼 HUD 상태','목표 쪽으로 차로를 처음 넘기 시작한 순간 리뉴얼 HUD가 어느 상태였나: 01 안전 · 02 주의 · 03 대기 · 04 확인 · 05 이동 · 06 앞쪽 위험. 현대 HUD로 달릴 때도 같은 계산을 해서 남김(화면엔 안 보임). (안 옮김) = 끝까지 안 옮김, 빈칸 = 2026-11-17 전 기록','03 대기 · 04 확인에서 옮겼으면 \'기다려\'를 따르지 않은 것. \'대기 · 확인 중 옮기기 시작\' 칸은 예전과 같은 기준(판단 게이트)으로 그대로 셈'],
+  ['제시 순서','현대 → 리뉴얼 (모든 참가자 같음, 2026-11-04 고정)','순서 효과가 상쇄되지 않음 — 리뉴얼 HUD 결과엔 익숙해진 효과가 섞일 수 있음. 2026-11-03 이전 기록은 짝수 번호가 2차 → 현대'],
   ['연습 여부','본 실험 / 연습. 연습 주행은 \'연습\' 시트에만 있고 요약 · 기록에 들어가지 않음',''],
   ['정체 줄 합류 방식','정체 판 성공이 \'줄 합류\'(목표 차로 줄 뒤에 붙어 3초)였는지 \'줄 건너뜀\'(줄 옆을 지나 갈림 뒤에 출구로 들어감)이었는지. 건너뜀이면 차로 옮긴 곳 · 반응 시간이 빈칸으로 남음','정체 판 성공률을 읽을 때 둘을 나눠 볼 것. 1차 엑셀엔 이 칸이 없음'],
   ['앞으로 끼어들기 (번) · 그때 뒤차 간격 · 닿기까지','옮길 차로에서 내 뒤 60m 안에 차가 있는데 그 앞에 들어간 횟수, 그때 가장 가까운 뒤차와의 범퍼 간격(m)과 닿기까지 시간(초, 뒤차가 더 빠를 때만). 위험 여부와 상관없이 셈','2차 가설의 \'위험한 차로 변경\' 지표. 간격 · 시간이 작을수록 무리한 끼어들기'],
@@ -289,16 +293,16 @@ const EXPLAIN = [['칸','뜻','어떻게 읽나'],
   ['맵 · 상황','고속도로 ① IC 진출 · ② JC 4차로 · ③ 연속 분기 / 일반도로 ④ 이중 좌회전 · ⑤ 우회전 · 횡단보도','같은 상황끼리 HUD를 비교'],
   ['결과','성공 = 목적지 출구로 감 · 다른 출구 · 충돌(무엇과) · 시간 초과 · 신호 위반','성공률이 높을수록 좋음'],
   ['차로 옮긴 곳 (마감선 앞 m)','목표 차로에 자리 잡은 곳이 마감선보다 몇 m 앞이었나 (고속도로 갈림 25m 앞 · 일반도로 백색실선 시작). 빈칸 = 끝까지 못 옮김','클수록 미리 옮김. 위험한 끼어들기 0인 판끼리 비교'],
-  ['안전해진 뒤 옮기기까지 (초)','옮길 쪽 옆 차로가 안전해진 순간(뒤차 10m 넘게 · 3.5초 안에 안 닿음, 앞차 4m · 2초)부터 옮기기 시작할 때까지. 기준은 1차 실험과 같음','2026-10-29 우리 HUD는 위험이 풀린 뒤 0.8초 안정 확인을 거쳐 이동을 보여 주므로, 이 값이 그만큼 길어질 수 있음 — 1차 수치와 바로 비교하지 말 것'],
+  ['안전해진 뒤 옮기기까지 (초)','옮길 쪽 옆 차로가 안전해진 순간(뒤차 10m 넘게 · 3.5초 안에 안 닿음, 앞차 4m · 2초)부터 옮기기 시작할 때까지. 기준은 1차 실험과 같음','2026-10-29 리뉴얼 HUD는 위험이 풀린 뒤 0.8초 안정 확인을 거쳐 이동을 보여 주므로, 이 값이 그만큼 길어질 수 있음 — 1차 수치와 바로 비교하지 말 것'],
   ['위험한 끼어들기 (번)','옆 차로에 들어갈 때 그 차로 차와 4m보다 가깝거나 2초 안에 부딪힐 상황이었던 횟수 (기준 그대로)','적을수록 좋음'],
   ['보행자 양보 안 함 (번)','⑤에서 보행자가 건너거나 건너려 할 때 횡단보도에 들어간 횟수','0이 정답'],
   ['도로 벗어남 (번)','도로 끝(가드레일 · 연석)에 닿은 횟수','적을수록 좋음'],
   ['시나리오 ID','맵-상황-시간대(D 주간 · N 야간)-교통 번호. 같은 ID = 같은 교통 · 시작 차로 · 목적지','두 HUD가 같은 ID끼리 짝'],
   ['HUD 버전 · 환경 버전','HUD 그림 버전 · 시뮬레이터 환경(그래픽 · 미러) 버전','환경 2.0(그래픽 · 미러 추가) 결과를 1차(환경 1.x)와 비교할 때 HUD만의 효과로 읽지 말 것'],
   ['화면 1cm당 px · 보는 거리 · 장면 세로 시야각 · HUD 상자 (px)','연구자 설정 \'화면 맞추기\'(신용카드 크기 맞춤) 값과 보는 거리, 장면 카메라 세로 화각, 그때 HUD 상자의 CSS px. HUD는 참가자 눈에서 가로 10°가 되게 이 값으로 계산(D116)','\'(기본값)\'이 붙어 있으면 맞추지 않은 것 — 같은 기기 · 같은 값으로 고정해야 조건이 같음'],
-  ['대기 판단 시간 (초)','옮겨야 하는데 목표 차로가 막혀 판단이 \'대기\'였던 시간 합. 판단은 어느 HUD에서든 같게 계산(화면엔 우리 HUD만 보임)','HUD끼리 같은 교통이면 비슷해야 함'],
+  ['대기 판단 시간 (초)','옮겨야 하는데 목표 차로가 막혀 판단이 \'대기\'였던 시간 합. 판단은 어느 HUD에서든 같게 계산(화면엔 리뉴얼 HUD만 보임)','HUD끼리 같은 교통이면 비슷해야 함'],
   ['대기 · 확인 중 옮기기 시작 (번)','판단이 대기 · 확인일 때 목표 쪽으로 차로를 넘기 시작한 횟수','적을수록 \'기다려\'를 따른 것'],
-  ['이동 판단 뒤 옮기기까지 (초)','판단이 \'이동\'이 된 뒤 목표 쪽으로 옮기기 시작하기까지 (우리 HUD에선 초록 꺾쇠가 보인 뒤)','짧을수록 바로 판단'],
+  ['이동 판단 뒤 옮기기까지 (초)','판단이 \'이동\'이 된 뒤 목표 쪽으로 옮기기 시작하기까지 (리뉴얼 HUD에선 초록 꺾쇠가 보인 뒤)','짧을수록 바로 판단'],
   ['위험 발생 (번)','옮겨야 하는 동안 목표 차로가 막힌(위험) 횟수','교통 난이도 확인용'],
   ['질문 2','블록 끝 \"기다리라는 표시를 어떻게 이해했나\" A 유지하고 기다림 · B 멈춤 · C 빨리 옮김 · D 못 봄','A가 의도한 이해. [가정] 문항 — 파일럿에서 확인'],
   ['이벤트 시트','판마다 판단 상태 전환 · 위험 발생/해소 · 차로 변경 시작/완료 · 옆 차로 진입 · 충돌 시각','장면별로 다시 볼 때'],

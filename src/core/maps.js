@@ -133,7 +133,7 @@ function makeRoute(m, leafIdx, startLane){
   // 갈림 뒤: 첫 구간은 내 차로만큼 옆으로 띄운 선(다차로 출구), 다음 구간은 그대로 이어 붙임
   const after = [];
   // 2m 간격 (2026-10-29: 예전 24점 — 일반도로 회전 출구(≈ 300m)에선 점 사이 약 14m라 회전 모서리를 비스듬히 질러가
-  // 시연 차가 보도 위로 돌고, 우리 HUD 경로가 'ㄱ'자로 꺾여 보였다)
+  // 시연 차가 보도 위로 돌고, 리뉴얼 HUD 경로가 'ㄱ'자로 꺾여 보였다)
   const off = tx - cx, n = Math.max(24, Math.ceil(e1.L/2));
   for(let i=0;i<n;i++){
     const u = i/(n-1), q = e1.curve.getPointAt(u), t = e1.curve.getTangentAt(u);

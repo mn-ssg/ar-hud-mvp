@@ -1,8 +1,8 @@
 /* ============================================================
    hud.js — 유리 위 HUD 상자(SVG) 그리기
    · 현대 HUD(대조군): 사용자가 준 현대 HUD 사진을 그대로 재현 — 근거는 01_프로젝트/13_현대HUD_재현.md
-   · 우리 HUD (개선 전): 중간고사 1차 실험 때(v1.9, 커밋 470a8f7) 그대로 — 이 파일 아래쪽 drawAr(). 바꾸지 않는다(2차 실험의 비교 기준)
-   · 우리 HUD (개선 후, 2.1): hud2.js drawAr2() — 같은 자리 · 같은 길 안내, 뒤차 표현만 다름
+   · 리뉴얼 HUD (개선 전): 중간고사 1차 실험 때(v1.9, 커밋 470a8f7) 그대로 — 이 파일 아래쪽 drawAr(). 바꾸지 않는다(2차 실험의 비교 기준)
+   · 리뉴얼 HUD (개선 후, 2.1): hud2.js drawAr2() — 같은 자리 · 같은 길 안내, 뒤차 표현만 다름
    · 맵 5종(maps.js): 분기 그림 · 차로 안내 칸을 맵 데이터로 그린다. C = 다음 갈림 정보(main.js navCtx)
    config.js, maps.js, scene.js 다음에 로드. 상태 S·path는 main.js에서 정의(호출 시점엔 존재).
    ============================================================ */
@@ -151,9 +151,9 @@ function drawNav(p, f, C, kmh, remainKm, dangerOn){
   $('#nvBcwR').setAttribute('opacity', (S.drive ? S.bswR : dangerOn && R.side > 0) ? 1 : 0);
 }
 
-/* ---------- 우리 HUD: 중간고사 1차 실험(2026-10-12) 때 그대로 — 커밋 470a8f7의 hud.js에서 복원 (2026-10-29) ----------
+/* ---------- 리뉴얼 HUD: 중간고사 1차 실험(2026-10-12) 때 그대로 — 커밋 470a8f7의 hud.js에서 복원 (2026-10-29) ----------
    설계 근거 01_프로젝트/10_HUD_GUI_설계.md v1.9. 바꾼 것: 건넌 뒤 멀어지는 보행자를 그리지 않음(V1에 없던 단계) */
-/* ---------- 우리 HUD: 미니 도로 투영 (v1.4: 글자를 뺀 자리만큼 위·옆으로 키움, y 88~228 · 반폭 126) ---------- */
+/* ---------- 리뉴얼 HUD: 미니 도로 투영 (v1.4: 글자를 뺀 자리만큼 위·옆으로 키움, y 88~228 · 반폭 126) ---------- */
 const HX = 260, HY_NEAR = 228, HY_FAR = 88, HALF = 126, K = 55, PXM = HALF/5.25;   // PXM: 가장 가까운 곳 1m = px
 function makeProj(p, f){
   const rx = -f.z, rz = f.x;
@@ -210,7 +210,7 @@ const vehEls = Array.from({length:24}, () => { const r = document.createElementN
 const AS = {icon:null, since:0, doneUntil:0, wasMove:false};
 function resetHud(){ AS.icon = null; AS.doneUntil = 0; AS.wasMove = false; }
 
-/* ---------- 우리 HUD v1.4 ---------- */
+/* ---------- 리뉴얼 HUD v1.4 ---------- */
 function drawAr(p, f, C, k, dangerOn){
   const m = S.map, R = S.route, st = C.st, onMain = C.i === 0;
   const proj = makeProj(p, f), tx = R.tx, sgn = R.side, now = performance.now();
