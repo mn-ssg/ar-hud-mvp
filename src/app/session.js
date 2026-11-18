@@ -115,7 +115,7 @@ function lockUi(on){
 
 /* ---------- 흐름 ---------- */
 function openSession(){
-  stopDemo(); openSetup(false); setScreen('prep'); TOUR.preload();   // 안내 영상을 미리 받아 둔다(참가자 번호를 적는 동안)
+  stopDemo(); openSetup(false); setScreen('prep'); TOUR.preload();   // 안내 모션그래픽을 미리 그려 둔다(참가자 번호를 적는 동안)
   const pid = $('#pid').value || 'P1';
   sesCard({eyebrow:'주행 테스트', title:'참가자 정보', body:`<label class="pid">참가자 ID<input type="text" id="sesPid" value="${esc(pid)}" autocomplete="off"></label>
 `,

@@ -492,7 +492,9 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
   /* ---------- 8-0. 화면 UI 디자인 시스템 (D137, 2026-11-18 — 안내 모션그래픽과 같은 토큰 · 야간 페이지 테마 없음 · 참가자 화면에 HUD 신호색 없음) ---------- */
   {
     const u = await E(async () => { const o = {}, cs = e => getComputedStyle(e), tok = n => cs(document.documentElement).getPropertyValue(n).trim();
-      const rgb = c => { c = (c || '').trim().toLowerCase(); let m = /^#([0-9a-f]{6})$/.exec(c); if(m) return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)).join(','); m = /^rgba?\(([^)]+)\)/.exec(c); if(!m) return ''; const v = m[1].split(',').map(Number); return v.length > 3 && v[3] === 0 ? '' : v.slice(0, 3).join(','); };
+      const rgb = c => { c = (c || '').trim().toLowerCase(); let m = /^#([0-9a-f]{6})$/.exec(c); if(m) return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)).join(','); m = /^rgba?\(([^)]+)\)/.exec(c);
+        if(!m){ m = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)/.exec(c); if(!m) return ''; return +(m[4] ?? 1) === 0 ? '' : [m[1], m[2], m[3]].map(v => Math.round(+v*255)).join(','); }   // color-mix의 계산값(유리 바탕)
+        const v = m[1].split(',').map(Number); return v.length > 3 && v[3] === 0 ? '' : v.slice(0, 3).join(','); };
       const T = {bg:rgb(tok('--bg')), point:rgb(tok('--point')), ink:rgb(tok('--ink')), field:rgb(tok('--field')), danger:rgb(tok('--danger'))};
       const HUDC = ['#00e5ff', '#3ddc84', '#ffb020', '#ff4d4d', '#5fd4ea', '#4cd38a', '#ff5a4f', cs($('#cab')).getPropertyValue('--h2-route'), cs($('#cab')).getPropertyValue('--h2-go'), cs($('#cab')).getPropertyValue('--h2-warn'), cs($('#cab')).getPropertyValue('--h2-danger')].map(rgb).filter(Boolean);
       // 야간 장면이어도 페이지 · 카드 · 위 막대는 흰 바탕, <html data-light> 없음
@@ -516,19 +518,66 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const edge = () => { const r = $('#cab').getBoundingClientRect(), a = $('.stage').getBoundingClientRect(); return [r.left - a.left, a.right - r.right, a.bottom - r.bottom, r.top - a.top].every(v => Math.abs(v) < .5); };
       o.edgeDrive = edge() && $('#cab').getBoundingClientRect().width === innerWidth; $('#keyHint').hidden = true; $('#sess').hidden = true;
       setScreen('demo'); await new Promise(r => setTimeout(r, 60)); o.edgeDemo = edge(); setScreen('home'); await new Promise(r => setTimeout(r, 60)); o.frameHome = !edge();
-      // 세그먼트: 고른 칸 뒤의 흰 칸이 그 칸 자리로(설정을 열고 HUD를 바꿈)
-      openSetup(true); setMode('nav'); await new Promise(r => setTimeout(r, 400)); const th = $('#modeSeg .seg-thumb'), pb = $('#modeSeg [aria-pressed="true"]');
-      o.thumb = !!th && Math.abs(new DOMMatrix(cs(th).transform).m41 - pb.offsetLeft) < .5 && Math.abs(th.offsetWidth - pb.offsetWidth) < .5 && rgb(cs(th).backgroundColor) === T.bg; setMode('ar3'); openSetup(false); goHome();
+      // 세그먼트: 고른 칸 뒤의 흰 칸이 그 칸 자리로(설정을 열고 HUD를 바꿈 — 스프링이 끝난 뒤 흰 칸의 실제 상자 = 고른 칸의 상자)
+      const thumbAt = sel => { const th = $(sel + ' .seg-thumb'), pb = $(sel + ' [aria-pressed="true"]'), a = th.getBoundingClientRect(), b = pb.getBoundingClientRect(); return Math.abs((a.left + a.right)/2 - (b.left + b.right)/2) < .5 && Math.abs(a.width - b.width) < .5; };
+      openSetup(true); setMode('nav'); await new Promise(r => setTimeout(r, 650)); const th = $('#modeSeg .seg-thumb');
+      o.thumb = !!th && thumbAt('#modeSeg') && rgb(cs(th.firstChild).backgroundColor) === T.bg && cs(th.firstChild).opacity === '1'; setMode('ar3'); await new Promise(r => setTimeout(r, 650)); openSetup(false); goHome();
       o.bad = [...bad].slice(0, 6); return o; });
-    // prefers-reduced-motion: 카드 · 설정 · 서랍 · 세그먼트 움직임 꺼짐
+    // prefers-reduced-motion: 카드 · 뒤 어둡기 · 서랍 움직임 꺼짐, 세그먼트 흰 칸은 움직임 없이 바로 그 자리(스프링 없음)
     await page.emulateMedia({reducedMotion:'reduce'});
-    const motionOff = await E(() => { const cs = e => getComputedStyle(e); return {card:cs($('#intro .card')).animationName, overlay:cs($('#intro')).animationName, drawer:cs($('#drawer')).transitionDuration, thumb:cs($('#modeSeg .seg-thumb')).transitionDuration}; });
+    const motionOff = await E(async () => { const cs = (e, p) => getComputedStyle(e, p); openSetup(true); await new Promise(r => setTimeout(r, 100)); setMode('nav'); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const th = $('#modeSeg .seg-thumb'), a = th.getBoundingClientRect(), b = $('#modeSeg [aria-pressed="true"]').getBoundingClientRect();
+      const o = {card:cs($('#intro .card')).animationName, overlay:cs($('#intro'), '::before').animationName, drawer:cs($('#drawer')).transitionDuration, thumbAnims:th.getAnimations().length + th.firstChild.getAnimations().length, thumbAt:Math.abs(a.left - b.left) < .5};
+      setMode('ar3'); openSetup(false); goHome(); return o; });
     await page.emulateMedia({reducedMotion:'no-preference'});
     check('화면 UI(D137): 야간 장면이어도 페이지 · 위 막대 · 카드는 흰 바탕(<html data-light> 없음, 장면은 밤), 안내 모션그래픽의 색 = styles.css 토큰 한곳', Object.values(u.night).slice(0, 3).every(v => v === '255,255,255') && !u.night.attr && u.night.cabNight && u.tour, JSON.stringify({night:u.night, tour:u.tour}));
     check('화면 UI(D137): 주요 버튼 = 파랑 + 흰 글자 · 보조 = 옅은 회색 + 먹색 · 위 막대 = 글자만, 검정 버튼 없음', u.btn.primary && u.btn.second && u.btn.ghost && !u.btn.black.length, JSON.stringify(u.btn));
     check('화면 UI(D137): 참가자 화면(처음 · 판 결과 · 질문 · 키 안내)의 글자 · 바탕 · 테두리 색은 디자인 토큰뿐(HUD 신호색 · 연구자용 빨강 없음), 판 결과 아이콘 성공 = 파랑 · 그 밖 = 먹색', !u.bad.length && u.okIcon && u.badIcon, JSON.stringify({bad:u.bad, ok:u.okIcon, crash:u.badIcon}));
-    check('화면 UI(D137): 주행 중 · 시연 중 운전 화면 둘레 여백 없음(처음 화면은 둥근 틀), 키 안내는 움직임 없음, 세그먼트의 흰 칸이 고른 칸 자리로', u.edgeDrive && u.edgeDemo && u.frameHome && u.hintStill && u.thumb, JSON.stringify({drive:u.edgeDrive, demo:u.edgeDemo, home:u.frameHome, hint:u.hintStill, thumb:u.thumb}));
-    check('화면 UI(D137): 움직임 줄이기(prefers-reduced-motion)면 카드 · 뒤 어둡기 · 서랍 · 세그먼트 움직임 꺼짐', motionOff.card === 'none' && motionOff.overlay === 'none' && /^0s/.test(motionOff.drawer) && /^0s/.test(motionOff.thumb), JSON.stringify(motionOff));
+    check('화면 UI(D137): 주행 중 · 시연 중 운전 화면 둘레 여백 없음(처음 화면은 둥근 틀), 키 안내는 움직임 없음, 세그먼트의 흰 칸이 (움직임이 끝나면) 고른 칸 자리 · 흰색', u.edgeDrive && u.edgeDemo && u.frameHome && u.hintStill && u.thumb, JSON.stringify({drive:u.edgeDrive, demo:u.edgeDemo, home:u.frameHome, hint:u.hintStill, thumb:u.thumb}));
+    check('화면 UI(D137 · D138): 움직임 줄이기(prefers-reduced-motion)면 카드 · 뒤 어둡기 · 서랍 움직임 꺼짐, 세그먼트 흰 칸은 스프링 없이 바로 그 자리', motionOff.card === 'none' && motionOff.overlay === 'none' && /^0s/.test(motionOff.drawer) && motionOff.thumbAnims === 0 && motionOff.thumbAt, JSON.stringify(motionOff));
+  }
+
+  /* ---------- 8-0-1. 리퀴드 글래스 · 액체 움직임 (D138, 2026-11-18) — 3D 장면 위에 뜨는 것(처음 화면 카드 · 진행 카드 · 기록 서랍)에만, 주행 · 시연 중과 느린 기기에선 끔 ---------- */
+  {
+    const g = await E(async () => { const o = {}, cs = (e, p) => getComputedStyle(e, p), tok = n => cs(document.documentElement).getPropertyValue(n).trim(), two = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const alphaOf = bg => { let m = /rgba?\(([^)]+)\)/.exec(bg); if(m){ const v = m[1].split(','); return v[3] === undefined ? 1 : +v[3]; } m = /^color\([^/)]*\/ ([\d.]+)\)/.exec(bg); return m ? +m[1] : 1; };   // rgba(…) · color(srgb … / a)
+      const glassy = e => { const c = cs(e), bf = c.backdropFilter || c.webkitBackdropFilter || 'none'; return {blur:/blur/.test(bf), url:/^url/.test(bf), alpha:+alphaOf(c.backgroundColor).toFixed(2)}; };
+      goHome(); setLight('day'); S.running = false; await two();
+      o.home = glassy($('#intro .card')); $('#drawer').classList.add('open'); o.drawer = glassy($('#drawer')); openSetup(true); o.setup = glassy($('#setup')); o.top = glassy($('#topbar')); TOUR.preload(); o.tour = glassy($('#tour'));
+      o.hint = (cs($('#keyHint')).backdropFilter || 'none') === 'none'; o.refract = document.documentElement.classList.contains('refract');
+      // 한 화면에 유리는 두 겹까지(처음 화면 카드 + 서랍)
+      o.layers = [...document.querySelectorAll('body *')].filter(e => e.offsetParent !== null || e === $('#drawer')).filter(e => /blur/.test(cs(e).backdropFilter || '')).length;
+      openSetup(false); $('#drawer').classList.remove('open');
+      // 주행 · 시연이 돌아가는 동안: 유리 · 움직임 끔(흰 카드), 세그먼트도 바로
+      S.running = true; S.paused = false; await two(); o.drivingCls = document.documentElement.classList.contains('driving'); o.drive = glassy($('#intro .card')); o.sheenOff = cs($('#intro .card'), '::after').animationName === 'none' || cs($('#intro .card'), '::after').content === 'none';
+      openSetup(true); setMode('nav'); await two(); o.driveThumbAnims = $('#modeSeg .seg-thumb').getAnimations().length; setMode('ar3'); openSetup(false); S.running = false; await two(); o.after = glassy($('#intro .card'));
+      // 느린 기기(PERF가 화소 배율을 낮춤) → 흰 카드
+      const t0 = PERF.tier; PERF.tier = 1; await two(); o.slow = glassy($('#intro .card')); PERF.tier = t0; await two(); o.slowBack = glassy($('#intro .card'));
+      // 움직임은 transform · opacity만: 세그먼트 · 스위치를 움직이게 하고 그 키프레임의 속성을 모음
+      const props = new Set(), grab = els => els.forEach(e => e.getAnimations().forEach(a => a.effect.getKeyframes().forEach(k => Object.keys(k).forEach(p => { if(!['offset', 'easing', 'composite', 'computedOffset'].includes(p)) props.add(p); }))));
+      openSetup(true); await two(); setMode('nav'); await two(); const th = $('#modeSeg .seg-thumb'); o.segMoving = th.getAnimations().length > 0; grab([th, th.firstChild]);
+      // 스위치: 'HUD 설명 보기' — 스위치 모양 · 글자 그대로 · 누르면 켜짐(aria-pressed · 설명 층) · 움직임 → 끝나면 손잡이가 오른쪽(20px)
+      const btn = $('#explainBtn'), knob = btn.querySelector('.sw-knob'); o.sw = {has:!!knob, label:btn.textContent.trim()};
+      btn.click(); await two(); o.sw.on = btn.getAttribute('aria-pressed') === 'true' && $('#cab').classList.contains('explain'); o.sw.moving = knob.getAnimations().length > 0; grab([knob, knob.firstChild, btn.querySelector('.sw-fill')]);
+      await new Promise(r => setTimeout(r, 700)); o.sw.knobX = new DOMMatrix(cs(knob).transform).m41; o.sw.fill = new DOMMatrix(cs(btn.querySelector('.sw-fill')).transform).m41;
+      btn.click(); await new Promise(r => setTimeout(r, 700)); o.sw.off = btn.getAttribute('aria-pressed') === 'false' && !$('#cab').classList.contains('explain') && new DOMMatrix(cs(knob).transform).m41 === 0;
+      setMode('ar3'); await new Promise(r => setTimeout(r, 650)); openSetup(false); o.props = [...props].sort().join(',');
+      // 글자 대비(계산 — 가장 어두운 뒤 = 검정 + 뒤 어둡기 위의 유리): 먹색 · 보조 글자는 카드 유리, 거기에 진한 파랑 · 빨강은 서랍 유리에서 4.5:1 이상
+      const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)/255), lin = c => c <= .04045 ? c/12.92 : ((c + .055)/1.055)**2.4, Lum = rgb => { const [r, gg, b] = rgb.map(lin); return .2126*r + .7152*gg + .0722*b; };
+      const bgL = a => Lum([a, a, a]), cr = (l1, l2) => (Math.max(l1, l2) + .05)/(Math.min(l1, l2) + .05), gl = +tok('--glass'), gd = +tok('--glass-drawer');
+      o.cr = {ink:+cr(Lum(hex(tok('--ink'))), bgL(gl)).toFixed(2), sub:+cr(Lum(hex(tok('--sub'))), bgL(gl)).toFixed(2), blueDrawer:+cr(Lum(hex(tok('--point-dark'))), bgL(gd)).toFixed(2), redDrawer:+cr(Lum(hex(tok('--danger'))), bgL(gd)).toFixed(2), subDrawer:+cr(Lum(hex(tok('--sub'))), bgL(gd)).toFixed(2)};
+      goHome(); return o; });
+    // 스위치는 키보드(Space)로도
+    await E(() => { openSetup(true); $('#explainBtn').focus(); }); await page.keyboard.press('Space'); await page.waitForTimeout(80);
+    const kb = await E(() => { const on = $('#explainBtn').getAttribute('aria-pressed') === 'true'; $('#explainBtn').click(); openSetup(false); return on; });
+    check('리퀴드 글래스(D138): 처음 화면 카드 · 기록 서랍은 흰 반투명 + 뒤 흐림(서랍이 더 불투명), 크롬이면 가장자리 굴절 필터도. 연구자 설정 · 위 막대 · 안내 모션그래픽 · 키 안내에는 없음, 한 화면에 유리 두 겹까지',
+      g.home.blur && g.home.alpha < 1 && g.drawer.blur && g.drawer.alpha > g.home.alpha && g.refract === g.home.url && !g.setup.blur && !g.top.blur && !g.tour.blur && g.hint && g.layers <= 2, JSON.stringify({home:g.home, drawer:g.drawer, setup:g.setup.blur, top:g.top.blur, tour:g.tour.blur, hint:g.hint, layers:g.layers, refract:g.refract}));
+    check('리퀴드 글래스(D138): 주행 · 시연이 돌아가는 동안(<html class="driving">)은 흰 카드 · 반짝임 없음 · 세그먼트도 움직임 없이, 끝나면 다시 유리. 느린 기기(PERF 단계 ↑)면 흰 카드',
+      g.drivingCls && !g.drive.blur && g.drive.alpha === 1 && g.sheenOff && g.driveThumbAnims === 0 && g.after.blur && !g.slow.blur && g.slow.alpha === 1 && g.slowBack.blur, JSON.stringify({driving:g.drive, sheenOff:g.sheenOff, thumbAnims:g.driveThumbAnims, after:g.after.blur, slow:g.slow, back:g.slowBack.blur}));
+    check('액체 움직임(D138): 세그먼트 흰 칸 · 스위치(손잡이 · 바탕 차오름)는 transform · opacity만 움직임(폭을 움직이지 않음)', g.segMoving && g.sw.moving && /^(opacity,)?transform$|^opacity,transform$/.test(g.props), g.props);
+    check('스위치(D138): \'HUD 설명 보기\'가 iOS식 스위치 — 글자 그대로, 누르면 켜짐(aria-pressed · 설명 층)·손잡이 오른쪽 20px · 바탕 파랑으로 참, 다시 누르면 꺼짐, 키보드 Space로도',
+      g.sw.has && g.sw.label === 'HUD 설명 보기 (발표용)' && g.sw.on && Math.abs(g.sw.knobX - 20) < .5 && Math.abs(g.sw.fill) < .5 && g.sw.off && kb, JSON.stringify({...g.sw, keyboard:kb}));
+    check('리퀴드 글래스(D138): 글자 대비(계산, 가장 어두운 뒤에서) — 카드 유리 위 먹색 · 보조 글자, 서랍 유리 위 보조 · 진한 파랑 · 빨강 모두 4.5:1 이상', Object.values(g.cr).every(v => v >= 4.5), JSON.stringify(g.cr));
   }
 
   /* ---------- 8-1. 화면 구조: HUD 선택은 현대 · 우리 두 개 · 버전 선택 없음 · 리뉴얼 HUD에 설명 글자 없음 ---------- */

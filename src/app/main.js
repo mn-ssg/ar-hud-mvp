@@ -446,8 +446,13 @@ function frame(now){
   if(S.running && !S.paused && !S.drive){ S.s += cruiseOf(S.map)*(S.speedFactor ?? 1)*dt; S.cityT += dt; }
   update(dt);
   renderScene();
+  uiMode();
   requestAnimationFrame(frame);
 }
+// 화면 UI 표시 (D138): 주행 테스트 · 시연이 돌아가는 동안(S.running · 멈춤 아님) = <html class="driving"> — 유리 · UI 움직임을 모두 끔(뒤 흐림이 3D 장면과 겹치면 프레임이 떨어지고, 반응 시간을 재는 실험이라 끊김 = 기록 오류).
+// 느린 기기(scene.js PERF가 화소 배율을 낮춤) = <html class="lowperf"> — 유리를 흰 카드로. 바뀔 때만 클래스를 고침(매 프레임 비교 둘)
+const uiMode = (() => { let d = null, l = null; const h = document.documentElement;
+  return () => { const dv = !!(S.running && !S.paused), lv = PERF.tier > 0; if(dv !== d){ d = dv; h.classList.toggle('driving', dv); } if(lv !== l){ l = lv; h.classList.toggle('lowperf', lv); } }; })();
 
 /* ---------- 시연 흐름 ---------- */
 function start(){

@@ -5,7 +5,8 @@
    · 야간 장면이어도 화면 UI는 흰 바탕(예전 [data-light="night"] 페이지 다크 테마 삭제). 장면 · HUD의 밤 처리는 scene.js · hud.css .night 그대로
    · 참가자가 보는 화면(처음 화면 · 진행 카드 · 질문 · 키 안내)에는 HUD 신호색(청록 · 초록 · 주황 · 빨강)을 쓰지 않는다 — 판 결과도 성공 = 파랑, 그 밖 = 먹색.
      연구자만 보는 화면(설정 · 기록 서랍)에서만 차분한 빨강 하나(실패 칸 · 기록 지우기)
-   · 움직임: 150 ~ 250ms, 끝이 부드럽게 멈추는 이징 하나(--ease). 주행 중(키 안내 · 3 2 1)에는 움직임 없음, prefers-reduced-motion이면 모두 끔
+   · 움직임: 150 ~ 250ms, 끝이 부드럽게 멈추는 이징 하나(--ease). transform · opacity만. 주행 테스트 · 시연이 돌아가는 동안(html.driving)은 움직임 없음, prefers-reduced-motion이면 모두 끔
+   · 2026-11-18 D138: 장면 위 카드 · 기록 서랍에 리퀴드 글래스(아래 '리퀴드 글래스'), 세그먼트 · 스위치의 액체 움직임(ui.js 스프링)
    · 위계는 글자 크기 · 굵기로(글꼴은 그대로). HUD · 운전석 시각은 hud.css
    ============================================================ */
 
@@ -15,11 +16,11 @@
   --point:#3182F6;         /* 포인트: 주요 버튼 · 고른 것 · 강조 낱말 · 포커스 */
   --point-dark:#1B64DA;    /* 포인트 한 단계 진하게(호버 · 누름) [가정] */
   --ink:#191F28;           /* 글자 */
-  --sub:#6B7684;           /* 보조 글자 1 [가정] */
+  --sub:#4E5968;           /* 보조 글자 1 [가정] — 2026-11-18 D138: #6B7684 → 한 단계 진하게(흰 바탕 4.7 → 7.2:1, 옅은 회색 칸 4.3 → 6.6:1, 가장 어두운 뒤의 유리 위에서도 4.5:1 이상 — E64) */
   --mute:#B0B8C1;          /* 보조 글자 2 · 가는 선(안내 모션그래픽의 회색) */
   --field:#F2F4F6;         /* 입력칸 · 세그먼트 · 보조 버튼 바탕 [가정] */
   --rule:#E5E8EB;          /* 구분선 · 옅은 회색 바탕의 한 단계 진하게(호버) [가정] */
-  --danger:#E0574F;        /* 차분한 빨강 — 연구자 화면의 실패 칸 · 기록 지우기에만 [가정] */
+  --danger:#BD3B36;        /* 차분한 빨강 — 연구자 화면의 실패 칸 · 기록 지우기에만 [가정] — D138: #E0574F(흰 바탕에서도 3.7:1) → 한 단계 진하게(옅은 회색 칸 · 유리 서랍 위 4.5:1 이상) */
   --scrim:rgba(25,31,40,.34);              /* 주행 화면 위 카드 뒤를 살짝 어둡게 */
   --shadow:0 6px 24px rgba(25,31,40,.08);  /* 카드 · 패널: 아주 옅은 그림자 하나 */
   --shadow-up:0 12px 40px rgba(25,31,40,.14);   /* 장면 위에 뜨는 서랍 · 설정 */
@@ -66,7 +67,7 @@ button{ cursor:pointer; }
 .btn.danger{ color:var(--danger); }
 .btn.ghost{ height:36px; padding:0 10px; background:transparent; color:var(--sub); font-size:14px; }
 .btn.ghost:hover:not(:disabled){ background:transparent; color:var(--ink); }
-.btn.ghost[aria-expanded="true"]{ color:var(--point); }
+.btn.ghost[aria-expanded="true"]{ color:var(--point-dark); }
 .btn.lg{ height:52px; font-size:16px; font-weight:700; }
 .btn.block{ width:100%; }
 .btn:disabled{ opacity:.4; cursor:not-allowed; }
@@ -75,14 +76,20 @@ button{ cursor:pointer; }
 .btn.saved .ico path{ stroke-dasharray:24; stroke-dashoffset:0; animation:draw var(--t2) var(--ease) both; }
 @keyframes draw{ from{ stroke-dashoffset:24; } }
 /* 기록 수 배지: 숫자가 늘면 한 번 톡(ui.js) */
-.count{ display:inline-grid; place-items:center; min-width:22px; height:22px; padding:0 7px; border-radius:11px; background:var(--field); color:var(--ink); font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
+.count{ position:relative; isolation:isolate; display:inline-grid; place-items:center; min-width:22px; height:22px; padding:0 7px; border-radius:11px; background:var(--field); color:var(--ink); font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
+.count::after{ content:''; position:absolute; z-index:-1; inset:0; border-radius:inherit; background:var(--point); opacity:0; }
 .count.pop{ animation:pop var(--t2) var(--ease); }
-@keyframes pop{ 40%{ transform:scale(1.3); background:var(--point); color:var(--bg); } }
+.count.pop::after{ animation:popFill var(--t2) var(--ease); }
+@keyframes pop{ 40%{ transform:scale(1.3); color:var(--bg); } }
+@keyframes popFill{ 40%{ opacity:1; } }
 
 /* ---------- 세그먼트: 옅은 회색 바탕 안에서 고른 칸만 흰색. 흰 칸(.seg-thumb)은 새 칸으로 미끄러져 감(ui.js) ---------- */
 .seg{ position:relative; display:flex; background:var(--field); border-radius:var(--r-ctl); padding:3px; }
-.seg-thumb{ position:absolute; z-index:0; top:3px; bottom:3px; left:0; width:0; border-radius:9px; background:var(--bg); box-shadow:0 1px 3px rgba(25,31,40,.1); pointer-events:none;
-  transition:transform var(--t2) var(--ease), width var(--t2) var(--ease); }
+/* 흰 칸: 폭은 자리 잡을 때(처음 · 크기 바뀜)만 정하고, 움직임은 ui.js가 transform(스프링 — 늘어나며 미끄러지고 지나쳤다 튕겨 눌려 멈춤) · 안쪽 흰 채움의 opacity로만(D138).
+   움직이는 동안 살짝 커지고 흰 채움이 옅어져 유리처럼(가장자리 빛 · 그림자만 남음), 멈추면 다시 흰색 */
+.seg-thumb{ position:absolute; z-index:0; top:3px; bottom:3px; left:0; width:0; border-radius:9px; pointer-events:none; transform-origin:50% 50%;
+  box-shadow:0 1px 3px rgba(25,31,40,.12), inset 0 1px 0 var(--bg), inset 0 0 0 1px color-mix(in srgb, var(--bg) 70%, transparent); }
+.seg-thumb > i{ position:absolute; inset:0; border-radius:inherit; background:var(--bg); }
 .seg button{ position:relative; z-index:1; flex:1; min-width:0; height:34px; border:0; background:transparent; border-radius:9px; font-size:13.5px; font-weight:500; color:var(--sub); padding:0 6px; white-space:nowrap; transition:color var(--t1) var(--ease); }
 .seg button:hover:not(:disabled){ color:var(--ink); }
 .seg button[aria-pressed="true"]{ color:var(--ink); font-weight:700; }
@@ -91,6 +98,20 @@ button{ cursor:pointer; }
 .seg.maps button{ font-size:15px; }
 .ico-seg button{ display:flex; align-items:center; justify-content:center; gap:6px; }
 .ico{ width:16px; height:16px; flex:none; }
+
+/* ---------- 켬/끔 스위치 (D138): aria-pressed로 켜고 끄는 버튼(HUD 설명 보기)을 iOS식 스위치로 ----------
+   버튼 · aria-pressed · 키보드(Space · Enter)는 그대로. ui.js가 스위치(.sw)를 넣고, 누르는 순간 손잡이가 늘어나고 떼면 반대쪽으로 미끄러지며 살짝 넘쳤다 돌아오는 움직임(스프링, transform · opacity만)을 만든다.
+   바탕(.sw-fill)은 손잡이를 따라 파랑으로 차오름. 움직이는 동안 손잡이의 흰 채움이 옅어져 유리처럼. 아래 값은 멈춰 있을 때(움직임이 없어도 맞는 모양) */
+.btn.switch-row, .btn.switch-row[aria-pressed="true"]{ justify-content:space-between; gap:12px; padding:0 8px 0 16px; background:var(--field); color:var(--ink); }
+.btn.switch-row:hover:not(:disabled), .btn.switch-row[aria-pressed="true"]:hover:not(:disabled){ background:var(--rule); }
+.btn.switch-row:active:not(:disabled){ transform:none; }   /* 누름은 손잡이가 표현 */
+.sw{ position:relative; isolation:isolate; overflow:hidden; flex:none; width:48px; height:28px; border-radius:14px; background:var(--mute); }
+.sw-fill{ position:absolute; inset:0; border-radius:inherit; background:var(--point); transform:translateX(-100%); }
+.sw-knob{ position:absolute; z-index:1; top:2px; left:2px; width:24px; height:24px; border-radius:12px; transform-origin:0 50%;
+  box-shadow:0 2px 6px rgba(25,31,40,.22), inset 0 1px 0 var(--bg), inset 0 0 0 1px color-mix(in srgb, var(--bg) 70%, transparent); }
+.sw-knob > i{ position:absolute; inset:0; border-radius:inherit; background:var(--bg); }
+.switch-row[aria-pressed="true"] .sw-fill{ transform:none; }
+.switch-row[aria-pressed="true"] .sw-knob{ transform:translateX(20px); }
 
 /* ---------- 연구자 설정: 운전석 왼쪽 위에 뜨는 패널, 옆에서 미끄러져 열리고 닫힘 ---------- */
 .setup{ position:absolute; z-index:6; left:calc(var(--pad) + 12px); top:12px; bottom:calc(var(--pad) + 12px); width:300px; background:var(--bg); border-radius:var(--r-card); box-shadow:var(--shadow-up);
@@ -130,17 +151,18 @@ button{ cursor:pointer; }
 table{ border-collapse:collapse; width:100%; font-size:12.5px; }
 th,td{ padding:8px 10px; text-align:left; border-bottom:1px solid var(--rule); white-space:nowrap; }
 th{ color:var(--sub); font-weight:600; position:sticky; top:0; background:var(--bg); }
-td.ok{ color:var(--point); font-weight:700; } td.bad{ color:var(--danger); font-weight:700; }
+td.ok{ color:var(--point-dark); font-weight:700; }   /* 파랑 글자는 한 단계 진하게(--point는 흰 바탕에서 3.7:1 — 바탕 · 버튼에만) */ td.bad{ color:var(--danger); font-weight:700; }
 .empty{ padding:24px; color:var(--sub); font-size:13px; text-align:center; }
 #drawer .row{ display:flex; gap:8px; flex-wrap:wrap; }
 #drawer .row .btn{ flex:1; }
 
 /* ---------- 카드 (HUD가 아님): 처음 화면 · 진행(참가자 정보 · 판 사이 · 질문 · 요약) ----------
    장면 위에 뒤를 살짝 어둡게 깔고, 카드는 조금 위로 올라오며 들어옴. 다음 단계로 바뀔 때는 내용만 옆으로 밀리며 바뀜(session.js sesCard) */
-.overlay{ position:absolute; inset:0; display:grid; place-items:center; padding:20px; background:var(--scrim); animation:scrimIn var(--t2) var(--ease); }
-.overlay > .card{ animation:cardIn var(--t2) var(--ease); }
-.overlay.keep{ animation:none; }   /* 처음 화면 카드 → 참가자 정보처럼 카드끼리 넘어갈 때는 뒤 어둡기를 다시 깔지 않음 */
-@keyframes scrimIn{ from{ background-color:transparent; } }
+.overlay{ position:absolute; inset:0; display:grid; place-items:center; padding:20px; }
+.overlay::before{ content:''; position:absolute; inset:0; background:var(--scrim); animation:fadeIn var(--t2) var(--ease); }   /* 뒤 어둡기 — opacity로 깔림 */
+.overlay > .card{ position:relative; animation:cardIn var(--t2) var(--ease); }
+.overlay.keep::before{ animation:none; }   /* 처음 화면 카드 → 참가자 정보처럼 카드끼리 넘어갈 때는 뒤 어둡기를 다시 깔지 않음 */
+@keyframes fadeIn{ from{ opacity:0; } }
 @keyframes cardIn{ from{ transform:translateY(14px); opacity:0; } }
 .card.swap > *{ animation:swapIn var(--t2) var(--ease); }
 @keyframes swapIn{ from{ transform:translateX(28px); opacity:0; } }
@@ -177,36 +199,72 @@ td.ok{ color:var(--point); font-weight:700; } td.bad{ color:var(--danger); font-
 .q{ margin-top:20px; }
 .q-title{ margin:0; font-size:16px; font-weight:700; line-height:1.45; }
 .rate{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:12px; }
-.rate button, .choice button{ border:0; border-radius:var(--r-ctl); color:var(--ink); background:var(--field) linear-gradient(var(--point), var(--point)) no-repeat;
-  transition:background-size var(--t2) var(--ease), color var(--t1) var(--ease), transform var(--t1) var(--ease); }
-.rate button{ height:48px; font-size:18px; font-weight:700; background-position:bottom; background-size:100% 0%; }
-.choice button{ background-position:left; background-size:0% 100%; }
+.rate button, .choice button{ position:relative; isolation:isolate; overflow:hidden; border:0; border-radius:var(--r-ctl); color:var(--ink); background:var(--field);
+  transition:background-color var(--t1) var(--ease), color var(--t1) var(--ease), transform var(--t1) var(--ease); }
+.rate button::before, .choice button::before{ content:''; position:absolute; z-index:-1; inset:0; background:var(--point); transition:transform var(--t2) var(--ease); }
+.rate button{ height:48px; font-size:18px; font-weight:700; }
+.rate button::before{ transform-origin:50% 100%; transform:scaleY(0); }
+.choice button::before{ transform-origin:0 50%; transform:scaleX(0); }
 .rate button:hover:not([aria-pressed="true"]), .choice button:hover:not([aria-pressed="true"]){ background-color:var(--rule); }
 .rate button:active, .choice button:active{ transform:scale(.97); }
-.rate button[aria-pressed="true"], .choice button[aria-pressed="true"]{ background-size:100% 100%; color:var(--bg); }
+.rate button[aria-pressed="true"], .choice button[aria-pressed="true"]{ color:var(--bg); }
+.rate button[aria-pressed="true"]::before, .choice button[aria-pressed="true"]::before{ transform:none; }
 .rate-ends{ display:flex; justify-content:space-between; margin-top:6px; font-size:12px; color:var(--sub); }
 .choice{ display:flex; flex-direction:column; gap:6px; margin-top:12px; }
 .choice button{ min-height:44px; padding:10px 14px; text-align:left; font-size:14px; font-weight:500; display:flex; gap:10px; align-items:center; }
 .choice button span{ font-weight:700; color:var(--sub); width:14px; transition:color var(--t1) var(--ease); }
 .choice button[aria-pressed="true"] span{ color:inherit; }
 
+/* ---------- 리퀴드 글래스 (D138) — 3D 장면 위에 뜨는 것에만: 처음 화면 카드 · 진행 카드 · 기록 서랍 (한 화면에 두 겹까지 — 서랍 + 카드) ----------
+   흰색 반투명 + 뒤 흐림 · 채도 + 윗가장자리의 가는 흰 빛줄기(안쪽) + 아주 옅은 바깥 그림자. 새 색 없음(흰색의 투명도 · 먹색 그림자만).
+   굴절(가장자리에서 뒤가 살짝 휨)은 SVG 변위 필터(면마다 #lgR1 · 2 · 3 — ui.js가 그 면의 px 크기로 만듦)를 뒤 흐림 앞에 — 크롬 계열(html.refract)에서만. backdrop-filter 자체가 없으면(@supports) 지금의 흰 카드 그대로.
+   주행 테스트 · 시연이 돌아가는 동안(html.driving)과 느린 기기(html.lowperf, scene.js PERF가 화소 배율을 낮춤)도 흰 카드 — main.js uiMode.
+   넣지 않는 곳: 흰 바탕 위(연구자 설정 · 위 막대 · 안내 모션그래픽) · HUD · 운전석.
+   흰색 비율: 카드 --glass · 기록 서랍 --glass-drawer(표가 있어 더 불투명). 가장 어두운 뒤에서도 본문 대비 4.5:1 이상이 되게 [가정 — 측정 E64] */
+:root{ --glass:.82; --glass-drawer:.92; --glass-blur:22px; --glass-sat:1.8; }
+@supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+  html:not(.driving):not(.lowperf) :is(#intro, #sess) > .card, html:not(.driving):not(.lowperf) #drawer{
+    background:color-mix(in srgb, var(--bg) calc(var(--glass)*100%), transparent);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat)); backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+    box-shadow:inset 0 1px 0 var(--bg), inset 0 0 0 1px color-mix(in srgb, var(--bg) 45%, transparent), 0 10px 36px rgba(25,31,40,.14); }
+  html:not(.driving):not(.lowperf) #drawer{ background:color-mix(in srgb, var(--bg) calc(var(--glass-drawer)*100%), transparent); }
+  html:not(.driving):not(.lowperf) #drawer th{ background:color-mix(in srgb, var(--bg) calc(var(--glass-drawer)*100%), transparent); }
+  html.refract:not(.driving):not(.lowperf) :is(#intro, #sess) > .card, html.refract:not(.driving):not(.lowperf) #drawer{
+    backdrop-filter:var(--refract,) blur(var(--glass-blur)) saturate(var(--glass-sat)); }   /* --refract = url(#lgR1 · 2 · 3) — 면마다 크기에 맞춘 변위 필터(ui.js) */
+  /* 반짝임: 유리 카드가 나타날 때 · 그 위 주요 버튼에 마우스를 올릴 때 빛이 한 번 스쳐 지나감(반복 없음) */
+  html:not(.driving):not(.lowperf) .overlay > .card{ overflow:hidden; }
+  html:not(.driving):not(.lowperf) .overlay > .card::after{ content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    background:linear-gradient(110deg, transparent 34%, color-mix(in srgb, var(--bg) 70%, transparent) 50%, transparent 66%); transform:translateX(-120%); animation:sheen 900ms var(--ease) 80ms both; }
+  html:not(.driving):not(.lowperf) :is(#intro, #sess) .btn.primary{ position:relative; overflow:hidden; }
+  html:not(.driving):not(.lowperf) :is(#intro, #sess) .btn.primary::after{ content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(110deg, transparent 32%, color-mix(in srgb, var(--bg) 45%, transparent) 50%, transparent 68%); transform:translateX(-120%); }
+  html:not(.driving):not(.lowperf) :is(#intro, #sess) .btn.primary:hover:not(:disabled)::after{ animation:sheen 700ms var(--ease) both; }
+}
+@keyframes sheen{ from{ transform:translateX(-120%); } to{ transform:translateX(120%); } }
+
 /* ---------- 주행 화면 위: 3 · 2 · 1 · 키 안내 · 연구자용 중단 (움직임 없음 — 운전 방해) ---------- */
 #count{ position:absolute; top:28%; left:50%; transform:translate(-50%,-50%); font-size:min(16vh,120px); font-weight:800; color:var(--bg); text-shadow:0 4px 24px rgba(25,31,40,.55); pointer-events:none; font-variant-numeric:tabular-nums; }
 /* 키 안내: 작게. 키 모양은 안내 모션그래픽의 흰 키캡(윗면 흰색 → 옅은 회색 · 아래 두께 면 · 옅은 그림자). 밝은 하늘 · 밤 모두 읽히게 뒤에 옅은 먹색 판 */
 #keyHint{ position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; flex-wrap:wrap; gap:4px 12px; padding:6px 12px; border-radius:var(--r-ctl);
-  background:rgba(25,31,40,.42); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); color:rgba(255,255,255,.9); font-size:12px; font-weight:600; pointer-events:none; }
+  background:rgba(25,31,40,.5); color:rgba(255,255,255,.9); font-size:12px; font-weight:600; pointer-events:none; }   /* 뒤 흐림 없음(D138): 주행 중에 3D 장면 위 흐림은 프레임을 떨어뜨림 */
 #keyHint span{ display:inline-flex; align-items:center; }
 kbd{ display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 4px; margin:0 3px 2px 0; border-radius:5px; border:0; color:var(--ink); font-family:inherit; font-size:11px; font-weight:700;
   background:linear-gradient(135deg, var(--bg), var(--field)); box-shadow:inset 0 0 0 1px var(--rule), 0 2px 0 color-mix(in srgb, var(--mute) 45%, var(--bg)), 0 3px 6px rgba(25,31,40,.22); }
-.cab.night #keyHint{ background:rgba(25,31,40,.5); color:rgba(255,255,255,.78); }
+.cab.night #keyHint{ background:rgba(25,31,40,.56); color:rgba(255,255,255,.78); }
 .cab.night #keyHint kbd{ filter:brightness(.78); }   /* 밤: 흰 키캡이 눈부시지 않게 */
 /* 연구자용 중단: 참가자 눈에 띄지 않게 흐리게, 마우스를 올리면 보임 (Esc도 됨) */
 .abort{ position:absolute; right:10px; bottom:10px; height:28px; padding:0 10px; border:0; border-radius:8px; background:rgba(25,31,40,.35); color:rgba(255,255,255,.6); font-size:12px; opacity:.35; }
 .abort:hover, .abort:focus-visible{ opacity:1; }
 
-/* ---------- 움직임 끄기 ---------- */
+/* ---------- 움직임 끄기 ----------
+   주행 테스트 · 시연이 돌아가는 동안(html.driving): 화면 UI의 움직임을 모두 끔(운전 방해 · 프레임). 세그먼트 · 스위치의 스프링은 ui.js가 같은 조건에서 바로 그 자리로.
+   prefers-reduced-motion: 늘어남 · 튕김 · 반짝임 · 미끄러짐 없이 바로 바뀜 */
+html.driving :is(.btn, .seg button, .rate button, .choice button, .setup, #drawer, .overlay > .card, .card.swap > *, .count, .sw-fill, .sw-knob),
+html.driving :is(.overlay, .count, .rate button, .choice button, .card)::before, html.driving :is(.count, .card, .btn)::after{ animation:none !important; transition:none !important; }
 @media (prefers-reduced-motion: reduce){
-  .btn, .btn:active, .seg-thumb, .seg button, .setup, #drawer, .overlay, .overlay > .card, .card.swap > *, .count.pop, .rate button, .choice button, .btn.saved .ico path{ animation:none !important; transition:none !important; transform:none; }
+  :is(.btn, .btn:active, .seg button, .setup, #drawer, .overlay > .card, .card.swap > *, .count.pop, .rate button, .choice button, .btn.saved .ico path, .sw-fill, .sw-knob),
+  :is(.overlay, .rate button, .choice button)::before, :is(.count, .card, .btn)::after{ animation:none !important; transition:none !important; }
+  .btn:active, .rate button:active, .choice button:active{ transform:none; }
 }
 
 /* ---------- 좁은 화면 ---------- */

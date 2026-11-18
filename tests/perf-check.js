@@ -28,6 +28,20 @@ const serve = () => new Promise(res => { const srv = http.createServer((q, r) =>
       window.__ft = new Array(5000); stopDrive(); S.testing = false; return {frames:n, avgMs:+avg.toFixed(2), fps:+(1000/avg).toFixed(1), p95Ms:+f[Math.floor(n*.95)].toFixed(2), worstMs:+f[n - 1].toFixed(1), tier:PERF.tier, ...inf}; });
     out.scenes.push({label, ...r}); console.log(label, JSON.stringify(r));
   }
+  /* 2026-11-18(D138 리퀴드 글래스 전 · 후 비교): 3D 장면 위에 카드가 떠 있을 때(주행 아님)의 프레임. 장면은 매 프레임 다시 그려지므로 카드 뒤 흐림(backdrop-filter)이 있으면 매 프레임 다시 계산된다.
+     처음 화면 카드(주간 · 야간) · 판 사이 진행 카드(야간, 주행 화면 위) · 기록 서랍 + 처음 화면 카드(한 화면 두 겹) — 각 5초 */
+  out.cards = [];
+  for(const [label, light, setup] of [['처음 화면 카드 · 주간', 'day', 'home'], ['처음 화면 카드 · 야간', 'night', 'home'], ['진행 카드 · 야간(주행 화면 위)', 'night', 'sess'], ['기록 서랍 + 처음 화면 카드 · 주간', 'day', 'drawer']]){
+    await page.evaluate(([light, setup]) => { stopDrive(); S.testing = false; goHome(); setLight(light); update(1);
+      if(setup === 'sess'){ setScreen('drive'); $('#intro').hidden = true; sesCard({icon:'check', tone:'ok', eyebrow:'1 / 6', title:RESULT.ok, body:'', btn:['다음', () => {}]}); }
+      if(setup === 'drawer') $('#drawer').classList.add('open');
+      window.__ft = []; let last = performance.now(); const tick = now => { window.__ft.push(now - last); last = now; if(window.__ft.length < 4000) requestAnimationFrame(tick); }; requestAnimationFrame(tick); }, [light, setup]);
+    await page.waitForTimeout(1500); await page.evaluate(() => { window.__ft = []; }); await page.waitForTimeout(5000);
+    const r = await page.evaluate(() => { const f = window.__ft.slice(2).sort((p, q) => p - q), n = f.length, avg = f.reduce((p, q) => p + q, 0)/n; window.__ft = new Array(5000);
+      $('#drawer').classList.remove('open'); $('#sess').hidden = true;
+      const g = getComputedStyle($('#intro .card')); return {frames:n, avgMs:+avg.toFixed(2), fps:+(1000/avg).toFixed(1), p95Ms:+f[Math.floor(n*.95)].toFixed(2), worstMs:+f[n - 1].toFixed(1), tier:PERF.tier, blur:g.backdropFilter || g.webkitBackdropFilter || 'none'}; });
+    out.cards.push({label, ...r}); console.log(label, JSON.stringify(r));
+  }
   await page.evaluate(() => new Promise(res => { let n = 0; const t = setInterval(() => { if(Object.keys(builtMaps).length >= MAPS.length || ++n > 60){ clearInterval(t); res(); } }, 500); goHome(); }));
   out.bytes = {first:firstBytes, all:total, files:Object.entries(sent).sort((p, q) => q[1] - p[1]).slice(0, 14)};
   out.byType = {}; Object.entries(sent).forEach(([u, n]) => { const k = path.extname(u) || 'html'; out.byType[k] = (out.byType[k] || 0) + n; });

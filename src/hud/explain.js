@@ -46,9 +46,9 @@
   const T = {bg:tok('--bg'), point:tok('--point'), ink:tok('--ink'), sub:tok('--sub')};
   const DEFS = `<defs><filter id="exShadow" x="-20%" y="-30%" width="140%" height="180%"><feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="${T.ink}" flood-opacity=".16"/></filter></defs>`;
 
+  // 켬/끔은 aria-pressed 하나로 — 버튼은 iOS식 스위치(ui.js, D138)라 글자는 'HUD 설명 보기 (발표용)' 그대로 두고 스위치가 켜짐 · 꺼짐을 보여 줌(예전: 켜면 글자가 'HUD 설명 끄기'로 바뀜)
   function setOn(on){
     cabEl.classList.toggle('explain', on); btn.setAttribute('aria-pressed', String(on));
-    btn.textContent = on ? 'HUD 설명 끄기' : 'HUD 설명 보기';
   }
   btn.onclick = () => setOn(!cabEl.classList.contains('explain'));
 
