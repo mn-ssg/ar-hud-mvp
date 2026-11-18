@@ -14,8 +14,8 @@ styles/
 src/
   core/
     screen.js         화면 맞추기(신용카드 · 보는 거리, 연구자 설정) — HUD가 참가자 눈에 몇 도로 보였는지 기록 4칸으로 남김 (D116). HUD 크기는 안 바꿈
-    config.js         공용 헬퍼 · 상수(차로 · 갈림 · 난이도 HARD · 2차 뒤차 단계 REAR2 · 3차 HUD3) · 곡선 생성. **파일럿에서 바꿀 값 = HUD3 맨 위 네 줄**(주의 시작 · 대기 기준 · 확인 시간 · 앞쪽 위험 시작)
-    guide.js          안내 판단 로직(대기 → 확인 → 이동, 안내 단계, 3차 상태 h3Step). DOM 없음 — 단위 테스트 대상
+    config.js         공용 헬퍼 · 상수(차로 · 갈림 · 난이도 HARD · 2차 뒤차 단계 REAR2 · 3차 HUD3 · 앞쪽 위험 2단계 · 자동 급제동 AEB) · 곡선 생성. **파일럿에서 바꿀 값 = HUD3 맨 위 네 줄**(주의 시작 · 대기 기준 · 확인 시간 · 앞쪽 위험 시작) **+ AEB**(빨강 4 · 급제동 6 m/s² 등)
+    guide.js          안내 판단 로직(대기 → 확인 → 이동, 안내 단계, 3차 상태 h3Step · 06 빨강 단계, 필요 감속도 needDec). DOM 없음 — 단위 테스트 대상
     maps.js           맵 5종 데이터 · 경로 계산
   scene/
     scene.js          three.js 장면 · 하늘 · 도로 · 차량 메시 · 3D 차량 모델(GLB) 읽기 · 주야 조명
@@ -30,7 +30,7 @@ src/
     hud3.js           리뉴얼 HUD 3차(3.0, 3차 실험 조건) — 상태 6가지(안전 · 주의 · 대기 · 확인 · 이동 · 앞쪽 위험), 미니 도로 · 차 아이콘을 장면 카메라와 같은 투영으로. 값은 config.js HUD3
     explain.js        발표용 'HUD 설명 보기' 이름표
   drive/
-    drive.js          주행 테스트: 내 차 조작 · 깜빡이(Q · E) · 교통 AI(양보) · 도로 판정 · 기록 값
+    drive.js          주행 테스트: 내 차 조작 · 깜빡이(Q · E) · 교통 AI(양보) · 자동 급제동(aebStep — 어느 HUD든 같게) · 도로 판정 · 기록 값
   app/
     main.js           상태 · 매 프레임 루프 · 시연 흐름 · 화면 전환
     intro.js          주행 테스트 안내 모션그래픽(TOUR) — 맨 앞에: 조작 · 눌러 보기 · 할 일 · 기록 · 준비 (2026-11-17 밤). Blender 3D 영상(assets/video/) 위에 자막을 얹음. 스타일 styles/intro.css
@@ -43,7 +43,7 @@ assets/
   cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
-  drive-regression.js 브라우저 자동 운전 회귀 144항목  node drive-regression.js (Chrome 필요)
+  drive-regression.js 브라우저 자동 운전 회귀 157항목(NO_AEB=1이면 자동 급제동만 끄고 · RUNLOG=파일이면 판마다 결과를 남김 — 둘을 견줘 급제동이 바꾼 판을 찾음)  node drive-regression.js (Chrome 필요)
   capture-states.js   리뉴얼 HUD 3차 상태 6가지 캡처(주간 · 야간, 현대 HUD 줄 포함) + '앞쪽 위험 + 대기' 낱장 + 대비 측정   node capture-states.js <폴더>
   handling-check.js   조작감 점검(보조 켬 → handling-check-assist.json · ASSIST=0 이면 실제 값 → handling-check.json) — 새 조작 모델을 키 입력으로 돌려 차로 변경 시간 · 우회전 핸들 각도 · 가속 · 제동을 실제 값과 견줌(결과 handling-check.json)
   perf-check.js       성능 재기 — 장면 4개 프레임 시간 · 삼각형 · 그리기 호출 · 로딩 용량   node perf-check.js after (결과 perf-after.json, 그래픽 작업 전 값 perf-before.json)
@@ -59,6 +59,7 @@ tests/
 - 열기: `index.html`을 정적 서버로 연다 (파일로 직접 열면 재질 이미지가 막힐 수 있음). 예: `python3 -m http.server` 뒤 `http://localhost:8000/`
 - 테스트: `cd tests && npm i && npm test`
 - 조작: ← → 핸들 · ↑ 가속 · ↓ 브레이크 · Q E 깜빡이(차로 변경이 끝나면 자동으로 꺼짐). 차 움직임은 아반떼(CN7) 제원 · 실측 기준(`config.js VEH`): 키를 누르고 있는 동안 핸들이 점점 돌아가고(빠를수록 덜), 떼면 가운데로 돌아옴. ↓는 누르고 있을수록 세게. 키보드 운전이 어려운 부분은 조작 보조(`VEH.assist`)가 덜어 줌 — 2차 실험 때의 조작 느낌: 누르면 0.55초에 끝 각도, 떼면 0.33초에 가운데. 핸들이 스스로 움직이는 보정은 없음(2026-11-17 밤).
+- 앞쪽 위험 · 자동 급제동(2026-11-18, D134, 환경 3.3): 앞차 · 횡단보도 보행자에 대해 '멈추려면 필요한 감속도'가 4 m/s² 이상이면 리뉴얼 HUD 06이 빨강, 6 이상이고 운전자가 그만큼 안 밟고 있으면 차가 스스로 급제동(0.3초에 9.8까지 · 서면 1.5초 뒤 풀림 · SCC가 꺼져 ↑를 누르기 전까지 혼자 출발 안 함 · ↑를 1초 누르면 풀림). 값은 `config.js AEB`. 이 버전부터 기록의 충돌 수를 그 전 기록과 바로 비교하지 말 것
 - ⑤ 우회전 맵: 가운데 차로가 공사로 막혀 있음(`config.js CITY_WORK`, `maps.js` CRT `work`) — 미리 오른쪽 차로로 옮겨 버스 뒤에 섰다가 따라가 우회전. 공사 구간에 들어가면 충돌 '공사 구간'.
 - 처음 화면 버튼은 '주행 테스트 시작' · '시연 보기' 둘뿐(연습 주행은 없앰).
 - 주행 테스트 순서(3차): 안내 모션그래픽 → 현대 · 리뉴얼을 판마다 교대로 6판 → 질문(현대: 확신 / 리뉴얼: 확신 + 대기 표시 이해). `session.js EXP.alternate`

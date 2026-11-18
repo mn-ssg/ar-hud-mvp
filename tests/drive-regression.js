@@ -19,10 +19,12 @@ function serve(){
   });
 }
 
-/* 페이지 안에서 쓰는 자동 운전 도구. 조향만 대신하고 속도는 시뮬레이터의 SCC(손 뗀 상태) 그대로, 필요하면 브레이크 */
+/* 페이지 안에서 쓰는 자동 운전 도구. 조향만 대신하고 속도는 시뮬레이터의 SCC(손 뗀 상태) 그대로, 필요하면 브레이크
+   자동 급제동(D134, 환경 3.3) 뒤에는 SCC가 꺼져 ↑를 누르기 전까지 서 있다 → 사람처럼: 급제동이 풀리고 앞에 건너는 사람이 없으면 ↑를 한 번 톡 눌러 다시 출발(noResume면 안 누름).
+   up · down: 검사가 ↑ · ↓를 계속 누르게 할 때. brakeNeed: 앞쪽 위험의 필요 감속도가 이 값을 넘으면 ↓(보통으로 미리 서는 운전자) */
 const AUTOPILOT = () => {
   const _sp = stepPlayer; window.__sp0 = _sp;   // 자동 운전을 거치지 않는 원래 조작 함수(10절 조작감 검사가 씀)
-  window.AP = {mode:'route', lane:null, exit:null, brakeUntilS:null, brakeHold:0, held:0};
+  window.AP = {mode:'route', lane:null, exit:null, brakeUntilS:null, brakeHold:0, held:0, up:false, down:false, noResume:false, brakeNeed:null};
   stepPlayer = function(dt){
     const A = window.AP, ld = Math.max(8, D.v*.6);
     let tx, tz;
@@ -36,12 +38,15 @@ const AUTOPILOT = () => {
     // 급한 굽은 길(일반도로 회전 · 골목) 앞에서는 사람처럼 줄임: 앞 15m 경로 방향 변화가 크면 시속 25km 아래로
     { const r = project(path.P, D.x, D.z, -1), a = pathAt(path.P, r.s + 2), b = pathAt(path.P, r.s + 17), turnA = Math.acos(clamp(a[2]*b[2] + a[3]*b[3], -1, 1));
       if(turnA > .35 && D.v > 7) KEYS.down = true; }
+    if(A.down || (A.brakeNeed !== null && D.haz && D.haz.need >= A.brakeNeed) || (A.brakeNeed !== null && KEYS.__bn && D.v > .05)) KEYS.down = true;
+    KEYS.__bn = A.brakeNeed !== null && KEYS.down && (D.v > .05 || !!(D.haz && D.haz.kind === 'ped'));   // 보통 운전자: 한 번 밟기 시작하면 설 때까지, 횡단보도 앞이면 사람이 다 건널 때까지
     if(KEYS.down && D.v < .2) A.held += dt;
+    KEYS.up = !!A.up || (!A.noResume && D.sccOff && !(D.aeb && D.aeb.on) && !KEYS.down && !(D.haz && D.haz.kind === 'ped'));   // 급제동 뒤 다시 출발: ↑ 한 번(다음 걸음엔 SCC가 켜져 있어 안 누름)
     _sp(dt); D.autoSw = u;   // 다음 스텝의 핸들 각도 (2026-11-17: 예전엔 0 ~ 1 조향 입력과 앞바퀴 각을 직접 넣음)
   };
   // 한 판을 dt 간격으로 끝까지(또는 secs초) 돌리며 매 프레임 sample()을 모음
   window.runDrive = (cfg, opts = {}) => {
-    Object.assign(window.AP, {mode:'route', lane:null, exit:null, brakeUntilS:null, brakeHold:0, held:0, offset:0}, opts.ap || {});
+    Object.assign(window.AP, {mode:'route', lane:null, exit:null, brakeUntilS:null, brakeHold:0, held:0, offset:0, up:false, down:false, noResume:false, brakeNeed:null}, opts.ap || {}); KEYS.__bn = false;
     setMode(opts.hud || 'ar'); setLight(opts.light || 'day');
     startDrive(cfg); D.frozen = false;
     if(opts.noPeds) S.pedPlan = [];
@@ -53,6 +58,7 @@ const AUTOPILOT = () => {
       if(opts.sample) out.push(opts.sample());
     }
     const res = {result:D.result, exit:D.exitName, chosen:D.chosen.length, events:D.events.slice(), risky:D.risky, t:D.t, x:D.x, z:D.z, samples:out};
+    (window.__runLog = window.__runLog || []).push({map:cfg.map.id, hud:opts.hud || 'ar', seed:cfg.seed, result:D.result, crash:D.crashWith || '', ped:D.ped, aeb:D.aebN, t:+D.t.toFixed(2), x:+D.x.toFixed(1), z:+D.z.toFixed(1)});   // 판마다 결과 — NO_AEB=1로 돌린 것과 비교(D134)
     if(opts.keep) return res;
     stopDrive(); return res;
   };
@@ -62,6 +68,7 @@ const AUTOPILOT = () => {
 };
 
 const results = [];
+let SES_ROWS = [];   // 7절 세션의 판들 — 12절(자동 급제동 기록)이 다시 씀
 const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail}); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`); };
 
 (async () => {
@@ -76,6 +83,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
   await page.waitForTimeout(800);
   await page.evaluate(`(${AUTOPILOT})()`);
   const E = (fn, arg) => page.evaluate(fn, arg);
+  if(process.env.NO_AEB) await E(() => { AEB.on = Infinity; });   // 비교용: 자동 급제동만 끔(빨강 단계는 그대로) — 판마다 결과(__runLog)를 켠 것과 견줌
 
   /* ---------- 1. 회전 안내 (현대 HUD 대조군) ---------- */
   const turn = async (mapId, dest, lane, extra = {}) => E(([mapId, dest, lane, extra]) => {
@@ -129,9 +137,10 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const r = runDrive({map:m, leaf, lane:1, type:'city', jam:0, seed:777, sigT:0}, {hud:'ar3', noPeds:true, secs:40, keep:true, ap:{mode:'lane', lane:1},
         setup:() => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); },
         sample:() => { if(S.H3 && !st.includes(S.H3.state)) st.push(S.H3.state); if(hud === null && D.z < -95 && D.z > -110) hud = {work:($('#cWork').getAttribute('d') || '').length > 20, bars:($('#cWorkBars').getAttribute('d') || '').length > 20, fill:getComputedStyle($('#cWork')).fill, warn:getComputedStyle(document.documentElement).getPropertyValue('--h2-warn').trim(), gate:S.H3.gateZ}; }});
-      const o = {result:r.result, crash:D.crashWith, z:+D.z.toFixed(0), hud, states:st, ce:changeEndOf(m), work:m.work, in1:inWork(m, 0, -160), in2:inWork(m, 3.5, -160), tip:inWork(m, 0, -137), tipSide:inWork(m, 1.4, -138), after:inWork(m, 0, -210)}; stopDrive(); return o; });
+      const o = {result:r.result, crash:D.crashWith, z:+D.z.toFixed(0), hud, states:st, ce:changeEndOf(m), work:m.work, in1:inWork(m, 0, -160), in2:inWork(m, 3.5, -160), tip:inWork(m, 0, -137), tipSide:inWork(m, 1.4, -138), after:inWork(m, 0, -210), aeb:D.aebN, red:D.events.some(e => e.type === 'h3red')}; stopDrive(); return o; });
     check('⑤ 공사 구간: 가운데 차로에 그대로 있으면 공사 구간 충돌(좁아지는 곳 안에서)로 끝나고, 마감선은 좁아지기 시작하는 -136, 막힌 곳 판정은 가운데 차로 z -204 ~ -148(+ 삼각형)뿐', w.result === 'crash' && w.crash === '공사 구간' && w.z <= -136 && w.z >= -150 && w.ce === -136 && w.in1 && !w.in2 && w.tip && !w.tipSide && !w.after, JSON.stringify({r:w.result, c:w.crash, z:w.z, ce:w.ce}));
     check('⑤ 공사 구간: 리뉴얼 HUD가 막힌 차로를 주황(조심 색) 바탕 + 줄로 그리고 마감선이 -136, 그 차로로 다가가면 06 앞쪽 위험', w.hud && w.hud.work && w.hud.bars && w.hud.gate === -136 && w.states.includes(6), JSON.stringify({hud:w.hud, states:w.states}));
+    check('⑤ 공사 구간은 이번 범위 밖(D134): 06은 주황 그대로 — 빨강 · 자동 급제동 없이 공사 구간 충돌', w.aeb === 0 && !w.red && w.result === 'crash', JSON.stringify({aeb:w.aeb, red:w.red}));
   }
 
   // 2026-10-29: 리뉴얼 HUD를 중간고사 V1(470a8f7)로 되돌려 v2 그래픽 전용 검사(벽 · 꺾쇠 · 정체 띠 등)는 뺌 — 판단 로직은 guide.test.js
@@ -366,7 +375,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const old = {p:'P_OLD', block:1, no:1, hud:'ar', light:'day', map:'ICR', type:'rear', jam:0, rearN:2, brake:false, seed:5, lane:2, dest:'용인·기흥', exit:'용인·기흥', result:'ok', change:140, react:2.1, risky:0, offroad:0, ped:0, crash:'', secs:30, at:'2026-10-15T00:00:00Z'};
       drives = [old]; saveArr(DKEY, drives); surveys = []; saveArr(QKEY, surveys); practices = []; saveArr(PKEY, practices);
       let book = null; window.XLSX = {utils:{book_new:() => ({s:[]}), aoa_to_sheet:a => ({a}), book_append_sheet:(wb, ws, n) => wb.s.push([n, ws.a])}, writeFile:wb => { book = wb.s; }};
-      Object.assign(window.AP, {mode:'route', lane:null, exit:null, brakeUntilS:null, brakeHold:0, held:0});
+      Object.assign(window.AP, {mode:'route', lane:null, exit:null, brakeUntilS:null, brakeHold:0, held:0, up:false, down:false, noResume:false, brakeNeed:null});
       const sessions = {};
       for(const pid of ['P1', 'P2']){
         $('#pid').value = pid; openSession(); beginSession();
@@ -381,13 +390,13 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
           for(let k = 0; k < 120*30 && S.running; k++) update(1/30);
           void st;
         }
-        sessions[pid] = {rows:SES.rows.map(r => ({hud:r.hud, scn:r.scn, seq:r.seq, order:r.order, ver:r.ver, env:r.env, ev:(r.events || []).length, practice:r.practice, lcState:r.lcState})), qs:SES.qs.length, qd:SES.qs.map(q => ({hud:q.hud, rate:q.rate, wait:q.wait, q2:!!q.q2})), mode:S.mode, testing:S.testing};
+        sessions[pid] = {rows:SES.rows.map(r => ({hud:r.hud, scn:r.scn, seq:r.seq, order:r.order, ver:r.ver, env:r.env, ev:(r.events || []).length, practice:r.practice, lcState:r.lcState, aeb:r.aeb, aebEv:(r.events || []).filter(e => e.type === 'aebOn').length})), qs:SES.qs.length, qd:SES.qs.map(q => ({hud:q.hud, rate:q.rate, wait:q.wait, q2:!!q.q2})), mode:S.mode, testing:S.testing};
       }
       const stored = loadArr(DKEY);
       return {sessions, tours:window.__tours || [], step0:buildSteps('ALT')[0].kind, practiceCard:window.__practiceCard || null, storedN:stored.length, oldKept:stored.some(r => r.p === 'P_OLD'), practiceN:loadArr(PKEY).length, practiceInDrives:stored.some(r => r.practice),
         sheets:book && book.map(([n, a]) => [n, a.length, a[0].length]), head:book && book.find(([n]) => n === '기록')[1][0], oldRowCells:rowCells(old).length};
     });
-    const p1 = s.sessions.P1, p2 = s.sessions.P2;
+    const p1 = s.sessions.P1, p2 = s.sessions.P2; SES_ROWS = p1.rows.concat(p2.rows);
     check('세션: 참가자마다 본 주행 6판 기록', p1.rows.length === 6 && p2.rows.length === 6, `P1 ${p1.rows.length} · P2 ${p2.rows.length}`);
     check('세션(2026-11-17 밤): 맨 앞은 연습 주행이 아니라 안내 모션그래픽 — 참가자마다 한 번 뜨고(0번째 단계), 끝내면 바로 첫 주행. 연습 기록은 안 생김', s.step0 === 'tour' && JSON.stringify(s.tours) === JSON.stringify(['P1:0:start', 'P2:0:start']) && s.practiceN === 0 && !s.practiceInDrives, JSON.stringify({tours:s.tours, practice:s.practiceN}));
     const alt = rows => rows.map(r => r.hud).join(',') === 'nav,ar3,nav,ar3,nav,ar3' && rows.map(r => r.seq).join('') === '123456';
@@ -401,7 +410,7 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('세션: 예전 기록이 지워지거나 덮이지 않음', s.oldKept && s.storedN === 13, `저장 ${s.storedN}`);
     check('세션 끝: 질문은 여섯 판 뒤에 현대(확신) → 리뉴얼(확신 + 대기 표시 이해) · HUD/테스트 상태 복원', p1.qs === 2 && !p2.testing && p1.qd[0].hud === 'nav' && p1.qd[0].wait === 0 && p1.qd[1].hud === 'ar3' && p1.qd[1].wait === 1 && p1.qd[1].q2 && p1.rows.length === 6, JSON.stringify(p1.qd));
     check('엑셀(참가자 한 명): 요약 · 기록 · 질문 · 이벤트 · 설명 시트 — 연습 시트는 없음(연습 주행을 없앰)', s.sheets && ['요약','기록','질문','이벤트','설명'].every(n => s.sheets.some(x => x[0] === n)) && !s.sheets.some(x => x[0] === '연습'), JSON.stringify(s.sheets));
-    check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에(연습 여부 · 정체 줄 합류 방식 · 끼어들기 · 깜빡이 3칸 · 화면 맞추기 4칸 · 3차 상태 1칸)', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 13] === '연습 여부' && s.head[s.head.length - 12] === '정체 줄 합류 방식' && s.head[s.head.length - 9] === '그때 닿기까지 (초)' && s.head[s.head.length - 6] === '옮길 차로 뒤차 반응' && s.head[s.head.length - 5] === '화면 1cm당 px' && s.head[s.head.length - 2] === 'HUD 상자 (px)' && s.head[s.head.length - 1] === '옮기기 시작 때 리뉴얼 HUD 상태' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
+    check('엑셀: 기록 시트 앞 11칸은 예전 칸 그대로, 새 칸은 뒤에(연습 여부 · 정체 줄 합류 방식 · 끼어들기 · 깜빡이 3칸 · 화면 맞추기 4칸 · 3차 상태 1칸 · 자동 급제동 1칸)', s.head && s.head[0] === '참가자' && s.head[10] === '도로 벗어남 (번)' && s.head[11] === '시나리오 ID' && s.head[s.head.length - 14] === '연습 여부' && s.head[s.head.length - 13] === '정체 줄 합류 방식' && s.head[s.head.length - 10] === '그때 닿기까지 (초)' && s.head[s.head.length - 7] === '옮길 차로 뒤차 반응' && s.head[s.head.length - 6] === '화면 1cm당 px' && s.head[s.head.length - 3] === 'HUD 상자 (px)' && s.head[s.head.length - 2] === '옮기기 시작 때 리뉴얼 HUD 상태' && s.head[s.head.length - 1] === '자동 급제동 (번)' && s.oldRowCells === s.head.length, s.head && s.head.slice(9, 13).concat(s.head.slice(-5)).join(' | '));
   }
 
   {
@@ -700,6 +709,94 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       check('그래픽: 보행자 모델 4명이 자리 6개에 모두 들어가 뼈대로 걷고(시각에 따라 자세가 바뀌고 같은 시각이면 같은 자세), 걷는 방향을 보고 섬. 코드 모양은 숨김', g.peds.loaded === 4 && g.peds.mixers === 6 && g.peds.codeHidden && g.peds.face0 < -.05 && g.peds.face1 > .05 && g.peds.moves && g.peds.same && g.peds.nat.every(v => v > .4 && v < 1.6), JSON.stringify(g.peds));
       check('그래픽: 일반도로 보도를 걷는 사람들(장식) — 보도 위로만 다니고 횡단보도 머리 13m 안으로는 안 옴, 시각에 따라 걷고 같은 시각이면 같은 자리, 횡단보도 보행자 자리(6개)는 그대로', g.walk.n >= 30 && g.walk.made === g.walk.n && g.walk.onWalk && g.walk.moved > g.walk.n*.8 && g.walk.same && g.walk.cwClear && g.walk.pedMeshes === 6, JSON.stringify(g.walk));
       check('그래픽: 차량 모델 5종은 Draco 압축본을 읽음', g.cars.draco && g.cars.n === 5, JSON.stringify(g.cars));
+  }
+
+  /* ---------- 12. 앞쪽 위험 2단계 · 자동 급제동 (2026-11-18, D134 — config.js AEB · drive.js aebStep · guide.js needDec · h3Step) ---------- */
+  if(!process.env.NO_AEB){
+    await E(() => {
+      // 앞차 장면: ① 1차로 · 직진(대전·천안), 내 차로 앞차 한 대만 gap m 앞 · 같은 속도. brakeAt초에 급정거(6.5 m/s²로 서고 1.5초 뒤 다시 출발) / park: 서 있는 차
+      window.leadCfg = () => { const m = mapById('ICR'); return {map:m, leaf:m.leaves.findIndex(l => l.dest === '대전·천안'), lane:1, type:'rear', jam:0, seed:5, sigT:0}; };
+      window.leadSetup = (gap, brakeAt, park) => () => { const lead = D.cars.find(c => c.kind === 'lead'); D.cars.forEach(c => { if(c !== lead) c.mesh.visible = false; }); D.cars = [lead];
+        lead.s = LANE_START - (D.z - gap - halfL(lead) - DRV.carL/2); lead.v = lead.v0 = lead.base = D.v;
+        if(park){ lead.v = 0; lead.brakeAt = 0; lead.phase = 2; lead.holdT = 1e9; } else { lead.brakeAt = brakeAt; lead.phase = 0; } placeCars(); resetGuide(); resetHud3(); update(0); };
+      // ⑤ 우회전 전체 경로(seed 777): 다른 차를 빼고 마주 오는 차만 — 보행자는 내 차가 다가오면 건너기 시작(D126)
+      window.pedCfg = () => { const m = mapById('CRT'); return {map:m, leaf:m.leaves.findIndex(l => l.dest === '종합병원'), lane:2, type:'city', jam:0, seed:777, sigT:0}; };
+      window.pedSetup = () => { D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); };
+      const sc = el => { const m = (el.getAttribute('transform') || '').match(/scale\(([\d.]+)\)/); return m ? +m[1] : 1; };
+      window.aebSm = () => { const lead = D.cars.find(c => c.kind === 'lead');
+        return {t:+D.t.toFixed(3), v:+D.v.toFixed(3), aeb:D.aeb.on, dec:+D.aeb.dec.toFixed(2), need:D.haz ? +D.haz.need.toFixed(2) : 0, gap:D.haz && D.haz.kind === 'lead' ? +D.haz.gap.toFixed(2) : null, lvl:S.H3.level, st:S.H3.state, scc:D.sccOff, ped:D.ped,
+          cwd:path.cwS !== null ? +(path.cwS - S.s - DRV.carL/2).toFixed(2) : null, leadV:lead ? +lead.v.toFixed(2) : null,
+          tri:getComputedStyle($('#cWarn .c-warn-tri')).fill, mark:getComputedStyle($('#cWarn .c-warn-mark')).fill, scale:sc($('#cWarn')), leadFill:getComputedStyle($('#cLead')).fill, band:getComputedStyle($('#cFrontBand')).fill, zebra:getComputedStyle($('#cZebraHot')).fill, svgRed:$('#hudSvgTop').classList.contains('red')}; };
+    });
+    const pick = r => ({result:r.result, ev:r.events.filter(e => e.type === 'aebOn' || e.type === 'aebOff'), red:r.events.filter(e => e.type === 'h3red'), s:r.samples});
+    const aebOf = r => r.ev.map(e => [e.type, e.t, e.why || e.kind, e.kmh, e.need ?? '', e.gap ?? ''].join(':')).join(' | ');
+    const RGB = h => 'rgb(' + [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(', ') + ')', DANGER = RGB('#ff4d4d'), WARN = RGB('#ffb020'), WHITE = 'rgb(255, 255, 255)';
+
+    // ① 아무 키도 안 누르면: 앞차가 급정거해도 · 보행자가 건너도 급제동으로 선다. 걸리면 SCC가 꺼져 서 있다(앞차가 다시 출발해도 혼자 안 감)
+    const n1 = pick(await E(() => runDrive(leadCfg(), {hud:'ar3', secs:10, ap:{mode:'lane', lane:1, noResume:true}, setup:leadSetup(16, 1, false), sample:aebSm})));
+    const on1 = n1.ev.find(e => e.type === 'aebOn'), off1 = n1.ev.find(e => e.type === 'aebOff'), during = n1.s.filter(x => x.aeb), after = n1.s.filter(x => off1 && x.t > off1.t), redOn = n1.red.find(e => e.on);
+    const AB = await E(() => ({...AEB, max:VEH.brake.max}));
+    check(`자동 급제동 ① 아무 키도 안 누르면 앞차 급정거에서 급제동으로 섬 — 필요 감속도 ${AB.on} 이상에서 걸려 ${AB.rampT}초에 ${AB.max} m/s²까지, 서서 ${AB.hold}초 잡은 뒤 풀림 · 충돌 없음`,
+      n1.result === null && n1.ev.filter(e => e.type === 'aebOn').length === 1 && on1.kind === 'lead' && on1.need >= AB.on && off1 && off1.why === 'stop' && Math.abs(off1.t - during.find(x => x.v === 0).t - AB.hold) < .06 &&
+      during.some(x => x.dec >= AB.max - .01) && Math.min(...during.filter(x => x.dec >= AB.max - .01).map(x => x.t)) - on1.t <= AB.rampT + .05 && Math.min(...n1.s.map(x => x.gap ?? 99)) > 0,
+      aebOf(n1) + ` · 최소 간격 ${Math.min(...n1.s.map(x => x.gap ?? 99)).toFixed(2)}m`);
+    check('자동 급제동 ①: 급제동 뒤 SCC가 꺼져 — 앞차가 다시 출발해도 ↑를 누르기 전까지 서 있음', after.length > 30 && after.every(x => x.v === 0 && x.scc) && after.some(x => x.leadV > 3), JSON.stringify(after[after.length - 1]));
+    check('06 빨강: 필요 감속도 4 이상이면 급제동보다 먼저 빨강(주황 → 빨강 바로) · 급제동 중엔 늘 빨강 · 빨간 삼각형 + 흰 느낌표 · 앞차 아이콘 · 앞쪽 간격 띠도 빨강 · 바뀌는 순간 한 번 커짐',
+      redOn && redOn.t <= on1.t && during.every(x => x.lvl === 2) && n1.s.filter(x => x.lvl === 2).every(x => x.tri === DANGER && x.mark === WHITE && x.leadFill === DANGER && x.band === DANGER && x.svgRed) && n1.s.filter(x => x.lvl === 1).every(x => x.tri === WARN && x.leadFill === WARN) &&
+      (() => { const i = n1.s.findIndex(x => x.lvl === 2); return i > 0 && n1.s[i - 1].lvl === 1 && n1.s[i - 1].scale > .99 && n1.s[i].scale < .95 && n1.s.slice(i, i + 12).some(x => x.scale > .99); })(),
+      JSON.stringify({redOn, aebOn:on1.t, atRed:n1.s.find(x => x.lvl === 2)}));
+    const p1 = pick(await E(() => runDrive(pedCfg(), {hud:'ar3', secs:30, ap:{noResume:true}, setup:pedSetup, sample:aebSm})));
+    const pOn = p1.ev.find(e => e.type === 'aebOn'), pStop = p1.s.filter(x => pOn && x.t > pOn.t && x.v === 0);
+    check('자동 급제동 ① 아무 키도 안 누르면 ⑤ 횡단보도에 사람이 건널 때 그 앞에서 급제동으로 섬 — 앞범퍼가 횡단보도 앞 선을 넘지 않음 · 보행자 양보 안 함 0',
+      !!pOn && pOn.kind === 'ped' && pStop.length > 30 && pStop.every(x => x.cwd > 0) && p1.s[p1.s.length - 1].ped === 0 && p1.ev.some(e => e.type === 'aebOff' && e.why === 'stop'), aebOf(p1) + ` · 섰을 때 횡단보도까지 ${pStop.length ? pStop[0].cwd : '-'}m`);
+    check('06 빨강(보행자): 횡단보도 줄무늬도 빨강', p1.s.some(x => x.lvl === 2) && p1.s.filter(x => x.lvl === 2).every(x => x.tri === DANGER && x.zebra === DANGER), JSON.stringify(p1.s.find(x => x.lvl === 2)));
+
+    // ② ↓로 보통 제동해 서면 급제동이 안 걸린다(필요 감속도가 brakeNeed를 넘으면 밟기 시작해 설 때까지 — 미리 서는 운전자)
+    const b1 = pick(await E(() => runDrive(leadCfg(), {hud:'ar3', secs:10, ap:{mode:'lane', lane:1, noResume:true, brakeNeed:2.5}, setup:leadSetup(16, 1, false), sample:aebSm})));
+    const b2 = pick(await E(() => runDrive(pedCfg(), {hud:'ar3', secs:30, ap:{noResume:true, brakeNeed:2}, setup:pedSetup, sample:aebSm})));
+    // 횡단보도: 처음 선 자리가 앞 선 앞이면 '보통으로 섬'. 그 뒤 사람 사이가 잠깐 비었을 때 다시 출발해 걸음 속도로 들어가는 것은 급제동 기준(필요 감속도 6) 밖 — [한계] 시속 약 3km 아래(D134 기록)
+    const b2i = b2.s.findIndex(x => x.need >= 2), b2stop = b2i < 0 ? null : b2.s.slice(b2i).find(x => x.v === 0);   // 보행자 때문에 밟기 시작한 뒤 처음 선 자리(그 장면엔 앞차가 없어 필요 감속도는 횡단보도뿐)
+    check('자동 급제동 ② ↓로 보통 제동해 서면 급제동이 안 걸림 — 앞차 급정거 앞 · 횡단보도 앞 모두(충돌 없음, 횡단보도는 앞 선 앞에 섬)', b1.ev.length === 0 && b1.result === null && Math.min(...b1.s.map(x => x.v)) === 0 && b2.ev.length === 0 && !!b2stop && b2stop.cwd > 0 && b2.result !== 'crash',
+      `앞차: ${aebOf(b1) || '급제동 없음'} · 결과 ${b1.result} · 최대 필요 감속도 ${Math.max(...b1.s.map(x => x.need))} / 횡단보도: ${aebOf(b2) || '급제동 없음'} · 결과 ${b2.result} · 처음 선 자리 횡단보도 앞 ${b2stop ? b2stop.cwd : '-'}m · 보행자 양보 안 함 ${b2.s[b2.s.length - 1].ped} · 최대 ${Math.max(...b2.s.map(x => x.need))}`);
+
+    // ③ ↑를 계속 누르면: 급제동이 약해져(ovrDec) 속도가 줄다가, ovrT초 뒤 풀려 다시 빨라지고 충돌. 다시 걸리지 않음
+    const u1 = pick(await E(() => runDrive(leadCfg(), {hud:'ar3', secs:9, ap:{mode:'lane', lane:1, up:true}, setup:leadSetup(70, 0, true), sample:aebSm})));
+    const uOn = u1.ev.find(e => e.type === 'aebOn'), uOff = u1.ev.find(e => e.type === 'aebOff'), uIn = u1.s.filter(x => x.aeb), vAt = t => u1.s.reduce((b, x) => Math.abs(x.t - t) < Math.abs(b.t - t) ? x : b).v;
+    check(`자동 급제동 ③ ↑를 계속 누르면 속도가 줄다가(급제동 ${AB.ovrDec} m/s²로 약해짐) ${AB.ovrT}초 뒤 풀려 다시 빨라지고 충돌 · 다시 걸리지 않음`,
+      !!uOn && uOff && uOff.why === 'override' && Math.abs(uOff.dur - AB.ovrT) < .05 && vAt(uOff.t) < vAt(uOn.t) - 1 && uIn.every(x => x.dec <= AB.ovrDec + .01) && u1.s.filter(x => x.t > uOff.t + .3).every((x, i, a) => i === 0 || x.v >= a[i - 1].v - 1e-6) &&
+      u1.result === 'crash' && u1.ev.filter(e => e.type === 'aebOn').length === 1, aebOf(u1) + ` · 속도 ${vAt(uOn.t).toFixed(1)} → ${vAt(uOff.t).toFixed(1)} → ${u1.s[u1.s.length - 1].v.toFixed(1)}m/s · 결과 ${u1.result}`);
+    const u2 = pick(await E(() => runDrive(leadCfg(), {hud:'ar3', secs:9, ap:{mode:'lane', lane:1, up:true, noResume:true}, setup:leadSetup(70, 0, true), sample:aebSm,
+      beforeFrame:() => { if(D.aeb.on && D.t - D.aeb.t0 > .5) window.AP.up = false; }})));
+    const u2on = u2.ev.find(e => e.type === 'aebOn'), u2in = u2.s.filter(x => x.aeb);
+    check(`자동 급제동 ③-2 ↑를 ${AB.ovrT}초 전에 떼면 다시 세게 잡아(${AB.max} m/s²) 섬 · 충돌 없음`, !!u2on && u2.ev.some(e => e.type === 'aebOff' && e.why === 'stop') && u2in.some(x => x.t - u2on.t < .5 && x.dec <= AB.ovrDec + .01) && u2in.some(x => x.dec >= AB.max - .01) && u2.result === null,
+      aebOf(u2));
+
+    // ④ 같은 시나리오에서 현대 · 리뉴얼의 급제동 시점이 같다(차의 기능 — HUD와 상관없이 같은 걸음에)
+    const pair = await E(() => ['nav', 'ar3'].map(h => { const a = runDrive(leadCfg(), {hud:h, secs:10, ap:{mode:'lane', lane:1}, setup:leadSetup(16, 1, false)}), b = runDrive(pedCfg(), {hud:h, secs:30, ap:{}, setup:pedSetup});
+      const k = r => r.events.filter(e => /^aeb|^h3red$/.test(e.type)).map(e => [e.type, e.t, e.why || e.kind, e.kmh, e.on, e.need, e.gap].join(':')).join(' | '); return {lead:k(a), ped:k(b), shown:a.events.filter(e => e.type === 'h3red').map(e => e.shown)}; }));
+    check('자동 급제동 ④ 같은 시나리오에서 현대 HUD · 리뉴얼 HUD의 급제동 시작 · 끝 시점과 빨강 단계 시점이 같음(앞차 · 보행자, 빨강은 현대 HUD 화면에 안 보임)', pair[0].lead === pair[1].lead && pair[0].ped === pair[1].ped && /aebOn/.test(pair[0].lead) && /aebOn/.test(pair[0].ped) && pair[0].shown.every(x => !x) && pair[1].shown.every(x => x),
+      `앞차 ${pair[0].lead} / 보행자 ${pair[0].ped}`);
+
+    // ⑤ 기록: 한 판을 세션처럼 끝내(onDriveEnd) 기록 · 요약 · 이벤트 · 설명 시트에 급제동이 남는지
+    const rec = await E(() => {
+      const keep = drives.slice(), keepRows = SES.rows.slice(), cfg = leadCfg();
+      SES.cur = {st:{block:1, no:1, hud:'ar3', scn:'TEST-AEB', kind:'run'}, cfg}; SES.pid = 'P_AEB';
+      runDrive(cfg, {hud:'ar3', secs:12, ap:{mode:'lane', lane:1, noResume:true}, setup:leadSetup(16, 1, false), beforeFrame:t => { if(t > 9 && !D.result) endRun('timeout'); }});
+      const row = SES.rows[SES.rows.length - 1];
+      const cells = rowCells(row), sum = sumCells([row], []), ev = evRows([row]), ex = EXPLAIN.find(r => r[0] === '자동 급제동 (번)');
+      drives = keep; saveArr(DKEY, drives); SES.rows = keepRows; $('#sess').hidden = true;
+      return {aeb:row.aeb, cell:cells[HEAD.indexOf('자동 급제동 (번)')], sum:sum.filter(r => r[1] === '전체').map(r => r[SUM_HEAD.indexOf('자동 급제동 (번)')]), sumHead:SUM_HEAD.includes('자동 급제동 (번)'),
+        evOn:ev.filter(r => r[5] === '자동 급제동 시작').map(r => r[6]), evOff:ev.filter(r => r[5] === '자동 급제동 끝').map(r => r[6]), ex:ex && ex[2], env:row.env, oldCell:rowCells({...row, aeb:undefined})[HEAD.indexOf('자동 급제동 (번)')]};
+    });
+    const sesRows = SES_ROWS;
+    check('자동 급제동 ⑤ 기록 시트 \'자동 급제동 (번)\' · 요약 시트 HUD별 합계 · 이벤트 시트 시작(대상 · 그때 속도)/끝(멈춤) · 설명 시트 칸 뜻 · 환경 3.3 — 예전 기록은 빈칸',
+      rec.aeb === 1 && rec.cell === 1 && rec.sumHead && rec.sum.length === 1 && rec.sum[0] === 1 && rec.evOn.length === 1 && /대상 앞차 · 그때 시속 \d+km/.test(rec.evOn[0]) && rec.evOff.length === 1 && /^멈춤/.test(rec.evOff[0]) &&
+      rec.ex === '적을수록 운전자가 스스로 먼저 대처한 것. 가속으로 풀린 뒤 충돌했으면 경고를 무시한 것' && /환경 3\.3/.test(rec.env) && rec.oldCell === '' && sesRows.every(r => r.aeb === r.aebEv), JSON.stringify({...rec, ses:sesRows.map(r => r.aeb)}));
+  }
+  {
+    const log = await E(() => window.__runLog || []);
+    if(process.env.RUNLOG) fs.writeFileSync(process.env.RUNLOG, JSON.stringify(log, null, 1));
+    console.log(`(판 기록 ${log.length}판 · 급제동이 걸린 판 ${log.filter(r => r.aeb).length})`);
   }
 
   if(SHOTS){

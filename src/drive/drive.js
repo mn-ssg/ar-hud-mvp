@@ -117,6 +117,7 @@ function driveReset(cfg){
     enterZ:null, changeDist:null, risky:0, enc:{}, lastCut:{}, offroad:0, lastTouch:-9, followT:0, crashWith:'', result:null, endT:0,
     safeOn:false, safeSince:0, reactT:null, moved:false, cutAhead:0, cutAheadGap:null, cutAheadTtc:null,   // 앞으로 끼어들기(2026-11-03): 옮길 차로의 뒤차 앞에 들어간 횟수 · 그때 뒤차 간격(m, 최소) · 닿기까지(초, 최소)
     blink:0, blinkT0:0, blinkOnAt:null, blinkPhase:false, responder:null, blinkUsed:null, blinkLead:null, blinkResp:'',   // 깜빡이 (D103): 켜진 쪽 · 켠 시각 · 반응하는 뒤차 · 기록 3칸
+    aeb:{on:false, dec:0, ovrT:0, stopT:0, kind:'', car:null, t0:0, v0:0, latch:false}, aebN:0, sccOff:false, acc:0, haz:null,   // 자동 급제동 (D134): 상태 · 횟수 · SCC 꺼짐 · 지난 걸음의 실제 가속도 · 지금 앞쪽 위험
     events:[], lc:null});   // events: 위험 · 판단 상태 · 차로 변경 시작/완료 · 끼어들기 · 충돌 시점 (2026-10-29, session.js가 기록에 붙임)
   Object.keys(KEYS).forEach(k => KEYS[k] = false);
   queueCars.forEach(c => c.visible = false); flowCars.forEach(c => { c.visible = false; c.userData.onc = false; setBrake(c, false); }); otherCar.visible = false; busMesh.visible = false;
@@ -206,7 +207,7 @@ function driveReset(cfg){
   placeCars();
   hudThreat(0);
 }
-function driveClear(){ D.cars.forEach(c => c.mesh.visible = false); D.cars = []; }
+function driveClear(){ D.cars.forEach(c => c.mesh.visible = false); D.cars = []; if(D.aeb) D.aeb.on = false; D.sccOff = false; }   // 판을 멈추면 급제동 · SCC 꺼짐도 풀림(다음 판 · 조작감 점검에 남지 않게)
 
 function placeCars(){
   D.cars.forEach((c, i) => {
@@ -256,6 +257,7 @@ function stepBlink(){
 /* ---------- 매 프레임 ---------- */
 function driveStep(dt){
   D.t += dt;
+  aebStep(dt);   // 자동 급제동(D134): 이번 걸음의 위험을 보고 켜고 끔 → stepPlayer가 그 세기로 제동
   stepPlayer(dt);
   // ⑤ 보행자 시작: 내 차가 교차로 PED_TRIG m 앞에 온 순간(또는 이미 교차로에 든 순간) 건너기 시작 시각을 정한다. 그 뒤로는 예전처럼 시각만의 함수
   if(S.pedPlan && S.pedPlan.pending && (D.z < CZ.near + PED_TRIG || D.seg || D.cands)){ S.pedPlan = S.pedPlan.pending.map(p => ({x:p.x, dir:p.dir, v:p.v, t0:+(D.t + p.dt).toFixed(2)})); D.events.push({t:+D.t.toFixed(2), type:'peds', n:S.pedPlan.length, t0:S.pedPlan.map(p => p.t0)}); }
@@ -308,6 +310,10 @@ function stepPlayer(dt){
   D.wheel = D.sw/V.ratio*Math.PI/180;
   // 2) 속도
   const fx = Math.sin(D.psi), fz = -Math.cos(D.psi);
+  // 자동 급제동(aebStep이 켬, D134): rampT초에 걸쳐 VEH.brake.max까지 세지고, ↑를 누르는 동안은 ovrDec로 약해진다(떼면 다시 세게)
+  const AB = D.aeb && D.aeb.on ? D.aeb : null;
+  if(AB){ const to = KEYS.up ? AEB.ovrDec : V.brake.max, rate = V.brake.max/AEB.rampT; AB.dec += clamp(to - AB.dec, -rate*dt, rate*dt); }
+  else if(KEYS.up) D.sccOff = false;   // 급제동이 꺼진 뒤 ↑를 누르면 SCC가 다시 켜짐(그 전엔 손을 떼도 혼자 출발하지 않음)
   let a;
   if(KEYS.down){ D.brakeT += dt; D.thrT = 0; a = -brakeOf(D.brakeT); }
   else {
@@ -315,12 +321,17 @@ function stepPlayer(dt){
     if(KEYS.up){ D.thrT += dt; a = tabAt(V.accel, v0)*clamp(D.thrT/V.throttleT); }
     else {
       D.thrT = 0;
-      a = v0 > D.cruise + .3 ? -(V.coast[0] + V.coast[1]*v0) : idm(v0, D.cruise, Infinity, 0, DRV.coastUp);
-      const ld = leaderOf(D.x, D.z, fx, fz, null, 0, DRV.carW + Math.min(.55, v0*.03));
-      if(ld.gap < Infinity) a = Math.min(a, idm(v0, D.cruise, ld.gap, v0 - ld.v, DRV.coastUp));
-      a = Math.max(a, -HARD.accDec);   // SCC는 급정거를 못 함 — 앞차가 급히 서면 직접 ↓
+      if(D.sccOff) a = v0 > 0 ? -(V.coast[0] + V.coast[1]*v0) : 0;   // SCC 꺼짐(급제동 뒤): 타력으로만 — 서 있으면 그대로
+      else {
+        a = v0 > D.cruise + .3 ? -(V.coast[0] + V.coast[1]*v0) : idm(v0, D.cruise, Infinity, 0, DRV.coastUp);
+        const ld = leaderOf(D.x, D.z, fx, fz, null, 0, DRV.carW + Math.min(.55, v0*.03));
+        if(ld.gap < Infinity) a = Math.min(a, idm(v0, D.cruise, ld.gap, v0 - ld.v, DRV.coastUp));
+        a = Math.max(a, -HARD.accDec);   // SCC는 급정거를 못 함 — 앞차가 급히 서면 직접 ↓ (못 하면 자동 급제동)
+      }
     }
   }
+  if(AB) a = -Math.max(AB.dec, KEYS.down ? brakeOf(D.brakeT) : 0);   // 급제동 중: 가속 · SCC는 무시, ↓와 둘 중 센 쪽
+  D.acc = a;   // 다음 걸음의 급제동 판단이 '지금 실제로 얼마나 줄이고 있나'로 씀
   D.v = clamp(v0 + a*dt, 0, DRV.vMax);
   // 3) 자전거 모델: 요 속도 = v·tan(앞바퀴 각) ÷ (L + K·v²) — 빠를수록 같은 각도에 덜 꺾임. 타이어 한계(grip)를 넘지 않고, 차는 yawTau만큼 늦게 따라 돈다
   const v = D.v, lim = V.grip/Math.max(v, .5), rT = clamp(v*Math.tan(D.wheel)/(V.L + V.K*v*v), -lim, lim);
@@ -472,7 +483,7 @@ function stepSeg(dt){
   if(e.node){ if(r.s >= P.L - .5) D.cands = e.node.exits.map(x => ({e:x, hint:-1})); }
   else if(r.s >= (S.map.city ? CITY_DRV.endAfter : DRV.endAfter)) endRun('ok');
 }
-function endRun(result){ if(D.result) return; D.result = result; D.endT = D.t + (result === 'wrong' ? DRV.wrongEnd : 0); }
+function endRun(result){ if(D.result) return; D.result = result; D.endT = D.t + (result === 'wrong' ? DRV.wrongEnd : 0); if(D.aeb && D.aeb.on) aebEnd(result === 'crash' ? 'crash' : 'end'); }
 // 다른 차와 겹치면 충돌 상대를 돌려줌 (기록용: 누구와 · 내가 받았나 / 받혔나)
 const KIND_NAME = {queue:'정체 줄 차', rear:'옆 차로 뒤차', tail:'내 뒤차', lead:'앞차', amb:'옆 차로 차', bus:'버스', onc:'마주 오는 차'};
 function hit(){
@@ -507,6 +518,52 @@ function pedCheck(){
   const inBand = xf > cw.x0 - .2 && D.x - DRV.carL/2 < cw.x1 && zf < CZ.near + .5 && zf > CZ.far;
   if(inBand && !D.pedIn && pedBlock(D.t)) D.ped++;
   D.pedIn = inBand;
+}
+
+/* ---------- 자동 긴급 제동 (AEB, 2026-11-18 D134 — 값 · 근거 config.js AEB) ----------
+   차의 기능 — 어느 HUD로 달리든 같은 걸음(1/60초)에 같은 판단. 단계는 필요 감속도(guide.js needDec)로:
+   · 걸림: 앞차 · 횡단보도 중 필요 감속도가 AEB.on(6) 이상이고, 지금 실제로 줄이는 감속(운전자 ↓ · SCC)이 그보다 작음 → SCC도 꺼짐
+   · 풀림: 서서 AEB.hold초 잡고 있은 뒤('멈춤') / ↑를 AEB.ovrT초 계속 누름('가속으로 풀림' — 그 위험이 사라질 때까지 다시 안 걸림) /
+           달리는 중에 위험이 사라짐 — 핸들로 피해 앞차가 진행선 밖 · 앞차가 더 빨라짐 · 사람이 다 건넘('위험 사라짐') / 충돌 · 판 끝 */
+// 지금 내 앞의 위험: 앞차(내 진행선 옆 AEB.lat m 안 · 앞, 마주 오는 차 뺌)와 횡단보도(사람이 건너거나 건너려 할 때, 앞 선까지) 중 필요 감속도가 큰 쪽. 없으면 null
+function frontHaz(){
+  const fx = Math.sin(D.psi), fz = -Math.cos(D.psi); let best = null;
+  D.cars.forEach(c => {
+    if(c.kind === 'onc') return;
+    const dx = c.x - D.x, dz = c.z - D.z, lon = dx*fx + dz*fz, lat = dx*(-fz) + dz*fx;
+    if(lon <= 0 || Math.abs(lat) > AEB.lat) return;
+    const gap = lon - halfL(c) - DRV.carL/2, closing = D.v - c.v, need = needDec(closing, gap);
+    if(!best || need > best.need || (need === best.need && gap < best.gap)) best = {kind:'lead', car:c, gap, closing, need};
+  });
+  const m = S.map;
+  if(m.cw && path.cwS !== null && pedBlock(D.t) && D.x < m.cw.x0){
+    const s = project(path.P, D.x, D.z, -1).s;
+    if(s > path.cwS - AEB.pedDist && s < path.cwS){ const gap = Math.max(0, path.cwS - s - DRV.carL/2), need = needDec(D.v, gap); if(!best || need > best.need) best = {kind:'ped', car:null, gap, closing:D.v, need}; }
+  }
+  return best;
+}
+const aebWith = h => h.kind === 'ped' ? '보행자' : KIND_NAME[h.car.kind] || '앞차';
+function aebStep(dt){
+  const A = D.aeb, h = D.haz = D.result ? null : frontHaz(), live = !!h && h.need > 0;   // live: 가까워지는 위험이 있음
+  if(A.latch && !live) A.latch = false;
+  if(!A.on){
+    if(live && !A.latch && h.need >= AEB.on && -D.acc < h.need){
+      Object.assign(A, {on:true, dec:0, ovrT:0, stopT:0, kind:h.kind, car:h.car, t0:D.t, v0:D.v}); D.sccOff = true; D.aebN++;
+      D.events.push({t:+D.t.toFixed(2), type:'aebOn', kind:h.kind, with:aebWith(h), kmh:Math.round(D.v*3.6), need:+h.need.toFixed(1), gap:+h.gap.toFixed(1)});
+    }
+    return;
+  }
+  if(h && h.kind === A.kind) A.car = h.car;
+  if(KEYS.up){ A.ovrT += dt; if(A.ovrT >= AEB.ovrT){ aebEnd('override'); A.latch = live; return; } } else A.ovrT = 0;
+  if(D.v < .05){ A.stopT += dt; if(A.stopT >= AEB.hold) aebEnd('stop'); return; }
+  A.stopT = 0;
+  if(!live) aebEnd('clear');
+}
+function aebEnd(why){
+  const A = D.aeb; if(!A.on) return;
+  A.on = false; A.dec = 0;
+  D.events.push({t:+D.t.toFixed(2), type:'aebOff', why, kmh:Math.round(D.v*3.6), dur:+(D.t - A.t0).toFixed(2)});
+  A.car = null;
 }
 
 /* ---------- 본선 차로: 기록 (자리 잡은 곳 · 위험 끼어들기) + HUD 경로 다시 계산 ---------- */

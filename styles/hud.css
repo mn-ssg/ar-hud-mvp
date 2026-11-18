@@ -57,7 +57,8 @@
 /* ============================================================
    리뉴얼 HUD 3차 (3.0, 2026-11-17) — 색 · 굵기 토큰은 2차와 같은 것(--h2-*)을 쓴다. 색 하나에 뜻 하나:
    청록 route = 길 안내(들어갈 차로 · 갈 방향, 상태가 바뀌어도 그대로) / 초록 go = 옮겨도 됨(이동 꺾쇠 · 채워진 틈) /
-   주황 warn = 조심(다가오는 뒤차 · 앞쪽 간격 · 앞쪽 경고 · 멈출 곳 · 정체) / 빨강 danger = 지금 옮기지 마(옆으로 옮기기 금지 표지 · 옆에 붙은 뒤차 · 가장자리 빛) /
+   주황 warn = 조심(다가오는 뒤차 · 앞쪽 간격 · 앞쪽 경고 · 멈출 곳 · 정체) /
+   빨강 danger = 지금 바로 위험 — 옮기지 마(옆으로 옮기기 금지 표지 · 옆에 붙은 뒤차 · 가장자리 빛) · 부딪히기 직전(06 빨강: 앞쪽 경고 · 그 앞차 · 앞쪽 간격 · 건너는 횡단보도 · 보행자, 2026-11-18 D134) /
    무채색 neutral · core = 도로 윤곽 · 내 차 · 마감선 · 남은 거리 막대 · 틈 테두리(확인).
    상태에 따라 바뀌는 값(색 · 투명도)은 hud3.js가 넣는다
    ============================================================ */
@@ -101,6 +102,13 @@
 #hudSvgTop.screen{ mix-blend-mode:screen; }
 #cWarn .c-warn-tri{ fill:var(--h2-warn); stroke:var(--h2-warn); stroke-width:5; stroke-linejoin:round; }
 #cWarn .c-warn-mark{ fill:#0b0d10; fill-opacity:.9; }
+/* 06 2단계 빨강(D134 — 필요 감속도 4 이상 · 급제동 중): 삼각형 빨강 + 흰 느낌표(검정은 빨강 위에서 안 보임), 빛 번짐도 빨강. 원인(앞차 · 앞쪽 간격 · 횡단보도)도 같은 빨강 — 사람 모델 · 3D 차 색은 hud3.js */
+#cWarn[data-level="2"] .c-warn-tri{ fill:var(--h2-danger); stroke:var(--h2-danger); }
+#cWarn[data-level="2"] .c-warn-mark{ fill:var(--h2-core); fill-opacity:1; }
+#hudSvgTop.red{ filter:drop-shadow(0 0 3px rgba(255,77,77,.6)); }
+.cab.night #hudSvgTop.red{ filter:brightness(.9) drop-shadow(0 0 2px rgba(255,77,77,.45)); }
+#arHud3[data-front="2"] .c-lead{ fill:var(--h2-danger); stroke:var(--h2-danger); }
+#arHud3[data-front="2"] .c-frontband, #arHud3[data-front="2"] .c-zebra-hot{ fill:var(--h2-danger); }
 .cab.night #hudSvgTop{ filter:brightness(.9) drop-shadow(0 0 2px rgba(255,176,32,.4)); }
 /* 거울 표시 (3차): 룸미러 테두리 + 경고등. HUD 상자 밖 — config.js HUD3.mirrorCue로 끔 */
 #mirCue{ position:absolute; z-index:2; pointer-events:none; box-sizing:border-box; border:2px solid transparent; border-radius:999px; transition:border-color .18s, box-shadow .18s; }

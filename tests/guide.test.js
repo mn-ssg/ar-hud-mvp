@@ -189,3 +189,36 @@ test('3차 06 앞쪽 위험: 어느 상태에서든 먼저, 풀린 뒤 0.6초 �
   assert.equal(h.frontKind, 'ped');
   assert.deepEqual(h.log.map(l => l.to), [3, 6, 3, 5, 6]);   // 대기 → 앞쪽 위험 → 대기 → (기다린 뒤 풀림) 이동 → 보행자
 });
+
+test('필요 감속도(D134): 가까워지는 속도² ÷ (2 × 남은 거리) — 같은 20m라도 빠를수록 크다, 멀어지면 0', () => {
+  assert.equal(G.needDec(30/3.6, 20).toFixed(2), '1.74');   // 시속 30km · 20m: 여유
+  assert.equal(G.needDec(80/3.6, 20).toFixed(2), '12.35');  // 시속 80km · 20m: 이미 늦음
+  assert.equal(G.needDec(10, 12.5), 4);
+  assert.equal(G.needDec(0, 5), 0);
+  assert.equal(G.needDec(-3, 5), 0);
+  assert.ok(G.needDec(5, 0) > 100);                          // 이미 닿음
+});
+
+const A3 = {red:4, redExitK:1.2, redHold:.6};
+test('06 2단계 빨강(D134): 필요 감속도 4 이상이면 바로 빨강, 내릴 때는 4 ÷ 1.2 아래로 0.6초 머문 뒤 · 공사 구간은 빨강 없음', () => {
+  const h = G.makeH3(), F = (need, o = {}) => I3({front:{ttc:1.5, closing:8, need, ...o}});
+  assert.equal(G.h3Step(h, 0, F(2), P3, A3), 6); assert.equal(h.level, 1);     // 주황
+  G.h3Step(h, .1, F(4.1), P3, A3); assert.equal(h.level, 2);                   // 바로 빨강
+  G.h3Step(h, .2, F(3.5), P3, A3); assert.equal(h.level, 2);                   // 3.5 ≥ 4/1.2 = 3.33: 그대로
+  G.h3Step(h, .3, F(3), P3, A3); assert.equal(h.level, 2);                     // 3.33 아래로 내려온 순간부터 0.6초
+  G.h3Step(h, .8, F(3), P3, A3); assert.equal(h.level, 2);
+  G.h3Step(h, .95, F(3), P3, A3); assert.equal(h.level, 1);                    // 0.65초 뒤 주황
+  const w = G.makeH3();
+  G.h3Step(w, 0, I3({front:{ttc:1, closing:10, need:50, work:true}}), P3, A3); assert.equal(w.level, 1);   // 공사 구간: 주황만
+});
+
+test('06 2단계 빨강(D134): 보행자 필요 감속도도 같은 기준 · 급제동 중이면 늘 빨강(앞쪽 위험 목록에 없는 대상이어도)', () => {
+  const h = G.makeH3();
+  G.h3Step(h, 0, I3({need:false, ped:true, pedNeed:1}), P3, A3); assert.equal(h.level, 1);
+  G.h3Step(h, .1, I3({need:false, ped:true, pedNeed:5}), P3, A3); assert.equal(h.level, 2); assert.equal(h.frontKind, 'ped');
+  const a = G.makeH3();
+  assert.equal(G.h3Step(a, 0, I3({aeb:'lead'}), P3, A3), 6); assert.equal(a.level, 2); assert.equal(a.frontKind, 'lead');
+  G.h3Step(a, .5, I3({aeb:'lead', front:{ttc:9, closing:.5, need:.1}}), P3, A3); assert.equal(a.level, 2);   // 필요 감속도가 낮아져도 급제동 중엔 빨강
+  G.h3Step(a, .6, I3({}), P3, A3); assert.equal(a.level, 2);                   // 풀린 뒤엔 06처럼 0.6초 더
+  G.h3Step(a, 1.25, I3({}), P3, A3); assert.equal(a.level, 0); assert.equal(a.state, 1);
+});

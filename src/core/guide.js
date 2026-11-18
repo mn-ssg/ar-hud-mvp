@@ -97,9 +97,12 @@ const stageOf = N => N.phase === 'approach' ? (N.d > 170 ? 1 : N.d > 115 ? 2 : N
    · 02 주의는 올릴 때 바로, 내릴 때는 기준 exitK배 + dwell초 머문 뒤
    · 06 앞쪽 위험은 base 위에 덮인다(어느 상태에서든 먼저). 풀린 뒤 frontHold초 더 유지. base는 밑에서 계속 계산돼 작고 옅게 보인다 */
 const H3_NAME = ['', '안전', '주의', '대기', '확인', '이동', '앞쪽 위험'];
+// 멈추려면 필요한 감속도(m/s²) = 가까워지는 속도² ÷ (2 × 남은 거리) (2026-11-18, D134). 멀어지거나 같은 속도면 0, 이미 닿았으면 아주 큼
+const needDec = (closing, gap) => closing <= 0 ? 0 : closing*closing/(2*Math.max(gap, .05));
 const h3Label = n => n ? String(n).padStart(2, '0') + ' ' + H3_NAME[n] : '';
-function makeH3(){ return {state:1, base:1, since:0, caution:false, cautionSince:-9, armed:false, qConfirm:null, front:false, frontClear:null, frontKind:'', log:[]}; }
-function h3Step(h, t, I, P){
+function makeH3(){ return {state:1, base:1, since:0, caution:false, cautionSince:-9, armed:false, qConfirm:null, front:false, frontClear:null, frontKind:'', red:false, redClear:null, level:0, log:[]}; }
+// A: 2단계 빨강 값(config.js AEB — red · redExitK · redHold). I.front.need · I.pedNeed = 필요 감속도, I.aeb = 지금 급제동 중이면 그 대상('lead' · 'ped')
+function h3Step(h, t, I, P, A = {red:4, redExitK:1.2, redHold:.6}){
   const r = I.rear, k = h.caution ? P.exitK : 1;
   const cautionNow = !!r && (r.gap < 1 || r.ttc < P.cautionTtc*k || r.gap < P.cautionGap*k);
   if(cautionNow && !h.caution){ h.caution = true; h.cautionSince = t; }
@@ -114,14 +117,21 @@ function h3Step(h, t, I, P){
     if(!I.queueGo) h.qConfirm = null;
     base = h.qConfirm !== null && t - h.qConfirm < P.confirmT ? 4 : h.caution ? 2 : h.armed ? 5 : 1;
   }
-  const f = I.front, hazNow = !!I.ped || (!!f && f.ttc < P.frontTtc && f.closing > P.frontClosing);
-  const clearNow = !I.ped && (!f || f.closing <= 0 || f.ttc > P.frontTtc*P.exitK);
-  if(hazNow){ h.front = true; h.frontClear = null; h.frontKind = I.ped ? 'ped' : 'lead'; }
+  /* 06 앞쪽 위험 2단계 (2026-11-18, D134): 1단계 주황 = 예전 기준 그대로. 2단계 빨강 = 필요 감속도(앞차 · 보행자 중 큰 쪽)가 A.red 이상이면 바로,
+     내릴 때는 A.red ÷ A.redExitK 아래로 A.redHold초 머문 뒤(06처럼 넉넉히). 급제동이 걸려 있는 동안은 늘 빨강. 공사 구간(f.work)은 빨강 없음 */
+  const f = I.front, need = Math.max(f && !f.work ? f.need || 0 : 0, I.ped ? I.pedNeed || 0 : 0), redNow = !!I.aeb || need >= A.red;
+  const hazNow = !!I.ped || (!!f && f.ttc < P.frontTtc && f.closing > P.frontClosing) || redNow;
+  const clearNow = !I.ped && !I.aeb && (!f || f.closing <= 0 || f.ttc > P.frontTtc*P.exitK);
+  if(hazNow){ h.front = true; h.frontClear = null; h.frontKind = I.ped ? 'ped' : f ? 'lead' : I.aeb; }
   else if(h.front){ if(!clearNow) h.frontClear = null; else { if(h.frontClear === null) h.frontClear = t; if(t - h.frontClear >= P.frontHold) h.front = false; } }
+  if(redNow){ h.red = true; h.redClear = null; }
+  else if(h.red){ if(need >= A.red/A.redExitK) h.redClear = null; else { if(h.redClear === null) h.redClear = t; if(t - h.redClear >= A.redHold) h.red = false; } }
+  if(!h.front) h.red = false;
+  h.level = h.front ? (h.red ? 2 : 1) : 0;
   const state = h.front ? 6 : base;
   h.base = base;
   if(state !== h.state){ h.log.push({t:+t.toFixed(2), from:h.state, to:state}); h.state = state; h.since = t; }
   return state;
 }
 
-if(typeof module !== 'undefined') module.exports = {GUIDE, blockOf, relDir, assessLane, makeGate, gateStep, navPhase, stageOf, H3_NAME, h3Label, makeH3, h3Step};
+if(typeof module !== 'undefined') module.exports = {GUIDE, blockOf, relDir, assessLane, makeGate, gateStep, navPhase, stageOf, H3_NAME, h3Label, makeH3, h3Step, needDec};

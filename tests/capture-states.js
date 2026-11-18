@@ -17,32 +17,57 @@ const STATES = [
   {id:'04', name:'확인', gap:7, closing:4, secs:1.45, jumpAt:1},
   {id:'05', name:'이동', gap:7, closing:4, secs:2.6, jumpAt:1},
   {id:'06', name:'앞쪽 위험', gap:80, closing:2, secs:.9, lead:[13, -6]},
-  {id:'06w', name:'앞쪽 위험 + 대기', gap:7, closing:4, secs:1.6, lead:[13, -6], extra:true}
+  {id:'06w', name:'앞쪽 위험 + 대기', gap:7, closing:4, secs:1.6, lead:[13, -6], extra:true},
+  // 06 앞쪽 위험 2단계 + 자동 급제동(D134, 리뉴얼 HUD만): 앞차는 06과 같은 장면에서 앞차를 더 가깝게 · 더 느리게(필요 감속도가 커짐), 보행자는 ⑤ 우회전 경로를 자동 운전으로(마주 오는 차만).
+  // until: 그 단계가 된 뒤 멈춤 — red: 빨강(급제동 전, 커지는 움직임이 끝난 뒤) · aeb: 급제동이 최대(9.8 m/s²)에 닿은 순간 · orange: 주황(보행자)
+  {id:'06r', name:'06 빨강 · 앞차', gap:80, closing:2, secs:8, lead:[16, 0], leadBrake:.5, until:'red', extra:true, lv:true},   // 앞차 급정거(6.5 m/s²) — SCC(3.5)로는 못 따라 필요 감속도가 커짐(회귀 검사 ①과 같은 장면)
+  {id:'06a', name:'급제동 중 · 앞차', gap:80, closing:2, secs:8, lead:[16, 0], leadBrake:.5, until:'aeb', extra:true, lv:true},
+  {id:'06po', name:'06 주황 · 보행자', secs:40, ped:true, until:'orange', extra:true, lv:true},
+  {id:'06pr', name:'06 빨강 · 보행자', secs:40, ped:true, until:'red', extra:true, lv:true},
+  {id:'06pa', name:'급제동 중 · 보행자', secs:40, ped:true, until:'aeb', extra:true, lv:true}
 ];
 const SHEET = STATES.filter(s => !s.extra);
+const LV_ROWS = [['앞차', ['06', '06r', '06a']], ['횡단보도 보행자', ['06po', '06pr', '06pa']]], LV_COLS = ['1단계 주황', '2단계 빨강', '자동 급제동 중'];
 (async () => {
   fs.mkdirSync(OUT, {recursive:true});
   const srv = await serve(), url = `http://127.0.0.1:${srv.address().port}/index.html`;
   const browser = await chromium.launch({executablePath:CHROME, headless:true, args:['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist']});
   const page = await browser.newPage({viewport:{width:1366, height:768}, deviceScaleFactor:2});
   await page.goto(url, {waitUntil:'load'}); await page.waitForTimeout(3000);
-  await page.evaluate(() => { const _sp = stepPlayer; window.__off = 0; stepPlayer = function(dt){ const tx = S.map.laneX(1) + window.__off, tz = D.z - 10, fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1;
+  await page.evaluate(() => { const _sp = stepPlayer; window.__off = 0; window.__route = false; stepPlayer = function(dt){ let tx, tz;
+    // __route: 경로를 따라감(⑤ 보행자 장면) — 급한 굽은 길 앞에서만 ↓(회귀 검사 자동 운전과 같은 규칙). 아니면 1차로 가운데 10m 앞을 겨눔
+    if(window.__route){ const r = project(path.P, D.x, D.z, -1), a = pathAt(path.P, r.s + 2), b = pathAt(path.P, r.s + 17); [tx, tz] = pathAt(path.P, r.s + Math.max(8, D.v*.6)); KEYS.down = Math.acos(clamp(a[2]*b[2] + a[3]*b[3], -1, 1)) > .35 && D.v > 7; }
+    else { tx = S.map.laneX(1) + window.__off; tz = D.z - 10; KEYS.down = false; }
+    const fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = tx - D.x, dz = tz - D.z, l = Math.hypot(dx, dz) || 1;
     const sinA = (fx*dz - fz*dx)/l; KEYS.left = KEYS.right = false; _sp(dt); D.autoSw = swForCurv(2*sinA/l, D.v); };
+    const reached = u => u === 'red' ? S.H3.level === 2 && !D.aeb.on : u === 'aeb' ? D.aeb.on && D.aeb.dec >= VEH.brake.max - .01 : u === 'orange' ? S.H3.level === 1 && S.H3.kind === 'ped' : false;
     window.setupScene = (hud, light, tone, st) => {
       setTone(tone); setMode(hud); setLight(light); MIR.on = true; setScreen('drive'); $('#intro').hidden = true; $('#sess').hidden = true;
+      if(st.ped){   // ⑤ 우회전 · 횡단보도: 마주 오는 차만 두고 경로를 따라감 → 보행자가 건너려 할 때 그 단계가 될 때까지
+        const m = mapById('CRT'); window.__route = true;
+        startDrive({map:m, leaf:m.leaves.findIndex(l => l.dest === '종합병원'), lane:2, type:'city', jam:0, seed:777, sigT:0}); D.frozen = false;
+        D.cars.filter(c => c.kind !== 'onc').forEach(c => c.mesh.visible = false); D.cars = D.cars.filter(c => c.kind === 'onc'); resetGuide(); resetHud2(); resetHud(); resetHud3(); update(0);
+        for(let k = 0; k < st.secs*60 && !reached(st.until) && S.running; k++) update(1/60);
+        if(st.until !== 'aeb') for(let k = 0; k < 15 && reached(st.until); k++) update(1/60);   // 나타나는 · 커지는 움직임이 끝난 뒤(0.25초, 그 단계가 이어지는 동안만)
+        D.frozen = true; update(0);
+        const r = $('#hudWrap').getBoundingClientRect(), c = $('#cab').getBoundingClientRect();
+        return {x:r.left - 60, y:r.top - 40, w:r.width + 120, h:r.height + 70, lv:h3Label(S.H3.state) + ' · 단계 ' + S.H3.level + (D.aeb.on ? ' · 급제동 ' + D.aeb.dec.toFixed(1) : ''), gate:S.G && S.G.gate, cab:[c.left, c.top, c.width, c.height]};
+      }
+      window.__route = false;
       const m = mapById('ICR'), leaf = m.leaves.findIndex(l => l.dest === '용인·기흥');
       startDrive({map:m, leaf, lane:1, type:'rear', jam:0, seed:5, sigT:0}); D.frozen = false;
       D.cars.forEach(c => c.mesh.visible = false); const car = D.cars.find(c => c.kind === 'rear') || D.cars[1], lead = D.cars.find(c => c.kind === 'lead'); D.cars = [car]; car.mesh.visible = true; car.lane = 2; car.P = lanePath(S.map, 2, 0); car.kind = 'rear'; car.brakeAt = null;
       car.s = LANE_START - (D.z + st.gap + car.len/2 + DRV.carL/2); car.v = car.v0 = car.base = D.v + st.closing; car.T = 5; car.s0 = 1; window.__off = st.offset || 0; if(st.offset) D.x += st.offset;
-      if(st.lead && lead){ D.cars.push(lead); lead.mesh.visible = true; lead.brakeAt = null; lead.phase = 3; lead.s = LANE_START - (D.z - st.lead[0] - lead.len/2 - DRV.carL/2); lead.v = lead.v0 = lead.base = D.v + st.lead[1]; }
+      if(st.lead && lead){ D.cars.push(lead); lead.mesh.visible = true; lead.brakeAt = st.leadBrake ?? null; lead.phase = st.leadBrake !== undefined ? 0 : 3; lead.s = LANE_START - (D.z - st.lead[0] - lead.len/2 - DRV.carL/2); lead.v = lead.v0 = lead.base = D.v + st.lead[1]; }
       placeCars(); resetGuide(); resetHud2(); resetHud(); resetHud3(); update(0);   // 첫 프레임(원래 교통)으로 올라간 판단 · 단계를 지움
       let jumped = false;
-      for(let k = 0; k < st.secs*60; k++){ if(st.jumpAt && !jumped && D.t >= st.jumpAt){ jumped = true; car.s = LANE_START - (D.z - 26); car.v = car.v0 = D.v + 2; } update(1/60); }
+      for(let k = 0; k < st.secs*60 && !(st.until && reached(st.until)); k++){ if(st.jumpAt && !jumped && D.t >= st.jumpAt){ jumped = true; car.s = LANE_START - (D.z - 26); car.v = car.v0 = D.v + 2; } update(1/60); }
+      if(st.until === 'red') for(let k = 0; k < 9 && reached('red'); k++) update(1/60);   // 빨강으로 바뀌며 한 번 커지는 움직임(0.15초)이 끝난 뒤 — 급제동이 걸리기 전까지만
       // 대기 · 위험 강화는 깜빡임 '켜짐' 순간에 멈춤 (2026-11-04: 꺼짐 밝기 0이라 꺼진 순간을 찍으면 뒤차 · 빛이 안 보임)
       for(let k = 0; k < 30 && hud === 'ar3' && S.H3.state === 3 && !$('#cRing1').getAttribute('d'); k++) update(1/60);   // 대기는 깜빡임 '켜짐' 순간에
       D.frozen = true; update(0);
       const r = $('#hudWrap').getBoundingClientRect(), c = $('#cab').getBoundingClientRect();
-      return {x:r.left - 60, y:r.top - 40, w:r.width + 120, h:r.height + 70, lv:S.H3 ? h3Label(S.H3.state) : '', gate:S.G && S.G.gate, cab:[c.left, c.top, c.width, c.height]}; };
+      return {x:r.left - 60, y:r.top - 40, w:r.width + 120, h:r.height + 70, lv:S.H3 ? h3Label(S.H3.state) + (st.lv || st.id === '06' ? ' · 단계 ' + S.H3.level + (D.aeb.on ? ' · 급제동 ' + D.aeb.dec.toFixed(1) : '') : '') : '', gate:S.G && S.G.gate, cab:[c.left, c.top, c.width, c.height]}; };
   });
   const shots = {};
   const ROWS = [['ar3', '', '', '리뉴얼 HUD (3.0)'], ['nav', '', '', '현대 HUD (3.5)']];
@@ -56,7 +81,7 @@ const SHEET = STATES.filter(s => !s.extra);
       const buf = await page.screenshot({clip:{x:box.x, y:box.y, width:box.w, height:box.h}});
       fs.writeFileSync(path.join(OUT, name + '.png'), buf); shots[name] = {buf, label, st, light, lv:box.lv, gate:box.gate};
       // 대비: 요소마다 HUD 켬 / 끔 같은 프레임 (E20 방법). 달라진 픽셀 = HUD 픽셀, 그 자리의 끈 화면 밝기 = 배경
-      const els = hud === 'ar3' ? {'들어갈 차로 테두리':'#cRails', '갈 방향':'#cIcon', '남은 거리 막대':'#cCdBar', '이동 꺾쇠':'#cChev', '금지 표지':'#cHold', '틈':'#cGap', '뒤차':'#cRear', '가장자리 빛':'#cEdgeR', '내 차':'#cEgo', '앞쪽 경고':'#cWarn', '앞차':'#cLead'} : {};
+      const els = hud === 'ar3' ? {'들어갈 차로 테두리':'#cRails', '갈 방향':'#cIcon', '남은 거리 막대':'#cCdBar', '이동 꺾쇠':'#cChev', '금지 표지':'#cHold', '틈':'#cGap', '뒤차':'#cRear', '가장자리 빛':'#cEdgeR', '내 차':'#cEgo', '앞쪽 경고':'#cWarn', '앞차':'#cLead', '건너는 횡단보도':'#cZebraHot'} : {};
       const boxes = await page.evaluate(sel => { const o = {}; Object.entries(sel).forEach(([k, q]) => { const e = document.querySelector(q); if(!e) return; const b = e.getBoundingClientRect(); if(b.width > 1 && b.height > 1) o[k] = [b.left, b.top, b.width, b.height]; }); return o; }, els);
       const on = await page.screenshot(); fs.writeFileSync(path.join(OUT, name + '_full.png'), on);   // 운전석 전체(실내 · 앞유리 · HUD)도 저장 (2026-11-07) 
       await page.evaluate(() => { $('#hudWrap').style.visibility = 'hidden'; }); await page.waitForTimeout(60);
@@ -86,6 +111,16 @@ const SHEET = STATES.filter(s => !s.extra);
     const p2 = await browser.newPage({viewport:{width:1990, height:440}, deviceScaleFactor:1});
     await p2.setContent(html); await p2.waitForTimeout(300);
     await p2.screenshot({path:path.join(OUT, `상태6_${light === 'day' ? '주간' : '야간'}.png`), fullPage:true}); await p2.close();
+  }
+  // 06 앞쪽 위험 2단계(D134): 행 = 앞차 · 횡단보도 보행자, 열 = 주황 · 빨강 · 급제동 중 (리뉴얼 HUD만 — 현대 HUD 화면은 그대로)
+  for(const light of ['day', 'night']){
+    const lbl = light === 'day' ? '주간' : '야간';
+    const html = `<html><body style="margin:0;background:#101418;color:#e7ecf1;font-family:-apple-system,'Pretendard','Apple SD Gothic Neo',sans-serif"><div style="padding:18px 22px 6px;font-size:20px;font-weight:700">리뉴얼 HUD 3차 — 06 앞쪽 위험 2단계 + 자동 급제동 · ${lbl}</div>
+      <table style="border-collapse:collapse;margin:8px 16px 18px"><tr><td></td>${LV_COLS.map(c => `<td style="padding:6px 8px;font-size:14px;font-weight:600;color:#9fb3c8">${c}</td>`).join('')}</tr>
+      ${LV_ROWS.map(([name, ids]) => `<tr><td style="padding:6px 10px;font-size:13px;font-weight:700;white-space:nowrap">${name}</td>${ids.map(id => { const c = shots[`${light}_ar3_${id}`]; return `<td style="padding:4px;vertical-align:top"><img src="data:image/png;base64,${c.buf.toString('base64')}" style="width:420px;display:block;border-radius:6px"><div style="font-size:12px;color:#9fb3c8;padding:4px 2px">${c.lv}</div></td>`; }).join('')}</tr>`).join('')}</table></body></html>`;
+    const p3 = await browser.newPage({viewport:{width:1420, height:600}, deviceScaleFactor:1});
+    await p3.setContent(html); await p3.waitForTimeout(300);
+    await p3.screenshot({path:path.join(OUT, `06단계_${lbl}.png`), fullPage:true}); await p3.close();
   }
   // 대비 표 (요소별 최솟값 — 밝은 쪽 25% 픽셀 평균 vs 같은 자리 노면 밝기)
   const lines = ['| 화면 | 요소 | 대비 |', '|---|---|---|'];

@@ -1,9 +1,10 @@
 /* ============================================================
    hud3.js — 리뉴얼 HUD 3차 (3.0, 2026-11-17) · 피그마 '기말 / 11주차' (3차 HUD 디자인 근거 ① ② · HUD 정보 구조 · 상태 변화 01 ~ 06)
    2차(2.4, hud2.js)의 구조(자리 · 크기 · ① 들어갈 차로 ② 갈 방향 ③ 막대 · 뒤차 정보)는 그대로 두고 2차 실험에서 문제였던 네 가지만 고쳤다.
-   01 앞쪽 위험 먼저: 앞차와 간격이 좁아지거나 보행자가 건너려 하면 주황 삼각형 · 앞쪽 간격이 가장 크게, 들어갈 차로 · 갈 방향 · 뒤차는 작고 옅게
+   01 앞쪽 위험 먼저: 앞차와 간격이 좁아지거나 보행자가 건너려 하면 주황 삼각형 · 앞쪽 간격이 가장 크게, 들어갈 차로 · 갈 방향 · 뒤차는 작고 옅게.
+      2단계(2026-11-18 D134): 멈추려면 단단히 밟아야 할 만큼(필요 감속도 4 이상) 가까우면 · 자동 급제동 중이면 빨강(config.js AEB)
    02 들어갈 때를 분명하게: 기다림(갈 방향 화살표 옆에 옆으로 옮기기 금지 표지 · 마감선까지 남은 거리 밝게) → 확인(틈 자리 흰 점선 · 거울 표시) → 이동(틈 초록 · 꺾쇠 크게)
-   03 색 하나에 뜻 하나: 초록 = 옮겨도 됨 / 주황 = 조심 / 빨강 = 지금 옮기지 마 / 청록 = 길 안내(늘 그대로). 꺾쇠 = 옮길 방향 · 삼각형 = 앞쪽 주의 · 꺾쇠에 빨간 원 빗금 = 지금 옮기지 마(옆으로 옮기기 금지 표지).
+   03 색 하나에 뜻 하나: 초록 = 옮겨도 됨 / 주황 = 조심 / 빨강 = 지금 바로 위험(옮기지 마 · 부딪히기 직전 — 2026-11-18 D134로 넓힘) / 청록 = 길 안내(늘 그대로). 꺾쇠 = 옮길 방향 · 삼각형 = 앞쪽 주의 · 꺾쇠에 빨간 원 빗금 = 지금 옮기지 마(옆으로 옮기기 금지 표지).
       2차에서 뜻이 겹치던 곳을 정리: 막대 · 마감선의 초록 → 주황 → 빨강(무채색으로) · 정지선 빨간 막대(주황으로) · 차로 변경 뒤 차로가 초록으로 바뀌던 칭찬 · 해소 때 차로 전체 초록(틈만 초록으로) ·
       내 차 아이콘의 빨간 미등 · 제한속도 표지의 빨간 테(표지를 뺌) · 화살표 머리 삼각형(꺾쇠로) · 차로 경계 빨간 선(대기에 합침)
    04 미니 도로 투시: 손으로 맞춘 원근식(hud.js K · PXM · HY_*)을 버리고, 실제 차선 좌표를 장면 카메라와 같은 방향 · 같은 화각으로 투영한다(makeProj3).
@@ -199,15 +200,15 @@ function laneRibbon3(zNear, onMain, offFn, proj){
 }
 
 /* ---------- 상태 ---------- */
-const C3 = {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1, holdA:0, holdP:0, holdSide:1, lastIco:null};   // holdA · holdP · holdSide: 03 대기 금지 표지의 밝기 · 닫힘 진행 · 놓인 쪽, lastIco: 마지막으로 보인 갈 방향 화살표
+const C3 = {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1, holdA:0, holdP:0, holdSide:1, lastIco:null, warnPop:1, warnRed:false};   // holdA · holdP · holdSide: 03 대기 금지 표지의 밝기 · 닫힘 진행 · 놓인 쪽, lastIco: 마지막으로 보인 갈 방향 화살표, warnPop · warnRed: 06이 빨강으로 바뀌는 순간 한 번 커짐(D134)
 function resetHud3(){
-  Object.assign(C3, {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1, holdA:0, holdP:0, holdSide:1, lastIco:null});
+  Object.assign(C3, {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1, holdA:0, holdP:0, holdSide:1, lastIco:null, warnPop:1, warnRed:false});
   S.H3 = null; VIEW3.x = null; VIEW3.lastT = null;
   ['cSurf', 'cLaneFill', 'cEdges', 'cDash', 'cRails', 'cSolid', 'cGate', 'cSlot', 'cQueue', 'cStop', 'cPed', 'cFrontBand', 'cLead', 'cLeadGlass', 'cDistBand', 'cFlow', 'cAhead', 'cWork', 'cWorkBars', 'cGap', 'cGapLine', 'cZebra', 'cZebraHot', 'cTrail1', 'cTrail2', 'cRing1', 'cRing2', 'cRear', 'cRearGlass', 'cEgo', 'cEgoGlass'].forEach(id => $('#' + id).setAttribute('d', ''));
   $$('#cChev path, #cAppr path').forEach(q => q.setAttribute('d', ''));
   $('#cEdgeL').setAttribute('opacity', 0); $('#cEdgeR').setAttribute('opacity', 0); $('#cWarn').setAttribute('opacity', 0); $('#cJam').setAttribute('opacity', 0);
   $('#cHold').setAttribute('opacity', 0); $('#cHold').style.display = 'none';
-  $('#arHud3').dataset.state = 1; $('#mirCue').hidden = true;
+  $('#arHud3').dataset.state = 1; $('#arHud3').dataset.front = 0; $('#cWarn').dataset.level = 1; $('#hudSvgTop').classList.remove('red'); $('#mirCue').hidden = true;
 }
 
 /* ---------- 매 프레임: 입력 모으기 → 상태 (어느 HUD로 달리든) ----------
@@ -238,12 +239,18 @@ function stepHud3(C, t){
       if(off < hw && ez > W.z0){ const zb = W.z0 + W.taper*(1 - off/hw), gap = Math.max(0, ez - EGO.halfL - zb); if(!front || gap < front.gap) front = {c:{x:m.laneX(W.lane), z:zb, halfL:0, v:0, work:true}, gap, closing:EGO.v}; } }
     if(front) front.ttc = front.closing > 0 ? front.gap/front.closing : Infinity; }
   const ped = !!(m.cw && path.cwS !== null && pedBlock(S.cityT) && ex < m.cw.x0 && S.s > path.cwS - HUD3.pedDist && S.s < path.cwS);
+  /* 2단계 빨강 · 자동 급제동 (2026-11-18, D134): 필요 감속도(guide.js needDec) — 앞차는 내 앞범퍼 ~ 앞차 뒤범퍼 · 속도 차, 보행자는 내 앞범퍼 ~ 횡단보도 앞 선 · 내 속도.
+     급제동(drive.js aebStep)이 걸려 있으면 늘 빨강. 급제동 대상이 이 목록에 없는 차면(갈림 뒤 등) 그 차를 앞차로 그린다 */
+  const aeb = S.drive && D.aeb && D.aeb.on ? D.aeb : null;
+  if(aeb && aeb.kind === 'lead' && aeb.car && !front && D.haz && D.haz.car === aeb.car){ const c = aeb.car; front = {c:{x:c.x, z:c.z, v:c.v, halfL:halfL(c), ref:c.mesh}, gap:Math.max(0, D.haz.gap), closing:D.haz.closing}; front.ttc = front.closing > 0 ? front.gap/front.closing : Infinity; }
+  const pedNeed = ped ? needDec(EGO.v, Math.max(0, path.cwS - S.s - EGO.halfL)) : 0;
   const gate = G ? G.gate : 'none', rearWait = !!G && (gate === 'wait' || gate === 'clearing') && !!(G.reason && G.reason.kind !== 'queue');
-  const prev = C3.h.state;
+  const prev = C3.h.state, prevRed = C3.h.red;
   h3Step(C3.h, t, {need:needMove, gate, rearWait, queueWait:besideQueue && !S.q.mergeNear, queueGo:besideQueue && S.q.mergeNear,
-    rear:rearNear ? {gap:rearNear.gap, ttc:rearNear.ttc} : null, front:front ? {ttc:front.ttc, closing:front.closing} : null, ped}, HUD3);
-  S.H3 = {state:C3.h.state, base:C3.h.base, since:C3.h.since, kind:C3.h.frontKind, needMove, inLane, tail, besideQueue, gateZ, cand, others, ahead, front, ped, gate, onMain};
+    rear:rearNear ? {gap:rearNear.gap, ttc:rearNear.ttc} : null, front:front ? {ttc:front.ttc, closing:front.closing, need:needDec(front.closing, front.gap), work:!!front.c.work} : null, ped, pedNeed, aeb:aeb ? aeb.kind : null}, HUD3, AEB);
+  S.H3 = {state:C3.h.state, base:C3.h.base, since:C3.h.since, kind:C3.h.frontKind, level:C3.h.level, needMove, inLane, tail, besideQueue, gateZ, cand, others, ahead, front, ped, gate, onMain};
   if(S.drive && D.events && C3.h.state !== prev) D.events.push({t:+t.toFixed(2), type:'h3', from:prev, to:C3.h.state, shown:S.mode === 'ar3'});
+  if(S.drive && D.events && C3.h.red !== prevRed) D.events.push({t:+t.toFixed(2), type:'h3red', on:C3.h.red, kind:C3.h.frontKind, shown:S.mode === 'ar3'});   // 06 빨강 켜짐 · 꺼짐(D134)
   return S.H3;
 }
 
@@ -267,7 +274,7 @@ function drawAr3(p, f, C, k){
   const needMove = H.needMove, besideQueue = H.besideQueue, tail = H.tail, gateZ = H.gateZ;
   const set = (id, d) => $('#' + id).setAttribute('d', d || '');
   const ramp = (v, to, sec) => v + clamp(to - v, -dt/sec, dt/sec);
-  $('#arHud3').dataset.state = H.state;
+  $('#arHud3').dataset.state = H.state; $('#arHud3').dataset.front = H.level || 0;   // front 2 = 빨강: 앞차 아이콘 · 앞쪽 간격 띠 · 횡단보도 줄무늬가 빨강(hud.css)
   // 06 앞쪽 위험이면 나머지를 작고 옅게 (0 → 1, 0.18초)
   C3.dim = ramp(C3.dim, front ? 1 : 0, .18); C3.warnA = ramp(C3.warnA, front ? 1 : 0, .15);
   const dim = C3.dim, soft = 1 - .55*dim;
@@ -495,20 +502,25 @@ function drawAr3(p, f, C, k){
       // 보행자: 걷는 사람 모델(같은 가상 카메라, 실제 키). 0.45초마다 좌우를 뒤집어 걷는 것처럼. 건너거나 건너려 하는 사람은 주황, 모델을 못 불러오면 점
       pedsAt(ct).forEach(q => { if(q.phase === 'done') return; const c = proj(q.x, q.z, .9); if(!c) return;
         const flip = q.walking && Math.floor(ct/.45 + q.i*.5) % 2 ? -1 : 1, fz = q.dir > 0 ? -1 : 1;
-        if(mdl3Put('ped', q.x, q.z, 0, fz, flip*1.25, 1.25, 1.25, H.ped ? T.warn : T.neutral, H.ped ? 1 : .8)) return;
+        if(mdl3Put('ped', q.x, q.z, 0, fz, flip*1.25, 1.25, 1.25, H.ped ? (H.level === 2 ? T.danger : T.warn) : T.neutral, H.ped ? 1 : .8)) return;
         const r = Math.max(2.2, 5.5*c[2]); pd += `M${(c[0] - r).toFixed(1)} ${c[1].toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2*r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2*r).toFixed(1)} 0Z`; });
     }
   }
-  set('cStop', cs); set('cPed', pd); $('#cPed').setAttribute('fill', H.ped ? T.warn : T.neutral); $('#cPed').setAttribute('fill-opacity', H.ped ? 1 : .9);
+  set('cStop', cs); set('cPed', pd); $('#cPed').setAttribute('fill', H.ped ? (H.level === 2 ? T.danger : T.warn) : T.neutral); $('#cPed').setAttribute('fill-opacity', H.ped ? 1 : .9);
 
-  /* 06 앞쪽 위험 — 주황 삼각형(가운데 위, 가장 크게) + 앞차(주황)와 앞쪽 간격. 한 번 커지며 나타남 */
-  const wEl = $('#cWarn'), wa = C3.warnA;
+  /* 06 앞쪽 위험 — 삼각형(가운데 위, 가장 크게) + 앞차와 앞쪽 간격(보행자면 횡단보도 줄무늬 · 사람). 한 번 커지며 나타남.
+     2단계(D134): 1 주황 = 앞쪽 주의 / 2 빨강 = 부딪히기 직전(필요 감속도 4 이상 · 급제동 중). 주황 → 빨강은 서서히가 아니라 바로 바뀌고, 그 순간 처음 나타날 때처럼 한 번 커진다.
+     빨강일 때 느낌표는 흰색(검정은 빨강 위에서 안 보임), 원인(앞차 아이콘 · 간격 띠 / 횡단보도 · 보행자)도 빨강 */
+  const wEl = $('#cWarn'), wa = C3.warnA, red = H.level === 2;
+  if(red && !C3.warnRed) C3.warnPop = 0;
+  C3.warnRed = red; C3.warnPop = ramp(C3.warnPop, 1, .15);
+  wEl.dataset.level = red ? 2 : 1; $('#hudSvgTop').classList.toggle('red', red);
   // 자리: 삼각형 아래끝(테두리 포함)과 남은 거리 막대 사이를 WARN_GAP만큼 띄운다 (2026-11-17 사용자: 삼각형과 막대가 겹침 — 예전 y 44는 아래끝 71.5 · 막대 윗선 69)
-  wEl.setAttribute('opacity', wa.toFixed(3)); wEl.setAttribute('transform', `translate(${HX} ${(barY - WARN_GAP - 27.5).toFixed(1)}) scale(${(.8 + .2*ease(wa)).toFixed(3)})`);
+  wEl.setAttribute('opacity', wa.toFixed(3)); wEl.setAttribute('transform', `translate(${HX} ${(barY - WARN_GAP - 27.5).toFixed(1)}) scale(${(.8 + .2*ease(Math.min(wa, C3.warnPop))).toFixed(3)})`);
   let ld = null, fb = '';
   if(wa > .01 && H.front && H.kind === 'lead'){
     const c = H.front.c, ry = c.ref && c.ref.rotation ? c.ref.rotation.y : 0, cf = [-Math.sin(ry), -Math.cos(ry)];
-    if(!c.work){ ld = slab3(proj, c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW); if(ld) car3Put(c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW, HUD3.icon, T.warn, wa); }   // 공사 구간이면 차 아이콘 없이 간격 띠만(막힌 곳은 아래 빗금으로 이미 보임)
+    if(!c.work){ ld = slab3(proj, c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW); if(ld) car3Put(c.x, c.z, cf[0], cf[1], c.halfL*2, DRV.carW, HUD3.icon, red ? T.danger : T.warn, wa); }   // 공사 구간이면 차 아이콘 없이 간격 띠만(막힌 곳은 아래 빗금으로 이미 보임)
     const ax = ex + ef.x*DRV.carL/2, az = p.z + ef.z*DRV.carL/2, bx2 = c.x - cf[0]*c.halfL, bz2 = c.z - cf[1]*c.halfL, rx = -ef.z, rz = ef.x, w = .95;
     if(Math.hypot(bx2 - ax, bz2 - az) > .4) fb = quadW([[ax - rx*w, az - rz*w], [ax + rx*w, az + rz*w], [bx2 + rx*w, bz2 + rz*w], [bx2 - rx*w, bz2 - rz*w]], proj);
   }
