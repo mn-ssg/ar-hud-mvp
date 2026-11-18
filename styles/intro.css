@@ -1,45 +1,45 @@
 /* ============================================================
    intro.css — 주행 테스트 안내 모션그래픽 (intro.js TOUR, 2026-11-18 다시 디자인 D135)
-   흰 바탕이 화면 전체 · 상자 없이 큰 글자 · 가는 선 · 점. 색은 intro.js C가 넣는 CSS 변수(--t-bg · --t-point · --t-ink · --t-mute)만 쓴다
+   흰 바탕이 화면 전체 · 상자 없이 큰 글자 · 가는 선 · 점. 색은 styles.css :root의 디자인 토큰(--bg · --point · --ink · --mute)만 쓴다 — 화면 UI와 한곳(D137)
    ============================================================ */
-#tour{ position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; background:var(--t-bg); color:var(--t-ink); font-family:var(--font); }
+#tour{ position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; background:var(--bg); color:var(--ink); font-family:var(--font); }
 .tour-stage{ flex:1; min-height:0; position:relative; }
 .tour-stage svg{ position:absolute; inset:0; width:100%; height:100%; display:block; }
 /* 아래: 가는 선 진행 + 장면 이름(글자만) · 이전(글자 + 화살표) · 다음(파란 원 안에 흰 화살표) */
 .tour-bar{ flex:none; height:84px; display:flex; align-items:center; gap:32px; padding:0 40px; }
-.tour-prev{ flex:none; border:0; background:none; padding:8px 0; font:inherit; font-size:15px; font-weight:600; color:var(--t-mute); cursor:pointer; }
-.tour-prev:hover:not(:disabled){ color:var(--t-ink); } .tour-prev:disabled{ visibility:hidden; }
+.tour-prev{ flex:none; border:0; background:none; padding:8px 0; font:inherit; font-size:15px; font-weight:600; color:var(--mute); cursor:pointer; }
+.tour-prev:hover:not(:disabled){ color:var(--ink); } .tour-prev:disabled{ visibility:hidden; }
 .tour-steps{ flex:1; position:relative; display:flex; justify-content:space-between; padding-top:16px; }
-.tour-line, .tour-fill{ position:absolute; left:0; top:0; height:1px; background:var(--t-mute); width:100%; }
-.tour-fill{ height:2px; top:-.5px; background:var(--t-ink); width:0; }
-.tour-step{ font-size:13px; font-weight:600; color:var(--t-mute); white-space:nowrap; letter-spacing:-.01em; }
-.tour-step.on{ color:var(--t-ink); }
+.tour-line, .tour-fill{ position:absolute; left:0; top:0; height:1px; background:var(--mute); width:100%; }
+.tour-fill{ height:2px; top:-.5px; background:var(--ink); width:0; }
+.tour-step{ font-size:13px; font-weight:600; color:var(--mute); white-space:nowrap; letter-spacing:-.01em; }
+.tour-step.on{ color:var(--ink); }
 .tour-go{ flex:none; display:flex; align-items:center; gap:14px; }
-.tour-go-label{ font-size:16px; font-weight:700; color:var(--t-ink); }
-.tour-next{ width:52px; height:52px; border-radius:50%; border:0; background:var(--t-point); color:var(--t-bg); display:grid; place-items:center; cursor:pointer; padding:0; }
+.tour-go-label{ font-size:16px; font-weight:700; color:var(--ink); }
+.tour-next{ width:52px; height:52px; border-radius:50%; border:0; background:var(--point); color:var(--bg); display:grid; place-items:center; cursor:pointer; padding:0; }
 .tour-next svg{ width:24px; height:24px; }
-.tour-prev:focus-visible, .tour-next:focus-visible{ outline:1px solid var(--t-mute); outline-offset:5px; }
+.tour-prev:focus-visible, .tour-next:focus-visible{ outline:1px solid var(--mute); outline-offset:5px; }
 /* 글자: 한 글꼴, 크기 대비를 크게 */
-#tour text{ font-family:var(--font); fill:var(--t-ink); }
-#tour .em{ fill:var(--t-point); }
+#tour text{ font-family:var(--font); fill:var(--ink); }
+#tour .em{ fill:var(--point); }
 #tour .t-hero{ font-size:92px; font-weight:800; letter-spacing:-.045em; }
 #tour .t-title{ font-size:64px; font-weight:800; letter-spacing:-.04em; }
 #tour .t-verb{ font-size:120px; font-weight:800; letter-spacing:-.05em; }
 #tour .t-rule{ font-size:60px; font-weight:800; letter-spacing:-.04em; }
 #tour .t-big{ font-size:230px; font-weight:800; letter-spacing:-.06em; font-variant-numeric:tabular-nums; }
-#tour .t-num{ font-size:60px; font-weight:800; fill:var(--t-point); font-variant-numeric:tabular-nums; letter-spacing:-.03em; }
+#tour .t-num{ font-size:60px; font-weight:800; fill:var(--point); font-variant-numeric:tabular-nums; letter-spacing:-.03em; }
 #tour .t-speed{ font-size:200px; font-weight:800; letter-spacing:-.06em; font-variant-numeric:tabular-nums; }
 #tour .t-speed2{ font-size:96px; font-weight:800; letter-spacing:-.05em; font-variant-numeric:tabular-nums; }
-#tour .t-unit{ font-size:16px; font-weight:600; fill:var(--t-mute); }
+#tour .t-unit{ font-size:16px; font-weight:600; fill:var(--mute); }
 #tour .t-lead{ font-size:22px; font-weight:700; }
-#tour .t-small{ font-size:19px; font-weight:500; fill:var(--t-ink); }
-#tour .t-cap{ font-size:14px; font-weight:600; fill:var(--t-mute); }
-#tour .t-cap.em{ fill:var(--t-point); }
-#tour .t-idx{ font-size:15px; font-weight:700; fill:var(--t-mute); font-variant-numeric:tabular-nums; }
-#tour .t-idx.on{ fill:var(--t-point); font-size:18px; }
+#tour .t-small{ font-size:19px; font-weight:500; fill:var(--ink); }
+#tour .t-cap{ font-size:14px; font-weight:600; fill:var(--mute); }
+#tour .t-cap.em{ fill:var(--point); }
+#tour .t-idx{ font-size:15px; font-weight:700; fill:var(--mute); font-variant-numeric:tabular-nums; }
+#tour .t-idx.on{ fill:var(--point); font-size:18px; }
 #tour .t-item{ font-size:28px; font-weight:700; }
-#tour .t-past{ font-size:22px; font-weight:600; fill:var(--t-mute); }
+#tour .t-past{ font-size:22px; font-weight:600; fill:var(--mute); }
 #tour .t-key{ font-weight:700; }
-#tour .t-line{ font-size:26px; font-weight:500; fill:var(--t-mute); }
-#tour .t-line .k{ font-weight:800; fill:var(--t-ink); }
-#tour .t-enter{ font-size:30px; font-weight:800; fill:var(--t-ink); }
+#tour .t-line{ font-size:26px; font-weight:500; fill:var(--mute); }
+#tour .t-line .k{ font-weight:800; fill:var(--ink); }
+#tour .t-enter{ font-size:30px; font-weight:800; fill:var(--ink); }

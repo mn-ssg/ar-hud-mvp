@@ -85,10 +85,9 @@ function setTarget(i, lane){
   S.car = null; otherCar.visible = false;
   resetHud(); resetHud2(); resetHud3(); resetGuide();
 }
-// 주간 · 야간: 3D 장면(scene.js) + HUD 밤 밝기(hud.css .night) + 페이지 다크 테마(styles.css [data-light])
+// 주간 · 야간: 3D 장면(scene.js) + HUD 밤 밝기(hud.css .night). 화면 UI는 밤에도 흰 바탕 — 예전 페이지 다크 테마(<html data-light>)는 2026-11-18에 없앰(D137, 그 속성을 읽는 코드 · 검사 없음)
 function setLight(l){
   S.light = l; const night = l === 'night';
-  document.documentElement.dataset.light = l;
   $('#cab').classList.toggle('night', night);
   setSceneLight(night); setCabinLight(night);
   $('#glow feGaussianBlur').setAttribute('stdDeviation', night ? 1.1 : 2.4);   // 밤엔 빛 번짐을 줄임
@@ -154,7 +153,13 @@ function renderStatus(){
   const sc = $('#app').dataset.screen;
   $('#statusLine').textContent = sc === 'demo' ? `시연 · ${mapLabel(S.demoMap)} · ${modeName(S.mode)} · ${S.light === 'night' ? '야간' : '주간'}` : '';
 }
-function openSetup(open){ $('#setup').hidden = !open; $('#setupBtn').setAttribute('aria-expanded', String(open)); }
+// 연구자 설정: 운전석 왼쪽 위에 뜨는 패널. 연구자가 버튼으로 닫을 때만(anim) 옆으로 미끄러져 닫히고, 흐름이 닫을 때(주행 테스트 시작 등)는 바로 닫힘 — styles.css .setup
+function openSetup(open, anim){
+  const el = $('#setup'); clearTimeout(el._close); el.classList.remove('closing'); $('#setupBtn').setAttribute('aria-expanded', String(open));
+  if(open || el.hidden){ el.hidden = !open; return; }
+  if(!anim || matchMedia('(prefers-reduced-motion: reduce)').matches){ el.hidden = true; return; }
+  el.classList.add('closing'); el._close = setTimeout(() => { el.hidden = true; el.classList.remove('closing'); }, 220);
+}
 function goHome(){
   if(S.testing) return;
   stopDemo(); $('#sess').hidden = true; $('#intro').hidden = false; $('#drawer').classList.remove('open');
@@ -466,7 +471,7 @@ function finish(){
 $('#demoBtn').onclick = () => { openSetup(true); start(); };
 $('#demoSide').onclick = () => start();
 $('#homeBtn').onclick = goHome;
-$('#setupBtn').onclick = () => openSetup($('#setup').hidden);
+$('#setupBtn').onclick = () => openSetup($('#setupBtn').getAttribute('aria-expanded') !== 'true', true);
 $$('#modeSeg button').forEach(b => b.onclick = () => { setMode(b.dataset.mode); update(1); renderStatus(); });
 $$('#lightSeg button').forEach(b => b.onclick = () => { setLight(b.dataset.light); update(1); renderStatus(); });
 $$('#mapSeg button').forEach(b => b.onclick = () => {

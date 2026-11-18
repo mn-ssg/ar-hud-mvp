@@ -40,7 +40,11 @@
     ]
   };
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const W = 214, H = 52, GAP = 10;
+  const W = 214, H = 54, GAP = 10;
+  // 이름표 모양(2026-11-18 D137): 화면 UI 디자인 토큰(styles.css :root)을 따름 — 흰 이름표(모서리 16 · 옅은 그림자) · 먹색 제목 · 회색 설명 · 파란 번호 · 파란 연결선. HUD 색(청록)은 안 씀
+  const tok = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const T = {bg:tok('--bg'), point:tok('--point'), ink:tok('--ink'), sub:tok('--sub')};
+  const DEFS = `<defs><filter id="exShadow" x="-20%" y="-30%" width="140%" height="180%"><feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="${T.ink}" flood-opacity=".16"/></filter></defs>`;
 
   function setOn(on){
     cabEl.classList.toggle('explain', on); btn.setAttribute('aria-pressed', String(on));
@@ -73,19 +77,19 @@
       it.ly = cy - H/2; col[it.n.side].push(it);
     });
     Object.values(col).forEach(list => { list.sort((a,b) => a.ly - b.ly); for(let i=1;i<list.length;i++) list[i].ly = Math.max(list[i].ly, list[i-1].ly + H + GAP); });
-    let out = '';
+    let out = DEFS;
     items.forEach(it => {
       const {r, n} = it, left = n.side === 'L';
       const ax = left ? r.x : r.x + r.w, ay = r.y + r.h/2;                 // 대상 쪽 끝점
       const bx = left ? it.lx + W : it.lx, by = it.ly + H/2;               // 이름표 쪽 끝점
-      out += `<rect x="${r.x-4}" y="${r.y-4}" width="${r.w+8}" height="${r.h+8}" rx="8" fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-dasharray="4 4"/>`;
-      out += `<path d="M${ax} ${ay} C${(ax+bx)/2} ${ay} ${(ax+bx)/2} ${by} ${bx} ${by}" fill="none" stroke="#ffffff" stroke-opacity=".7" stroke-width="1.5"/>`;
-      out += `<circle cx="${ax}" cy="${ay}" r="3.5" fill="#ffffff"/>`;
-      out += `<g transform="translate(${it.lx} ${it.ly})"><rect width="${W}" height="${H}" rx="12" fill="#0c1016" fill-opacity=".86" stroke="#ffffff" stroke-opacity=".16"/>`;
-      const tx = n.n ? 44 : 14;
-      if(n.n) out += `<circle cx="24" cy="${H/2}" r="12" fill="${C_NOW}"/><text x="24" y="${H/2+4.5}" text-anchor="middle" font-size="13" font-weight="800" fill="#0c1016">${n.n}</text>`;
-      out += `<text x="${tx}" y="22" font-size="14" font-weight="700" fill="#ffffff">${esc(n.t)}</text>`;
-      out += `<text x="${tx}" y="40" font-size="12" fill="#b8c4d0">${esc(n.s)}</text></g>`;
+      out += `<rect x="${r.x-4}" y="${r.y-4}" width="${r.w+8}" height="${r.h+8}" rx="8" fill="none" stroke="${T.point}" stroke-opacity=".9" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+      out += `<path d="M${ax} ${ay} C${(ax+bx)/2} ${ay} ${(ax+bx)/2} ${by} ${bx} ${by}" fill="none" stroke="${T.point}" stroke-width="1.5"/>`;
+      out += `<circle cx="${ax}" cy="${ay}" r="4" fill="${T.point}" stroke="${T.bg}" stroke-width="2"/>`;
+      out += `<g transform="translate(${it.lx} ${it.ly})"><rect width="${W}" height="${H}" rx="16" fill="${T.bg}" filter="url(#exShadow)"/>`;
+      const tx = n.n ? 46 : 16;
+      if(n.n) out += `<circle cx="25" cy="${H/2}" r="11" fill="${T.point}"/><text x="25" y="${H/2+4.5}" text-anchor="middle" font-size="12.5" font-weight="800" fill="${T.bg}">${n.n}</text>`;
+      out += `<text x="${tx}" y="23" font-size="14" font-weight="700" fill="${T.ink}">${esc(n.t)}</text>`;
+      out += `<text x="${tx}" y="41" font-size="12" font-weight="500" fill="${T.sub}">${esc(n.s)}</text></g>`;
     });
     layer.innerHTML = out;
   }

@@ -84,16 +84,28 @@ function buildSteps(order){
 function runCfg(st){ return {map:mapById(st.map), leaf:st.leaf, lane:st.lane, type:st.type, jam:st.jam, seed:st.seed, sigT:st.sigT}; }
 
 /* ---------- 카드 · 카운트다운 ---------- */
+// 카드 움직임(styles.css): 처음 뜰 때 = 뒤가 어두워지며 카드가 조금 위로 올라옴 / 이미 떠 있던 카드의 다음 단계 = 내용만 옆으로 밀리며 바뀜(.swap) / 처음 화면 카드에서 넘어올 때 = 뒤 어둡기는 그대로(.keep)
 function sesCard({icon = '', tone = '', eyebrow = '', title, body = '', btn, btn2}){
+  const box = $('#sess'), card = box.querySelector('.card'), swap = !box.hidden, keep = swap || !$('#intro').hidden;
   $('#sesIcon').innerHTML = icon ? ico(icon) : ''; $('#sesIcon').className = icon ? 'card-icon ' + tone : '';
   $('#sesEyebrow').textContent = eyebrow; $('#sesTitle').textContent = title; $('#sesBody').innerHTML = body;
   const b1 = $('#sesBtn'), b2 = $('#sesBtn2');
+  [b1, b2].forEach(unTick);
   b1.textContent = btn[0]; b1.onclick = btn[1]; b1.disabled = false;
   b2.hidden = !btn2; if(btn2){ b2.textContent = btn2[0]; b2.onclick = btn2[1]; }
-  $('#intro').hidden = true; $('#sess').hidden = false;
+  box.classList.toggle('keep', keep); card.classList.remove('swap');
+  $('#intro').hidden = true; box.hidden = false;
+  if(swap){ void card.offsetWidth; card.classList.add('swap'); }
   const inp = $('#sesPid'); (inp ? inp : b1).focus();
 }
 const hideCard = () => { $('#sess').hidden = true; };
+// 엑셀 저장이 끝나면 그 버튼 자리에 짧은 체크(1.4초 뒤 원래 글자로) — styles.css .btn.saved
+function savedTick(b){
+  if(!b) return; unTick(b); b.dataset.label = b.innerHTML;
+  b.innerHTML = ico('check') + '저장됨'; b.classList.add('saved');
+  b._tick = setTimeout(() => unTick(b), 1400);
+}
+function unTick(b){ clearTimeout(b._tick); if(b.dataset.label !== undefined){ b.innerHTML = b.dataset.label; delete b.dataset.label; } b.classList.remove('saved'); }
 
 function lockUi(on){
   $('#setup').classList.toggle('locked', on);
@@ -223,7 +235,7 @@ function doneSession(){
   const xl = exportBook(rows, name, qs);
   setScreen('home');
   sesCard({icon:'check', tone:'ok', eyebrow:SES.pid, title:'끝', body:summaryHtml(rows) + `<p class="ses-meta">${esc(name)}.${xl ? 'xlsx' : 'csv'}</p>`,
-    btn:['다음 참가자', openSession], btn2:['엑셀 다시 저장', () => exportBook(rows, name, qs)]});
+    btn:['다음 참가자', openSession], btn2:['엑셀 다시 저장', () => { exportBook(rows, name, qs); savedTick($('#sesBtn2')); }]});
 }
 function endSession(){
   clearTimeout(SES.timer); SES.on = false; SES.cur = null; S.testing = false; TOUR.hide();
@@ -345,7 +357,7 @@ function renderLog(){
 }
 $('#logBtn').onclick = () => $('#drawer').classList.toggle('open');
 $('#closeDrawer').onclick = () => $('#drawer').classList.remove('open');
-$('#allXlsx').onclick = () => exportBook(drives, `주행테스트_전체_${today()}`, surveys, practices);
+$('#allXlsx').onclick = () => { exportBook(drives, `주행테스트_전체_${today()}`, surveys, practices); savedTick($('#allXlsx')); };
 $('#clearLog').onclick = () => { if(confirm('주행 테스트 기록을 모두 지울까요? (연습 · 예전 클릭 기록은 그대로)')){ drives = []; surveys = []; saveArr(DKEY, drives); saveArr(QKEY, surveys); renderLog(); } };
 
 /* ---------- 방향키 · 단축키 ---------- */

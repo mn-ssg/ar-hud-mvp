@@ -489,6 +489,48 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('안내 모션그래픽: HUD 표시의 뜻(기다려 · 이동 · 색)은 알려 주지 않음 — 조작 · 할 일 · 기록 항목만(자동 급제동은 사용자 결정 전이라 넣지 않음)', !t.words, '');
   }
 
+  /* ---------- 8-0. 화면 UI 디자인 시스템 (D137, 2026-11-18 — 안내 모션그래픽과 같은 토큰 · 야간 페이지 테마 없음 · 참가자 화면에 HUD 신호색 없음) ---------- */
+  {
+    const u = await E(async () => { const o = {}, cs = e => getComputedStyle(e), tok = n => cs(document.documentElement).getPropertyValue(n).trim();
+      const rgb = c => { c = (c || '').trim().toLowerCase(); let m = /^#([0-9a-f]{6})$/.exec(c); if(m) return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)).join(','); m = /^rgba?\(([^)]+)\)/.exec(c); if(!m) return ''; const v = m[1].split(',').map(Number); return v.length > 3 && v[3] === 0 ? '' : v.slice(0, 3).join(','); };
+      const T = {bg:rgb(tok('--bg')), point:rgb(tok('--point')), ink:rgb(tok('--ink')), field:rgb(tok('--field')), danger:rgb(tok('--danger'))};
+      const HUDC = ['#00e5ff', '#3ddc84', '#ffb020', '#ff4d4d', '#5fd4ea', '#4cd38a', '#ff5a4f', cs($('#cab')).getPropertyValue('--h2-route'), cs($('#cab')).getPropertyValue('--h2-go'), cs($('#cab')).getPropertyValue('--h2-warn'), cs($('#cab')).getPropertyValue('--h2-danger')].map(rgb).filter(Boolean);
+      // 야간 장면이어도 페이지 · 카드 · 위 막대는 흰 바탕, <html data-light> 없음
+      goHome(); setLight('night'); o.night = {body:rgb(cs(document.body).backgroundColor), card:rgb(cs($('#intro .card')).backgroundColor), top:rgb(cs($('#topbar')).backgroundColor), attr:document.documentElement.hasAttribute('data-light'), cabNight:$('#cab').classList.contains('night')}; setLight('day');
+      // 토큰 한곳: 안내 모션그래픽의 색 = styles.css 토큰, intro.css의 따로 둔 변수(--t-*) 없음
+      TOUR.preload(); const P = TOUR.parts.C; o.tour = ['bg', 'point', 'ink', 'mute'].every(k => rgb(P[k]) === rgb(tok('--' + k))) && !cs($('#tour')).getPropertyValue('--t-point').trim();
+      // 버튼: 주요 = 파랑 + 흰 글자, 보조 = 옅은 회색 + 먹색, 위 막대 = 글자만. 검정 버튼 없음
+      o.btn = {primary:rgb(cs($('#testBtn')).backgroundColor) === T.point && rgb(cs($('#testBtn')).color) === T.bg, second:rgb(cs($('#demoBtn')).backgroundColor) === T.field && rgb(cs($('#demoBtn')).color) === T.ink,
+        ghost:$$('.topbar .btn').every(b => !rgb(cs(b).backgroundColor)), black:$$('.btn').filter(b => rgb(cs(b).backgroundColor) === T.ink || rgb(cs(b).backgroundColor) === '20,25,31').map(b => b.id)};
+      // 참가자 화면(처음 · 진행 카드 · 질문 · 키 안내)의 모든 글자 · 바탕 · 테두리 색에 HUD 신호색 · 연구자용 빨강 없음. 결과 아이콘: 성공 = 파랑, 그 밖 = 먹색
+      // 허용 = 디자인 토큰뿐(흰 · 파랑 · 진한 파랑 · 먹색 · 회색 둘 · 옅은 회색 · 구분선). 그 밖의 색(HUD 신호색 계열 · 연구자용 빨강 · 예전 초록 등)은 모두 걸림
+      const ALLOW = ['--bg', '--point', '--point-dark', '--ink', '--sub', '--mute', '--field', '--rule'].map(n => rgb(tok(n)));
+      const colorsIn = sel => { const out = new Set(); [$(sel), ...$$(sel + ' *')].forEach(e => { const c = cs(e), svgEl = e instanceof SVGElement; [c.color, c.backgroundColor, c.borderTopColor, ...(svgEl ? [c.fill, c.stroke] : [])].forEach(v => { const r = rgb(v); if(r) out.add(r); }); }); return out; };
+      const bad = new Set(), scan = sel => colorsIn(sel).forEach(c => { if(!ALLOW.includes(c) || HUDC.includes(c)) bad.add(sel + ':' + c); });
+      scan('#intro'); setScreen('drive');
+      sesCard({icon:'check', tone:'ok', eyebrow:'1 / 6', title:RESULT.ok, btn:['다음', () => {}]}); scan('#sess'); o.okIcon = rgb(cs($('#sesIcon')).backgroundColor) === T.point;
+      sesCard({icon:'cross', tone:'bad', eyebrow:'2 / 6', title:RESULT.crash, btn:['다음', () => {}]}); scan('#sess'); o.badIcon = rgb(cs($('#sesIcon')).backgroundColor) === T.ink;
+      SES.order = 'ALT'; surveyCard({block:1, hud:'ar3'}); setRate(4); setWait(0); scan('#sess');
+      $('#keyHint').hidden = false; scan('#keyHint'); o.hintStill = cs($('#keyHint')).animationName === 'none' && /^0s/.test(cs($('#keyHint')).transitionDuration) && cs($('#keyHint kbd')).animationName === 'none';
+      // 주행 중 · 시연 중: 운전 화면 둘레 여백 없음(창 끝까지)
+      const edge = () => { const r = $('#cab').getBoundingClientRect(), a = $('.stage').getBoundingClientRect(); return [r.left - a.left, a.right - r.right, a.bottom - r.bottom, r.top - a.top].every(v => Math.abs(v) < .5); };
+      o.edgeDrive = edge() && $('#cab').getBoundingClientRect().width === innerWidth; $('#keyHint').hidden = true; $('#sess').hidden = true;
+      setScreen('demo'); await new Promise(r => setTimeout(r, 60)); o.edgeDemo = edge(); setScreen('home'); await new Promise(r => setTimeout(r, 60)); o.frameHome = !edge();
+      // 세그먼트: 고른 칸 뒤의 흰 칸이 그 칸 자리로(설정을 열고 HUD를 바꿈)
+      openSetup(true); setMode('nav'); await new Promise(r => setTimeout(r, 400)); const th = $('#modeSeg .seg-thumb'), pb = $('#modeSeg [aria-pressed="true"]');
+      o.thumb = !!th && Math.abs(new DOMMatrix(cs(th).transform).m41 - pb.offsetLeft) < .5 && Math.abs(th.offsetWidth - pb.offsetWidth) < .5 && rgb(cs(th).backgroundColor) === T.bg; setMode('ar3'); openSetup(false); goHome();
+      o.bad = [...bad].slice(0, 6); return o; });
+    // prefers-reduced-motion: 카드 · 설정 · 서랍 · 세그먼트 움직임 꺼짐
+    await page.emulateMedia({reducedMotion:'reduce'});
+    const motionOff = await E(() => { const cs = e => getComputedStyle(e); return {card:cs($('#intro .card')).animationName, overlay:cs($('#intro')).animationName, drawer:cs($('#drawer')).transitionDuration, thumb:cs($('#modeSeg .seg-thumb')).transitionDuration}; });
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    check('화면 UI(D137): 야간 장면이어도 페이지 · 위 막대 · 카드는 흰 바탕(<html data-light> 없음, 장면은 밤), 안내 모션그래픽의 색 = styles.css 토큰 한곳', Object.values(u.night).slice(0, 3).every(v => v === '255,255,255') && !u.night.attr && u.night.cabNight && u.tour, JSON.stringify({night:u.night, tour:u.tour}));
+    check('화면 UI(D137): 주요 버튼 = 파랑 + 흰 글자 · 보조 = 옅은 회색 + 먹색 · 위 막대 = 글자만, 검정 버튼 없음', u.btn.primary && u.btn.second && u.btn.ghost && !u.btn.black.length, JSON.stringify(u.btn));
+    check('화면 UI(D137): 참가자 화면(처음 · 판 결과 · 질문 · 키 안내)의 글자 · 바탕 · 테두리 색은 디자인 토큰뿐(HUD 신호색 · 연구자용 빨강 없음), 판 결과 아이콘 성공 = 파랑 · 그 밖 = 먹색', !u.bad.length && u.okIcon && u.badIcon, JSON.stringify({bad:u.bad, ok:u.okIcon, crash:u.badIcon}));
+    check('화면 UI(D137): 주행 중 · 시연 중 운전 화면 둘레 여백 없음(처음 화면은 둥근 틀), 키 안내는 움직임 없음, 세그먼트의 흰 칸이 고른 칸 자리로', u.edgeDrive && u.edgeDemo && u.frameHome && u.hintStill && u.thumb, JSON.stringify({drive:u.edgeDrive, demo:u.edgeDemo, home:u.frameHome, hint:u.hintStill, thumb:u.thumb}));
+    check('화면 UI(D137): 움직임 줄이기(prefers-reduced-motion)면 카드 · 뒤 어둡기 · 서랍 · 세그먼트 움직임 꺼짐', motionOff.card === 'none' && motionOff.overlay === 'none' && /^0s/.test(motionOff.drawer) && /^0s/.test(motionOff.thumb), JSON.stringify(motionOff));
+  }
+
   /* ---------- 8-1. 화면 구조: HUD 선택은 현대 · 우리 두 개 · 버전 선택 없음 · 리뉴얼 HUD에 설명 글자 없음 ---------- */
   {
     const r = await E(() => ({modes:$$('#modeSeg button').map(b => b.dataset.mode + ':' + b.textContent.trim()), pair:!!$('#pairSeg'),

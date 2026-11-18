@@ -13,8 +13,9 @@
    ============================================================ */
 const TOUR = (() => {
   const NS = 'http://www.w3.org/2000/svg';
-  /* 색 — 이 넷뿐. intro.css는 이 값을 CSS 변수(--t-*)로 받는다 */
-  const C = {bg:'#FFFFFF', point:'#3182F6', ink:'#191F28', mute:'#B0B8C1'};
+  /* 색 — 이 넷뿐. 값은 styles.css :root의 디자인 토큰 한곳에서 읽는다(D137 — 화면 UI와 같은 값, 6자리 #RRGGBB) */
+  const tok = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const C = {bg:tok('--bg'), point:tok('--point'), ink:tok('--ink'), mute:tok('--mute')};
   const svg = (tag, a = {}, parent) => { const e = document.createElementNS(NS, tag); for(const k in a) e.setAttribute(k, a[k]); if(parent) parent.appendChild(e); return e; };
   const txt = (parent, x, y, s, cls, a = {}) => { const e = svg('text', {x, y, class:cls, ...a}, parent); e.textContent = s; return e; };
   // 강조 단어 하나만 파랑: parts = ['키보드로 ', ['여섯 번'], ' 운전합니다'] — 배열로 감싼 조각이 강조
@@ -415,7 +416,6 @@ const TOUR = (() => {
   function mount(){
     if(root) return;
     root = document.createElement('div'); root.id = 'tour'; root.hidden = true; root.setAttribute('role', 'dialog'); root.setAttribute('aria-label', '주행 테스트 안내');
-    Object.entries(C).forEach(([k, v]) => root.style.setProperty('--t-' + k, v));   // 색은 C 한곳에서
     root.innerHTML = '<div class="tour-stage"></div><div class="tour-bar"><button class="tour-prev" id="tourPrev"><span aria-hidden="true">←</span> 이전</button><div class="tour-steps"></div>'
       + '<div class="tour-go"><span class="tour-go-label"></span><button class="tour-next" id="tourNext" aria-label="다음"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12 H18 M12 6 L18 12 L12 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div>';
     document.body.appendChild(root);

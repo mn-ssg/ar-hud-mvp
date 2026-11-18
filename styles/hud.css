@@ -1,6 +1,6 @@
 /* ============================================================
-   hud.css — 운전석(3D 뷰) · HUD · 안내 카드/질문/토스트 · HUD 애니메이션
-   (페이지 뼈대·패널은 styles.css)
+   hud.css — 운전석(3D 뷰) · HUD · HUD 애니메이션
+   (화면 UI — 뼈대 · 패널 · 카드 · 질문 · 키 안내 — 는 styles.css)
    ============================================================ */
 
 /* ============================================================
@@ -169,57 +169,7 @@
 .cab.explain #explain{ display:block; }
 .hud-t{ font-family:var(--font); }
 
-/* ---------- 카드 (HUD가 아님): 처음 화면 · 진행 · 질문 · 결과. 그림자 하나 · 둥근 모서리 12px ---------- */
-.overlay{ position:absolute; inset:0; display:grid; place-items:center; padding:20px; pointer-events:none; }
-.card{ pointer-events:auto; background:var(--raised); color:var(--ink); border-radius:12px; padding:24px; width:100%; max-width:400px; box-shadow:0 10px 30px rgba(0,0,0,.28); display:flex; flex-direction:column; }
-.card h1{ margin:4px 0 0; font-size:26px; line-height:1.25; letter-spacing:-.02em; }
-.card h2{ margin:0; font-size:20px; line-height:1.3; letter-spacing:-.015em; }
-.eyebrow{ margin:0; font-size:12.5px; font-weight:600; color:var(--sub); }
-.eyebrow:empty{ display:none; }
-.lead{ margin:10px 0 0; font-size:14.5px; line-height:1.55; color:var(--sub); }
-.card .row{ display:flex; gap:8px; margin-top:10px; }
-.card .row .btn{ flex:1; }
-.card > .btn.lg{ margin-top:20px; }
-#sess .card .row{ margin-top:20px; }
-.card.home{ max-width:440px; }
-.card-head{ display:flex; align-items:center; gap:12px; }
-.card-icon{ width:40px; height:40px; border-radius:50%; display:grid; place-items:center; flex:none; background:var(--field); color:var(--ink); }
-.card-icon .ico{ width:22px; height:22px; stroke-width:2.6; }
-.card-icon.ok{ background:var(--ok); color:#fff; } .card-icon.bad{ background:var(--bad); color:#fff; }
-.card-icon:empty, .card-head > span:empty{ display:none; }
-.chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
-.chip{ display:inline-flex; align-items:center; gap:4px; height:26px; padding:0 10px; border-radius:13px; background:var(--field); color:var(--sub); font-size:12.5px; font-weight:600; }
-#sesBody .pid{ display:flex; flex-direction:column; gap:6px; margin-top:16px; font-size:12.5px; font-weight:600; color:var(--sub); }
-#sesBody .pid input{ height:44px; border:1px solid var(--rule); border-radius:8px; padding:0 12px; font-size:17px; font-weight:600; background:var(--field); color:var(--ink); }
-.ses-note{ margin:12px 0 0; font-size:14px; color:var(--sub); line-height:1.55; }
-.ses-note b{ color:var(--ink); }
-.ses-meta{ margin:14px 0 0; padding:10px 12px; background:var(--soft); border-radius:8px; font-size:12.5px; color:var(--sub); line-height:1.6; }
-.ses-meta b{ color:var(--ink); font-weight:600; }
-.q{ margin-top:18px; }
-.q-title{ margin:0; font-size:15px; font-weight:700; line-height:1.45; }
-.keyrow, #keyHint{ display:flex; flex-wrap:wrap; gap:6px 14px; font-size:13px; color:var(--sub); }
-.keyrow{ margin-top:14px; }
-kbd{ display:inline-grid; place-items:center; min-width:24px; height:24px; padding:0 5px; margin-right:3px; border:1px solid var(--rule); border-bottom-width:2px; border-radius:6px; background:var(--field); color:var(--ink); font-family:inherit; font-size:13px; font-weight:600; }
-.rate{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px; }
-.rate button, .choice button{ border:1px solid var(--rule); background:var(--field); border-radius:8px; color:var(--ink); }
-.rate button{ height:44px; font-size:17px; font-weight:700; }
-.rate button[aria-pressed="true"], .choice button[aria-pressed="true"]{ background:var(--btn); border-color:var(--btn); color:var(--on-btn); }
-.rate-ends{ display:flex; justify-content:space-between; margin-top:4px; font-size:12px; color:var(--sub); }
-.choice{ display:flex; flex-direction:column; gap:6px; margin-top:10px; }
-.choice button{ min-height:40px; padding:8px 12px; text-align:left; font-size:14px; font-weight:500; display:flex; gap:10px; align-items:center; }
-.choice button span{ font-weight:700; color:var(--sub); width:14px; }
-.choice button[aria-pressed="true"] span{ color:inherit; }
-.ses-sum{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px; }
-.ses-sum div{ background:var(--soft); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--sub); line-height:1.7; }
-.ses-sum strong{ display:block; color:var(--ink); font-size:14px; }
-.ses-sum em{ font-style:normal; color:var(--ink); font-weight:600; }
-#count{ position:absolute; top:28%; left:50%; transform:translate(-50%,-50%); font-size:min(16vh,120px); font-weight:700; color:#fff; text-shadow:0 4px 24px rgba(0,0,0,.55); pointer-events:none; font-variant-numeric:tabular-nums; }
-#keyHint{ position:absolute; top:14px; left:50%; transform:translateX(-50%); background:rgba(20,25,31,.78); color:#e7ecf1; padding:7px 14px; border-radius:8px; pointer-events:none; }
-#keyHint kbd{ background:#0f141a; border-color:#3a434e; color:#e7ecf1; }
-#keyHint span{ display:inline-flex; align-items:center; }
-/* 연구자용 중단: 참가자 눈에 띄지 않게 흐리게, 마우스를 올리면 보임 (Esc도 됨) */
-.abort{ position:absolute; right:10px; bottom:10px; height:28px; padding:0 10px; border:1px solid rgba(255,255,255,.18); border-radius:6px; background:rgba(0,0,0,.35); color:rgba(255,255,255,.55); font-size:12px; opacity:.35; }
-.abort:hover, .abort:focus-visible{ opacity:1; }
+/* 카드 · 질문 · 키 안내 · 3 2 1 · 중단 버튼(화면 UI)은 2026-11-18 styles.css로 옮김(D137 — 디자인 시스템 한곳에서) */
 
 /* ---------- HUD 애니메이션 (목적형): 경로 흐름 (v1.4: 행동 단계 글자와 함께 맥박 헤일로 삭제) ---------- */
 

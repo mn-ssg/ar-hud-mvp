@@ -1,110 +1,216 @@
 /* ============================================================
-   styles.css — 페이지 뼈대 · 색 변수 · 위 막대 · 연구자 설정 · 기록 서랍 (2026-10-29 개편)
-   화면 흐름: 처음(home) → 연습 · 시연(demo) · 주행 테스트(drive). 주행 중에는 위 막대 · 설정을 숨겨 운전 화면을 넓힌다.
-   위계는 글자 크기 · 굵기 · 배치로만: 제목 26/700 · 카드 제목 20/700 · 본문 14.5/400 · 보조 12.5/600. 강조색은 포커스(파랑)와 결과(초록 · 빨강)에만
-   (HUD · 운전석 시각은 hud.css)
+   styles.css — 화면 UI(HUD · 운전석 바깥): 디자인 토큰 · 위 막대 · 버튼 · 세그먼트 · 연구자 설정 · 기록 서랍 · 진행 카드 · 질문 · 키 안내
+   2026-11-18 다시 디자인(D137, 사용자 지시): 주행 안내 모션그래픽(intro.css · intro.js)과 같은 디자인 시스템 — 흰 바탕 · 포인트 파랑 하나 · 먹색 글자 · 회색 두 단계.
+   · 토큰은 아래 :root 한곳에만. intro.css · intro.js(안내 모션그래픽)도 이 값을 읽는다
+   · 야간 장면이어도 화면 UI는 흰 바탕(예전 [data-light="night"] 페이지 다크 테마 삭제). 장면 · HUD의 밤 처리는 scene.js · hud.css .night 그대로
+   · 참가자가 보는 화면(처음 화면 · 진행 카드 · 질문 · 키 안내)에는 HUD 신호색(청록 · 초록 · 주황 · 빨강)을 쓰지 않는다 — 판 결과도 성공 = 파랑, 그 밖 = 먹색.
+     연구자만 보는 화면(설정 · 기록 서랍)에서만 차분한 빨강 하나(실패 칸 · 기록 지우기)
+   · 움직임: 150 ~ 250ms, 끝이 부드럽게 멈추는 이징 하나(--ease). 주행 중(키 안내 · 3 2 1)에는 움직임 없음, prefers-reduced-motion이면 모두 끔
+   · 위계는 글자 크기 · 굵기로(글꼴은 그대로). HUD · 운전석 시각은 hud.css
    ============================================================ */
 
 :root{
-  --page:#eceff2; --panel:#ffffff; --ink:#14191f; --sub:#5d6772; --rule:#d6dbe0;
-  --btn:#14191f; --on-btn:#ffffff; --field:#f0f2f4; --raised:#ffffff; --soft:#f5f6f8;
-  --focus:#2f6fde; --ok:#1f8a57; --bad:#c8443f;
-  --h-btn:40px; --r:8px;
-  /* HUD 전용 색 — 페이지에서는 쓰지 않는다 */
-  --hud-now:#00e5ff; --hud-warn:#ffb020; --hud-danger:#ff4d4d; --hud-go:#3ddc84;
+  /* 색 — 안내 모션그래픽과 같은 값. 포인트 밖의 단계 값은 [가정] */
+  --bg:#FFFFFF;            /* 바탕 · 카드 · 패널 */
+  --point:#3182F6;         /* 포인트: 주요 버튼 · 고른 것 · 강조 낱말 · 포커스 */
+  --point-dark:#1B64DA;    /* 포인트 한 단계 진하게(호버 · 누름) [가정] */
+  --ink:#191F28;           /* 글자 */
+  --sub:#6B7684;           /* 보조 글자 1 [가정] */
+  --mute:#B0B8C1;          /* 보조 글자 2 · 가는 선(안내 모션그래픽의 회색) */
+  --field:#F2F4F6;         /* 입력칸 · 세그먼트 · 보조 버튼 바탕 [가정] */
+  --rule:#E5E8EB;          /* 구분선 · 옅은 회색 바탕의 한 단계 진하게(호버) [가정] */
+  --danger:#E0574F;        /* 차분한 빨강 — 연구자 화면의 실패 칸 · 기록 지우기에만 [가정] */
+  --scrim:rgba(25,31,40,.34);              /* 주행 화면 위 카드 뒤를 살짝 어둡게 */
+  --shadow:0 6px 24px rgba(25,31,40,.08);  /* 카드 · 패널: 아주 옅은 그림자 하나 */
+  --shadow-up:0 12px 40px rgba(25,31,40,.14);   /* 장면 위에 뜨는 서랍 · 설정 */
+  /* 모양 · 크기 */
+  --r-card:20px; --r-ctl:12px; --h-btn:44px;
+  /* 움직임 */
+  --ease:cubic-bezier(.22,1,.36,1);   /* 빠르게 시작해 부드럽게 멈춤 */
+  --t1:160ms; --t2:220ms;
   --font:"Pretendard Variable","Pretendard","IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   color-scheme:light;
 }
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --page:#eceff2; } }
-:root[data-theme="dark"]{ --page:#eceff2; }
-/* 야간 장면일 때 페이지도 어둡게 (main.js setLight → <html data-light="night">) */
-:root[data-light="night"]{
-  --page:#0b0e12; --panel:#141920; --ink:#e7ecf1; --sub:#9aa5b1; --rule:#2a313b;
-  --btn:#e7ecf1; --on-btn:#0e1319; --field:#0f141a; --raised:#1b222b; --soft:#18202a; --focus:#7aa7ff;
-  color-scheme:dark;
-}
 *,*::before,*::after{ box-sizing:border-box; }
-html,body{ height:100%; margin:0; overflow:hidden; background:var(--page); color:var(--ink); font-family:var(--font); -webkit-font-smoothing:antialiased; }
+html,body{ height:100%; margin:0; overflow:hidden; background:var(--bg); color:var(--ink); font-family:var(--font); -webkit-font-smoothing:antialiased; }
 button,input{ font:inherit; color:inherit; }
 button{ cursor:pointer; }
-:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+:focus-visible{ outline:2px solid var(--point); outline-offset:2px; }
+.btn:focus-visible, .seg button:focus-visible, .rate button:focus-visible, .choice button:focus-visible{ outline:0; box-shadow:0 0 0 3px rgba(49,130,246,.3); }   /* 포커스: 파란 버튼 위 겹테 대신 옅은 파란 번짐 */
 [hidden]{ display:none !important; }
 
-/* ---------- 뼈대: 위 막대 + (설정 | 운전석) ---------- */
+/* ---------- 뼈대: 위 막대 + 운전석 (연구자 설정은 운전석 위에 옆에서 열림) ---------- */
 .app{ height:100%; display:flex; flex-direction:column; }
-.topbar{ flex:none; height:52px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 16px; }
+.topbar{ flex:none; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 20px; background:var(--bg); box-shadow:inset 0 -1px 0 var(--rule); }
 .brand{ display:flex; align-items:baseline; gap:12px; min-width:0; }
-.brand b{ font-size:15px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; }
-#statusLine{ font-size:12.5px; font-weight:600; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.topbar-actions{ display:flex; gap:6px; flex:none; }
-.stage{ flex:1; min-height:0; display:flex; gap:12px; padding:0 12px 12px; }
+.brand b{ font-size:16px; font-weight:800; letter-spacing:-.02em; white-space:nowrap; }
+#statusLine{ font-size:13px; font-weight:600; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.topbar-actions{ display:flex; gap:2px; flex:none; }
+/* --pad: 운전석 둘레 여백. 처음 화면 · 참가자 정보에서는 둥근 틀, 시연 · 주행 중에는 0(흰 테두리 없음 — 야간 눈부심) */
+.stage{ --pad:12px; position:relative; flex:1; min-height:0; display:flex; padding:var(--pad); }
+.app[data-screen="demo"] .stage, .app[data-screen="drive"] .stage{ --pad:0px; }
+.stage > .cab{ border-radius:var(--r-card); }
+.app[data-screen="demo"] .cab, .app[data-screen="drive"] .cab{ border-radius:0; }
 /* 주행 중: 위 막대 · 설정 없음, 운전석이 화면 전체 */
 .app[data-screen="drive"] .topbar, .app[data-screen="drive"] .setup{ display:none !important; }
-.app[data-screen="drive"] .stage{ padding:0; }
-.app[data-screen="drive"] .cab{ border-radius:0; }
 /* 주행 테스트 준비(참가자 정보) · 끝 카드: 연구자 설정(HUD · 시연 고르기)을 열 수 없게 */
 .app[data-screen="prep"] .setup, .app[data-screen="prep"] #setupBtn{ display:none !important; }
 
-/* ---------- 버튼 · 세그먼트 ---------- */
-.btn{ height:var(--h-btn); display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:0 14px; border:1px solid var(--rule); background:var(--raised); border-radius:var(--r); font-size:14px; font-weight:600; white-space:nowrap; }
-.btn:hover{ border-color:var(--sub); }
-.btn.primary{ background:var(--btn); border-color:var(--btn); color:var(--on-btn); }
-.btn.primary:hover{ opacity:.9; }
-.btn.ghost{ height:34px; padding:0 11px; font-size:13px; background:transparent; border-color:transparent; color:var(--sub); }
-.btn.ghost:hover, .btn.ghost[aria-expanded="true"]{ background:var(--raised); border-color:var(--rule); color:var(--ink); }
-.btn.lg{ height:48px; font-size:16px; }
+/* ---------- 버튼: 주요 = 파랑 바탕 + 흰 글자 · 보조 = 옅은 회색 바탕 + 먹색 · 위 막대 = 글자만. 누르면 0.97로 작아졌다 돌아옴 ---------- */
+.btn{ height:var(--h-btn); display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:0 16px; border:0; border-radius:var(--r-ctl); background:var(--field); color:var(--ink);
+  font-size:15px; font-weight:600; white-space:nowrap; transition:background-color var(--t1) var(--ease), color var(--t1) var(--ease), transform var(--t1) var(--ease); }
+.btn:hover:not(:disabled){ background:var(--rule); }
+.btn:active:not(:disabled){ transform:scale(.97); }
+.btn.primary, .btn[aria-pressed="true"]{ background:var(--point); color:var(--bg); }
+.btn.primary:hover:not(:disabled), .btn[aria-pressed="true"]:hover:not(:disabled){ background:var(--point-dark); }
+.btn.danger{ color:var(--danger); }
+.btn.ghost{ height:36px; padding:0 10px; background:transparent; color:var(--sub); font-size:14px; }
+.btn.ghost:hover:not(:disabled){ background:transparent; color:var(--ink); }
+.btn.ghost[aria-expanded="true"]{ color:var(--point); }
+.btn.lg{ height:52px; font-size:16px; font-weight:700; }
 .btn.block{ width:100%; }
-.btn:disabled{ opacity:.45; cursor:not-allowed; }
-.btn[aria-pressed="true"]{ background:var(--btn); border-color:var(--btn); color:var(--on-btn); }
-.count{ display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--field); color:var(--ink); font-size:11.5px; font-variant-numeric:tabular-nums; }
-.seg{ display:flex; gap:2px; background:var(--field); border:1px solid var(--rule); border-radius:var(--r); padding:2px; }
-.seg button{ flex:1; min-width:0; height:32px; border:1px solid transparent; background:transparent; border-radius:6px; font-size:13px; font-weight:500; color:var(--sub); padding:0 6px; white-space:nowrap; }
-.seg button[aria-pressed="true"]{ background:var(--raised); border-color:var(--rule); color:var(--ink); font-weight:700; }
-.seg button:disabled{ opacity:.45; cursor:not-allowed; }
+.btn:disabled{ opacity:.4; cursor:not-allowed; }
+/* 엑셀 저장이 끝나면 버튼 자리에 짧은 체크(session.js savedTick) */
+.btn.saved{ pointer-events:none; }
+.btn.saved .ico path{ stroke-dasharray:24; stroke-dashoffset:0; animation:draw var(--t2) var(--ease) both; }
+@keyframes draw{ from{ stroke-dashoffset:24; } }
+/* 기록 수 배지: 숫자가 늘면 한 번 톡(ui.js) */
+.count{ display:inline-grid; place-items:center; min-width:22px; height:22px; padding:0 7px; border-radius:11px; background:var(--field); color:var(--ink); font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
+.count.pop{ animation:pop var(--t2) var(--ease); }
+@keyframes pop{ 40%{ transform:scale(1.3); background:var(--point); color:var(--bg); } }
+
+/* ---------- 세그먼트: 옅은 회색 바탕 안에서 고른 칸만 흰색. 흰 칸(.seg-thumb)은 새 칸으로 미끄러져 감(ui.js) ---------- */
+.seg{ position:relative; display:flex; background:var(--field); border-radius:var(--r-ctl); padding:3px; }
+.seg-thumb{ position:absolute; z-index:0; top:3px; bottom:3px; left:0; width:0; border-radius:9px; background:var(--bg); box-shadow:0 1px 3px rgba(25,31,40,.1); pointer-events:none;
+  transition:transform var(--t2) var(--ease), width var(--t2) var(--ease); }
+.seg button{ position:relative; z-index:1; flex:1; min-width:0; height:34px; border:0; background:transparent; border-radius:9px; font-size:13.5px; font-weight:500; color:var(--sub); padding:0 6px; white-space:nowrap; transition:color var(--t1) var(--ease); }
+.seg button:hover:not(:disabled){ color:var(--ink); }
+.seg button[aria-pressed="true"]{ color:var(--ink); font-weight:700; }
+.seg:not(.has-thumb) button[aria-pressed="true"]{ background:var(--bg); box-shadow:0 1px 3px rgba(25,31,40,.1); }   /* ui.js가 없을 때 */
+.seg button:disabled{ opacity:.4; cursor:not-allowed; }
 .seg.maps button{ font-size:15px; }
 .ico-seg button{ display:flex; align-items:center; justify-content:center; gap:6px; }
 .ico{ width:16px; height:16px; flex:none; }
 
-/* ---------- 연구자 설정 ---------- */
-.setup{ width:288px; flex:none; background:var(--panel); border:1px solid var(--rule); border-radius:12px; padding:16px; overflow:auto; display:flex; flex-direction:column; gap:22px; }
+/* ---------- 연구자 설정: 운전석 왼쪽 위에 뜨는 패널, 옆에서 미끄러져 열리고 닫힘 ---------- */
+.setup{ position:absolute; z-index:6; left:calc(var(--pad) + 12px); top:12px; bottom:calc(var(--pad) + 12px); width:300px; background:var(--bg); border-radius:var(--r-card); box-shadow:var(--shadow-up);
+  padding:20px; overflow:auto; display:flex; flex-direction:column; gap:24px; animation:fromLeft var(--t2) var(--ease); }
+.setup.closing{ animation:toLeft var(--t2) var(--ease) forwards; }
+@keyframes fromLeft{ from{ transform:translateX(calc(-100% - 24px)); } }
+@keyframes toLeft{ to{ transform:translateX(calc(-100% - 24px)); } }
 .setup section{ display:flex; flex-direction:column; gap:8px; }
-.setup h2{ margin:0 0 2px; font-size:13px; font-weight:700; letter-spacing:.02em; }
-.setup .field{ margin:6px 0 0; font-size:12.5px; font-weight:600; color:var(--sub); display:flex; justify-content:space-between; gap:8px; }
-.field-note{ font-weight:500; }
+.setup h2{ margin:0 0 2px; font-size:15px; font-weight:800; letter-spacing:-.01em; }
+.setup .field{ margin:8px 0 0; font-size:13px; font-weight:600; color:var(--sub); display:flex; justify-content:space-between; gap:8px; }
+.field-note{ font-weight:500; color:var(--mute); }
 /* 화면 맞추기 (D116) */
 #calib summary{ cursor:pointer; list-style:none; }
 #calib summary::-webkit-details-marker{ display:none; }
-#calib summary::before{ content:'▸ '; color:var(--sub); }
+#calib summary::before{ content:'▸ '; color:var(--mute); }
 #calib[open] summary::before{ content:'▾ '; }
-#calib input[type=range]{ width:100%; margin:4px 0; }
-#calCard{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:60; border:3px solid #ff9f1c; border-radius:9px; background:rgba(255,159,28,.12); display:grid; place-items:center; color:#ff9f1c; font-size:13px; font-weight:700; pointer-events:none; }
-.setup .btn.primary{ margin-top:6px; }
-.setup.locked #scenario{ opacity:.45; pointer-events:none; }
+#calib input[type=range]{ width:100%; margin:6px 0; accent-color:var(--point); }
+#calib input[type=number]{ height:32px; border:0; border-radius:8px; padding:0 8px; background:var(--field); color:var(--ink); font-weight:600; }
+#calCard{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:60; border:3px solid var(--point); border-radius:9px; background:rgba(49,130,246,.08); display:grid; place-items:center; color:var(--point); font-size:13px; font-weight:700; pointer-events:none; }
+.setup .btn.primary{ margin-top:8px; }
+.setup.locked #scenario{ opacity:.4; pointer-events:none; }
 
-/* ---------- 기록 서랍 ---------- */
-#drawer{ position:fixed; top:12px; right:12px; bottom:12px; width:min(460px,calc(100vw - 24px)); background:var(--panel); border:1px solid var(--rule); border-radius:12px; padding:18px;
-  display:flex; flex-direction:column; gap:12px; box-shadow:0 12px 32px rgba(0,0,0,.18); transform:translateX(calc(100% + 30px)); transition:transform .25s ease; z-index:5; }
-#drawer.open{ transform:none; }
+/* ---------- 기록 서랍: 오른쪽에서 미끄러져 열리고 닫힘 ---------- */
+#drawer{ position:fixed; top:12px; right:12px; bottom:12px; width:min(480px,calc(100vw - 24px)); background:var(--bg); border-radius:var(--r-card); padding:20px;
+  display:flex; flex-direction:column; gap:14px; box-shadow:var(--shadow-up); transform:translateX(calc(100% + 30px)); visibility:hidden; z-index:5;
+  transition:transform var(--t2) var(--ease), visibility 0s linear var(--t2); }
+#drawer.open{ transform:none; visibility:visible; transition:transform var(--t2) var(--ease); }
 #drawer header{ display:flex; justify-content:space-between; align-items:center; }
-#drawer h2{ margin:0; font-size:17px; }
-#drawer label{ font-size:13px; color:var(--sub); display:flex; align-items:center; gap:8px; font-weight:600; }
-#drawer input[type=text]{ flex:1; height:36px; border:1px solid var(--rule); border-radius:var(--r); padding:0 10px; font-size:14px; background:var(--raised); }
-.drawer-note{ margin:-4px 0 0; font-size:12px; color:var(--sub); }
+#drawer h2{ margin:0; font-size:19px; font-weight:800; letter-spacing:-.02em; }
+#drawer label{ font-size:13px; color:var(--sub); display:flex; align-items:center; gap:10px; font-weight:600; }
+#drawer input[type=text]{ flex:1; height:40px; border:0; border-radius:var(--r-ctl); padding:0 12px; font-size:15px; font-weight:600; background:var(--field); }
 #summary{ display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; }
-#summary div{ background:var(--soft); border-radius:var(--r); padding:10px 12px; font-size:12.5px; color:var(--sub); line-height:1.7; }
-#summary strong{ display:block; color:var(--ink); font-size:13.5px; }
-#summary em{ font-style:normal; color:var(--ink); font-weight:600; }
-.tablewrap{ flex:1; overflow:auto; border:1px solid var(--rule); border-radius:var(--r); }
+#summary div, .ses-sum div{ background:var(--field); border-radius:var(--r-ctl); padding:12px 14px; font-size:12.5px; color:var(--sub); line-height:1.7; }
+#summary strong, .ses-sum strong{ display:block; color:var(--ink); font-size:14px; font-weight:700; }
+#summary em, .ses-sum em{ font-style:normal; color:var(--ink); font-weight:700; }
+.tablewrap{ flex:1; overflow:auto; border-radius:var(--r-ctl); box-shadow:inset 0 0 0 1px var(--rule); }
 table{ border-collapse:collapse; width:100%; font-size:12.5px; }
-th,td{ padding:7px 8px; text-align:left; border-bottom:1px solid var(--rule); white-space:nowrap; }
-th{ color:var(--sub); font-weight:600; position:sticky; top:0; background:var(--panel); }
-td.ok{ color:var(--ok); font-weight:600; } td.bad{ color:var(--bad); font-weight:600; }
-.empty{ padding:18px; color:var(--sub); font-size:13px; text-align:center; }
+th,td{ padding:8px 10px; text-align:left; border-bottom:1px solid var(--rule); white-space:nowrap; }
+th{ color:var(--sub); font-weight:600; position:sticky; top:0; background:var(--bg); }
+td.ok{ color:var(--point); font-weight:700; } td.bad{ color:var(--danger); font-weight:700; }
+.empty{ padding:24px; color:var(--sub); font-size:13px; text-align:center; }
 #drawer .row{ display:flex; gap:8px; flex-wrap:wrap; }
+#drawer .row .btn{ flex:1; }
+
+/* ---------- 카드 (HUD가 아님): 처음 화면 · 진행(참가자 정보 · 판 사이 · 질문 · 요약) ----------
+   장면 위에 뒤를 살짝 어둡게 깔고, 카드는 조금 위로 올라오며 들어옴. 다음 단계로 바뀔 때는 내용만 옆으로 밀리며 바뀜(session.js sesCard) */
+.overlay{ position:absolute; inset:0; display:grid; place-items:center; padding:20px; background:var(--scrim); animation:scrimIn var(--t2) var(--ease); }
+.overlay > .card{ animation:cardIn var(--t2) var(--ease); }
+.overlay.keep{ animation:none; }   /* 처음 화면 카드 → 참가자 정보처럼 카드끼리 넘어갈 때는 뒤 어둡기를 다시 깔지 않음 */
+@keyframes scrimIn{ from{ background-color:transparent; } }
+@keyframes cardIn{ from{ transform:translateY(14px); opacity:0; } }
+.card.swap > *{ animation:swapIn var(--t2) var(--ease); }
+@keyframes swapIn{ from{ transform:translateX(28px); opacity:0; } }
+.card{ background:var(--bg); color:var(--ink); border-radius:var(--r-card); padding:28px; width:100%; max-width:420px; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+.card h1{ margin:6px 0 0; font-size:28px; font-weight:800; line-height:1.25; letter-spacing:-.03em; }
+.card h2{ margin:0; font-size:22px; font-weight:800; line-height:1.3; letter-spacing:-.025em; }
+.eyebrow{ margin:0; font-size:13px; font-weight:600; color:var(--sub); }
+.eyebrow:empty{ display:none; }
+.lead{ margin:10px 0 0; font-size:15px; line-height:1.55; color:var(--sub); }
+.lead b{ color:var(--ink); }
+.card .row{ display:flex; gap:8px; margin-top:12px; }
+.card .row .btn{ flex:1; }
+.card > .btn.lg{ margin-top:24px; }
+.card > .btn.lg + .btn.lg{ margin-top:8px; }
+#sess .card .row{ margin-top:24px; }
+.card.home{ max-width:440px; }
+.card-head{ display:flex; align-items:center; gap:12px; }
+/* 판 결과 아이콘: 성공 = 파랑, 그 밖 = 먹색(HUD 신호색 안 씀) */
+.card-icon{ width:40px; height:40px; border-radius:50%; display:grid; place-items:center; flex:none; background:var(--field); color:var(--ink); }
+.card-icon .ico{ width:22px; height:22px; stroke-width:2.6; }
+.card-icon.ok{ background:var(--point); color:var(--bg); } .card-icon.bad{ background:var(--ink); color:var(--bg); }
+.card-icon:empty, .card-head > span:empty{ display:none; }
+.chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.chip{ display:inline-flex; align-items:center; gap:4px; height:26px; padding:0 10px; border-radius:13px; background:var(--field); color:var(--sub); font-size:12.5px; font-weight:600; }
+#sesBody .pid{ display:flex; flex-direction:column; gap:8px; margin-top:20px; font-size:13px; font-weight:600; color:var(--sub); }
+#sesBody .pid input{ height:52px; border:0; border-radius:var(--r-ctl); padding:0 16px; font-size:18px; font-weight:700; background:var(--field); color:var(--ink); }
+#sesBody .pid input:focus-visible, #drawer input:focus-visible{ outline:0; box-shadow:inset 0 0 0 2px var(--point); }
+.ses-note{ margin:12px 0 0; font-size:14px; color:var(--sub); line-height:1.55; }
+.ses-note b{ color:var(--ink); }
+.ses-meta{ margin:14px 0 0; padding:12px 14px; background:var(--field); border-radius:var(--r-ctl); font-size:12.5px; color:var(--sub); line-height:1.6; }
+.ses-meta b{ color:var(--ink); font-weight:600; }
+.ses-sum{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+/* 질문: 1 ~ 5는 고른 칸이 아래에서 파랑으로 차오름, A ~ D는 왼쪽에서 */
+.q{ margin-top:20px; }
+.q-title{ margin:0; font-size:16px; font-weight:700; line-height:1.45; }
+.rate{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:12px; }
+.rate button, .choice button{ border:0; border-radius:var(--r-ctl); color:var(--ink); background:var(--field) linear-gradient(var(--point), var(--point)) no-repeat;
+  transition:background-size var(--t2) var(--ease), color var(--t1) var(--ease), transform var(--t1) var(--ease); }
+.rate button{ height:48px; font-size:18px; font-weight:700; background-position:bottom; background-size:100% 0%; }
+.choice button{ background-position:left; background-size:0% 100%; }
+.rate button:hover:not([aria-pressed="true"]), .choice button:hover:not([aria-pressed="true"]){ background-color:var(--rule); }
+.rate button:active, .choice button:active{ transform:scale(.97); }
+.rate button[aria-pressed="true"], .choice button[aria-pressed="true"]{ background-size:100% 100%; color:var(--bg); }
+.rate-ends{ display:flex; justify-content:space-between; margin-top:6px; font-size:12px; color:var(--sub); }
+.choice{ display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+.choice button{ min-height:44px; padding:10px 14px; text-align:left; font-size:14px; font-weight:500; display:flex; gap:10px; align-items:center; }
+.choice button span{ font-weight:700; color:var(--sub); width:14px; transition:color var(--t1) var(--ease); }
+.choice button[aria-pressed="true"] span{ color:inherit; }
+
+/* ---------- 주행 화면 위: 3 · 2 · 1 · 키 안내 · 연구자용 중단 (움직임 없음 — 운전 방해) ---------- */
+#count{ position:absolute; top:28%; left:50%; transform:translate(-50%,-50%); font-size:min(16vh,120px); font-weight:800; color:var(--bg); text-shadow:0 4px 24px rgba(25,31,40,.55); pointer-events:none; font-variant-numeric:tabular-nums; }
+/* 키 안내: 작게. 키 모양은 안내 모션그래픽의 흰 키캡(윗면 흰색 → 옅은 회색 · 아래 두께 면 · 옅은 그림자). 밝은 하늘 · 밤 모두 읽히게 뒤에 옅은 먹색 판 */
+#keyHint{ position:absolute; top:12px; left:50%; transform:translateX(-50%); display:flex; flex-wrap:wrap; gap:4px 12px; padding:6px 12px; border-radius:var(--r-ctl);
+  background:rgba(25,31,40,.42); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); color:rgba(255,255,255,.9); font-size:12px; font-weight:600; pointer-events:none; }
+#keyHint span{ display:inline-flex; align-items:center; }
+kbd{ display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 4px; margin:0 3px 2px 0; border-radius:5px; border:0; color:var(--ink); font-family:inherit; font-size:11px; font-weight:700;
+  background:linear-gradient(135deg, var(--bg), var(--field)); box-shadow:inset 0 0 0 1px var(--rule), 0 2px 0 color-mix(in srgb, var(--mute) 45%, var(--bg)), 0 3px 6px rgba(25,31,40,.22); }
+.cab.night #keyHint{ background:rgba(25,31,40,.5); color:rgba(255,255,255,.78); }
+.cab.night #keyHint kbd{ filter:brightness(.78); }   /* 밤: 흰 키캡이 눈부시지 않게 */
+/* 연구자용 중단: 참가자 눈에 띄지 않게 흐리게, 마우스를 올리면 보임 (Esc도 됨) */
+.abort{ position:absolute; right:10px; bottom:10px; height:28px; padding:0 10px; border:0; border-radius:8px; background:rgba(25,31,40,.35); color:rgba(255,255,255,.6); font-size:12px; opacity:.35; }
+.abort:hover, .abort:focus-visible{ opacity:1; }
+
+/* ---------- 움직임 끄기 ---------- */
+@media (prefers-reduced-motion: reduce){
+  .btn, .btn:active, .seg-thumb, .seg button, .setup, #drawer, .overlay, .overlay > .card, .card.swap > *, .count.pop, .rate button, .choice button, .btn.saved .ico path{ animation:none !important; transition:none !important; transform:none; }
+}
 
 /* ---------- 좁은 화면 ---------- */
 @media (max-width:900px){
-  .stage{ flex-direction:column; }
-  .setup{ width:auto; max-height:45%; }
+  .setup{ width:auto; right:calc(var(--pad) + 12px); bottom:auto; max-height:60%; }
   #statusLine{ display:none; }
 }

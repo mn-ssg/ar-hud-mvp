@@ -391,7 +391,7 @@
   <!-- 발표용: HUD 층마다 이름표 (explain.js). HUD가 아님 -->
   <svg id="explain" aria-hidden="true"></svg>
 
-  <!-- 처음 화면: 할 수 있는 것 세 가지. 주행 테스트가 주된 행동 -->
+  <!-- 처음 화면: 주행 테스트가 주된 행동(파란 버튼). 장면 위에 뒤를 살짝 어둡게 깔고 뜸 — styles.css .overlay -->
   <div class="overlay" id="intro">
     <div class="card home">
       <p class="eyebrow">디지털미디어 프로타이핑 · 4팀</p>
@@ -432,7 +432,7 @@
   </table><div class="empty" id="logEmpty">아직 기록이 없습니다. 주행 테스트를 하면 여기에 쌓입니다.</div></div>
   <div class="row">
     <button class="btn" id="allXlsx">엑셀 (전체)</button>
-    <button class="btn" id="clearLog">기록 지우기</button>
+    <button class="btn danger" id="clearLog">기록 지우기</button>
   </div>
 </aside>
 
@@ -463,5 +463,6 @@
 <script src="src/app/intro.js"></script>
 <script src="src/app/session.js"></script>
 <script src="src/hud/explain.js"></script>
+<script src="src/app/ui.js"></script>   <!-- 화면 UI 움직임(세그먼트 미끄럼 · 배지 튐) — 맨 마지막 (D137) -->
 </body>
 </html>
