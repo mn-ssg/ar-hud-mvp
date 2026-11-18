@@ -40,6 +40,4 @@
 #tour .t-item{ font-size:28px; font-weight:700; }
 #tour .t-past{ font-size:22px; font-weight:600; fill:var(--mute); }
 #tour .t-key{ font-weight:700; }
-#tour .t-line{ font-size:26px; font-weight:500; fill:var(--mute); }
-#tour .t-line .k{ font-weight:800; fill:var(--ink); }
 #tour .t-enter{ font-size:30px; font-weight:800; fill:var(--ink); }

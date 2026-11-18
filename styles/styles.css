@@ -185,8 +185,6 @@ td.ok{ color:var(--point-dark); font-weight:700; }   /* 파랑 글자는 한 단
 .card-icon .ico{ width:22px; height:22px; stroke-width:2.6; }
 .card-icon.ok{ background:var(--point); color:var(--bg); } .card-icon.bad{ background:var(--ink); color:var(--bg); }
 .card-icon:empty, .card-head > span:empty{ display:none; }
-.chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
-.chip{ display:inline-flex; align-items:center; gap:4px; height:26px; padding:0 10px; border-radius:13px; background:var(--field); color:var(--sub); font-size:12.5px; font-weight:600; }
 #sesBody .pid{ display:flex; flex-direction:column; gap:8px; margin-top:20px; font-size:13px; font-weight:600; color:var(--sub); }
 #sesBody .pid input{ height:52px; border:0; border-radius:var(--r-ctl); padding:0 16px; font-size:18px; font-weight:700; background:var(--field); color:var(--ink); }
 #sesBody .pid input:focus-visible, #drawer input:focus-visible{ outline:0; box-shadow:inset 0 0 0 2px var(--point); }
@@ -260,15 +258,20 @@ kbd{ display:inline-grid; place-items:center; min-width:20px; height:20px; paddi
    주행 테스트 · 시연이 돌아가는 동안(html.driving): 화면 UI의 움직임을 모두 끔(운전 방해 · 프레임). 세그먼트 · 스위치의 스프링은 ui.js가 같은 조건에서 바로 그 자리로.
    prefers-reduced-motion: 늘어남 · 튕김 · 반짝임 · 미끄러짐 없이 바로 바뀜 */
 html.driving :is(.btn, .seg button, .rate button, .choice button, .setup, #drawer, .overlay > .card, .card.swap > *, .count, .sw-fill, .sw-knob),
-html.driving :is(.overlay, .count, .rate button, .choice button, .card)::before, html.driving :is(.count, .card, .btn)::after{ animation:none !important; transition:none !important; }
+html.driving :is(.overlay, .count, .rate button, .choice button, .card)::before, html.driving :is(.count, .card, .btn)::after{ animation-duration:0s !important; animation-delay:0s !important; transition:none !important; }
+/* ↑ animation:none이 아니라 길이 0 — 이름이 none ↔ 원래 이름으로 바뀌면 주행이 멈추거나 끝날 때(클래스가 빠질 때) 움직임이 처음부터 다시 재생됨(연구자 설정이 다시 미끄러져 들어오던 문제) */
 @media (prefers-reduced-motion: reduce){
   :is(.btn, .btn:active, .seg button, .setup, #drawer, .overlay > .card, .card.swap > *, .count.pop, .rate button, .choice button, .btn.saved .ico path, .sw-fill, .sw-knob),
   :is(.overlay, .rate button, .choice button)::before, :is(.count, .card, .btn)::after{ animation:none !important; transition:none !important; }
   .btn:active, .rate button:active, .choice button:active{ transform:none; }
 }
 
+/* 연구자 설정이 열려 있으면 장면 위 카드(처음 화면 · 시연 끝 등)는 패널 오른쪽 남은 자리의 가운데로 — 패널(300px + 여백)에 가리지 않게 */
+.stage:has(> .setup:not([hidden])) .overlay{ padding-left:calc(300px + 36px); }
+
 /* ---------- 좁은 화면 ---------- */
 @media (max-width:900px){
+  .stage:has(> .setup:not([hidden])) .overlay{ padding-left:20px; place-items:end center; }   /* 패널이 위쪽 전체 → 카드는 아래쪽으로 */
   .setup{ width:auto; right:calc(var(--pad) + 12px); bottom:auto; max-height:60%; }
   #statusLine{ display:none; }
 }

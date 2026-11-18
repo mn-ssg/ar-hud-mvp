@@ -247,7 +247,7 @@ const TOUR = (() => {
           if(got[k[0]] === undefined) got[k[0]] = api.t(); held[k[0]] = true; if(k[0] === 'q' || k[0] === 'e') st.blink = {side:k[0] === 'q' ? -1 : 1, until:Infinity}; };
         const onUp = e => { const k = KEYS6.find(q => q[1] === e.code); if(!k || !api.active('try')) return; e.preventDefault(); e.stopPropagation(); held[k[0]] = false;
           if((k[0] === 'q' || k[0] === 'e') && st.blink.until === Infinity) st.blink.until = api.t() + 1.6; };   // 깜빡이: 떼고도 1.6초 더
-        addEventListener('keydown', onDown, true); addEventListener('keyup', onUp, true); addEventListener('blur', () => { for(const k in held) held[k] = false; });
+        addEventListener('keydown', onDown, true); addEventListener('keyup', onUp, true); addEventListener('blur', () => { for(const k in held) held[k] = false; if(st.blink && st.blink.until === Infinity) st.blink.until = api.t() + 1.6; });   // 창이 포커스를 잃으면(키를 뗀 것으로) 깜빡이도 곧 꺼짐
         // 한 걸음: 속도 · 옆 자리 · 기울기(늦게 따라 돌며 넘침) · 눌림 · 키
         const step = h => {
           const up = held.up, dn = held.down, steer = (held.right ? 1 : 0) - (held.left ? 1 : 0), v0 = st.v;
@@ -427,7 +427,10 @@ const TOUR = (() => {
     bar = root.querySelector('.tour-steps'); bar.innerHTML = '<i class="tour-line"></i><i class="tour-fill"></i>' + scenes.map((s, i) => `<span class="tour-step" data-i="${i}">${s.name}</span>`).join('');
     btnPrev = root.querySelector('#tourPrev'); btnNext = root.querySelector('#tourNext');
     btnPrev.onclick = () => go(st.i - 1); btnNext.onclick = () => go(st.i + 1);
-    addEventListener('keydown', e => { if(!st.on) return; if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); go(st.i + 1); } else if(e.key === 'Backspace'){ e.preventDefault(); go(st.i - 1); }
+    addEventListener('keydown', e => { if(!st.on) return;
+      if((e.key === 'Enter' || e.key === 'Backspace') && e.repeat){ e.preventDefault(); e.stopPropagation(); return; }   // 누르고 있기(자동 반복)로 장면을 건너뛰지 않게
+      if(e.key === 'Enter' && e.target instanceof Element && e.target.closest('#tour button')){ e.stopPropagation(); return; }   // 이전 · 다음 버튼에 초점 → 그 버튼이 눌림(이전이면 뒤로)
+      if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); go(st.i + 1); } else if(e.key === 'Backspace'){ e.preventDefault(); go(st.i - 1); }
       else if(/^Arrow|^Key[QE]$/.test(e.code) || e.key === ' '){ e.preventDefault(); e.stopPropagation(); } }, true);   // 방향키 · Q · E는 '눌러 보기' 장면 몫(다른 곳으로 새지 않게)
     addEventListener('keyup', e => { if(st.on && /^Arrow|^Key[QE]$/.test(e.code)){ e.preventDefault(); e.stopPropagation(); } }, true);
   }
@@ -441,7 +444,8 @@ const TOUR = (() => {
       layers[tr.from].setAttribute('clip-path', 'url(#tourClipOld)'); clipOld.setAttribute('x', xR.toFixed(1));
       sweep.setAttribute('x', xL.toFixed(1)); sweep.setAttribute('width', W);
     } else sweep.setAttribute('width', 0);
-    s.draw(st.t);
+    const i0 = st.i; s.draw(st.t);
+    if(st.i !== i0) return;   // 그리는 중에 다음 장면으로 넘어감(눌러 보기를 다 채움) — go()가 이미 새 장면으로 다시 그림
     const p = (st.i + (s.hold ? 1 : cl(st.t/s.dur)))/scenes.length;
     bar.querySelector('.tour-fill').style.width = (p*100).toFixed(2) + '%';
     bar.querySelectorAll('.tour-step').forEach((e, i) => { e.classList.toggle('on', i === st.i); e.classList.toggle('done', i < st.i); });

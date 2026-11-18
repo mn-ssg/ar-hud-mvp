@@ -487,6 +487,13 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('안내 모션그래픽(D136): 준비 장면의 반복은 8초 한 바퀴가 이음매 없이(t와 t + 8초의 그림이 같음 — 3.3 · 6.1 · 7.96초)', t.loop.every(Boolean), JSON.stringify(t.loop));
     check('안내 모션그래픽(D135 · D136): 색은 흰 바탕 · 파랑 · 먹색 · 회색과 그 음영 단계(사이 섞임)뿐, 3D 영상 · 그림 없음(전부 SVG), 그림자 · 빛 번짐 필터는 차 · 키에만', t.badColors.length === 0 && t.media === 0 && t.filters === 0, JSON.stringify({bad:t.badColors, media:t.media, filters:t.filters}));
     check('안내 모션그래픽: HUD 표시의 뜻(기다려 · 이동 · 색)은 알려 주지 않음 — 조작 · 할 일 · 기록 항목만(자동 급제동은 사용자 결정 전이라 넣지 않음)', !t.words, '');
+    // 2026-11-18 버그 고침: Enter를 누르고 있으면(자동 반복) 장면 여섯 개를 건너뛰고 첫 주행으로 넘어가던 것 · 이전 버튼에 초점이 있어도 Enter가 앞으로 가던 것 — 실제 키 입력으로
+    await E(() => { TOUR.show(() => { window.__tourDone = (window.__tourDone || 0) + 1; }); window.__tourDone = 0; });
+    await page.keyboard.down('Enter'); for(let k = 0; k < 8; k++) await page.keyboard.down('Enter'); await page.keyboard.up('Enter'); await page.waitForTimeout(80);
+    const held = await E(() => ({i:TOUR.state().i, on:TOUR.state().on, done:window.__tourDone}));
+    await E(() => { TOUR.go(3); $('#tourPrev').focus(); }); await page.keyboard.press('Enter'); await page.waitForTimeout(80);
+    const back = await E(() => { const o = {i:TOUR.state().i}; TOUR.hide(); return o; });
+    check('안내 모션그래픽(버그 고침): Enter를 누르고 있어도 한 장면만 넘어감(자동 반복 무시 — 눌러 보기 판정을 건너뛰지 않음), 이전 버튼에 초점이 있으면 Enter = 뒤로', held.i === 1 && held.on && held.done === 0 && back.i === 2, JSON.stringify({held, back}));
   }
 
   /* ---------- 8-0. 화면 UI 디자인 시스템 (D137, 2026-11-18 — 안내 모션그래픽과 같은 토큰 · 야간 페이지 테마 없음 · 참가자 화면에 HUD 신호색 없음) ---------- */
@@ -856,6 +863,12 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       n1.result === null && n1.ev.filter(e => e.type === 'aebOn').length === 1 && on1.kind === 'lead' && on1.need >= AB.on && off1 && off1.why === 'stop' && Math.abs(off1.t - during.find(x => x.v === 0).t - AB.hold) < .06 &&
       during.some(x => x.dec >= AB.max - .01) && Math.min(...during.filter(x => x.dec >= AB.max - .01).map(x => x.t)) - on1.t <= AB.rampT + .05 && Math.min(...n1.s.map(x => x.gap ?? 99)) > 0,
       aebOf(n1) + ` · 최소 간격 ${Math.min(...n1.s.map(x => x.gap ?? 99)).toFixed(2)}m`);
+    // 2026-11-18 밤 버그 고침(환경 3.4): 천천히 서는(1.5 m/s²) 더 느린 앞차 — 예전엔 급제동으로 앞차보다 느려지는 순간(0.3m 앞) 풀리고 SCC가 꺼진 채 굴러가 다시 부딪혔음
+    const n1b = pick(await E(() => { const d0 = HARD.leadDec; HARD.leadDec = 1.5;
+      try{ return runDrive(leadCfg(), {hud:'ar3', secs:14, ap:{mode:'lane', lane:1, noResume:true}, setup:() => { leadSetup(10, 0, false)(); const l = D.cars[0]; l.v = l.v0 = l.base = Math.max(3, D.v - 10); }, sample:aebSm}); } finally { HARD.leadDec = d0; } }));
+    check('자동 급제동(버그 고침): 천천히 서는 더 느린 앞차 뒤에서 — 걸린 뒤 가까워지지 않는 순간 바로 풀리지 않고(0.5초 그대로일 때 · 달리는 중이면 SCC가 다시 따라감) 부딪히지 않음, 걸릴 때 제동은 그때 세기부터',
+      n1b.result === null && n1b.ev.some(e => e.type === 'aebOn') && Math.min(...n1b.s.map(x => x.gap ?? 99)) > 0 && n1b.s.filter(x => x.aeb).every((x, i, a) => i === 0 || x.dec >= a[i - 1].dec - 1e-9 || x.dec > 9),
+      aebOf(n1b) + ` · 최소 간격 ${Math.min(...n1b.s.map(x => x.gap ?? 99)).toFixed(2)}m`);
     check('자동 급제동 ①: 급제동 뒤 SCC가 꺼져 — 앞차가 다시 출발해도 ↑를 누르기 전까지 서 있음', after.length > 30 && after.every(x => x.v === 0 && x.scc) && after.some(x => x.leadV > 3), JSON.stringify(after[after.length - 1]));
     check('06 빨강: 필요 감속도 4 이상이면 급제동보다 먼저 빨강(주황 → 빨강 바로) · 급제동 중엔 늘 빨강 · 빨간 삼각형 + 흰 느낌표 · 앞차 아이콘 · 앞쪽 간격 띠도 빨강 · 바뀌는 순간 한 번 커짐',
       redOn && redOn.t <= on1.t && during.every(x => x.lvl === 2) && n1.s.filter(x => x.lvl === 2).every(x => x.tri === DANGER && x.mark === WHITE && x.leadFill === DANGER && x.band === DANGER && x.svgRed) && n1.s.filter(x => x.lvl === 1).every(x => x.tri === WARN && x.leadFill === WARN) &&
@@ -902,12 +915,12 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
       const cells = rowCells(row), sum = sumCells([row], []), ev = evRows([row]), ex = EXPLAIN.find(r => r[0] === '자동 급제동 (번)');
       drives = keep; saveArr(DKEY, drives); SES.rows = keepRows; $('#sess').hidden = true;
       return {aeb:row.aeb, cell:cells[HEAD.indexOf('자동 급제동 (번)')], sum:sum.filter(r => r[1] === '전체').map(r => r[SUM_HEAD.indexOf('자동 급제동 (번)')]), sumHead:SUM_HEAD.includes('자동 급제동 (번)'),
-        evOn:ev.filter(r => r[5] === '자동 급제동 시작').map(r => r[6]), evOff:ev.filter(r => r[5] === '자동 급제동 끝').map(r => r[6]), ex:ex && ex[2], env:row.env, oldCell:rowCells({...row, aeb:undefined})[HEAD.indexOf('자동 급제동 (번)')]};
+        evOn:ev.filter(r => r[5] === '자동 급제동 시작').map(r => r[6]), evOff:ev.filter(r => r[5] === '자동 급제동 끝').map(r => r[6]), ex:ex && ex[2], env:row.env, envVer:ENV_VER, oldCell:rowCells({...row, aeb:undefined})[HEAD.indexOf('자동 급제동 (번)')]};
     });
     const sesRows = SES_ROWS;
-    check('자동 급제동 ⑤ 기록 시트 \'자동 급제동 (번)\' · 요약 시트 HUD별 합계 · 이벤트 시트 시작(대상 · 그때 속도)/끝(멈춤) · 설명 시트 칸 뜻 · 환경 3.3 — 예전 기록은 빈칸',
+    check('자동 급제동 ⑤ 기록 시트 \'자동 급제동 (번)\' · 요약 시트 HUD별 합계 · 이벤트 시트 시작(대상 · 그때 속도)/끝(멈춤) · 설명 시트 칸 뜻 · 환경 버전(3.3부터 급제동, 2026-11-18 밤 고친 뒤 3.4) — 예전 기록은 빈칸',
       rec.aeb === 1 && rec.cell === 1 && rec.sumHead && rec.sum.length === 1 && rec.sum[0] === 1 && rec.evOn.length === 1 && /대상 앞차 · 그때 시속 \d+km/.test(rec.evOn[0]) && rec.evOff.length === 1 && /^멈춤/.test(rec.evOff[0]) &&
-      rec.ex === '적을수록 운전자가 스스로 먼저 대처한 것. 가속으로 풀린 뒤 충돌했으면 경고를 무시한 것' && /환경 3\.3/.test(rec.env) && rec.oldCell === '' && sesRows.every(r => r.aeb === r.aebEv), JSON.stringify({...rec, ses:sesRows.map(r => r.aeb)}));
+      rec.ex === '적을수록 운전자가 스스로 먼저 대처한 것. 가속으로 풀린 뒤 충돌했으면 경고를 무시한 것' && Number(rec.envVer) >= 3.3 && rec.env.startsWith('환경 ' + rec.envVer) && rec.oldCell === '' && sesRows.every(r => r.aeb === r.aebEv), JSON.stringify({...rec, ses:sesRows.map(r => r.aeb)}));
   }
   {
     const log = await E(() => window.__runLog || []);

@@ -117,7 +117,7 @@ function driveReset(cfg){
     enterZ:null, changeDist:null, risky:0, enc:{}, lastCut:{}, offroad:0, lastTouch:-9, followT:0, crashWith:'', result:null, endT:0,
     safeOn:false, safeSince:0, reactT:null, moved:false, cutAhead:0, cutAheadGap:null, cutAheadTtc:null,   // 앞으로 끼어들기(2026-11-03): 옮길 차로의 뒤차 앞에 들어간 횟수 · 그때 뒤차 간격(m, 최소) · 닿기까지(초, 최소)
     blink:0, blinkT0:0, blinkOnAt:null, blinkPhase:false, responder:null, blinkUsed:null, blinkLead:null, blinkResp:'',   // 깜빡이 (D103): 켜진 쪽 · 켠 시각 · 반응하는 뒤차 · 기록 3칸
-    aeb:{on:false, dec:0, ovrT:0, stopT:0, kind:'', car:null, t0:0, v0:0, latch:false}, aebN:0, sccOff:false, acc:0, haz:null,   // 자동 급제동 (D134): 상태 · 횟수 · SCC 꺼짐 · 지난 걸음의 실제 가속도 · 지금 앞쪽 위험
+    aeb:{on:false, dec:0, ovrT:0, stopT:0, calmT:0, kind:'', car:null, t0:0, v0:0, latch:null}, aebN:0, sccOff:false, acc:0, haz:null,   // 자동 급제동 (D134): 상태 · 횟수 · SCC 꺼짐 · 지난 걸음의 실제 가속도 · 지금 앞쪽 위험
     events:[], lc:null});   // events: 위험 · 판단 상태 · 차로 변경 시작/완료 · 끼어들기 · 충돌 시점 (2026-10-29, session.js가 기록에 붙임)
   Object.keys(KEYS).forEach(k => KEYS[k] = false);
   queueCars.forEach(c => c.visible = false); flowCars.forEach(c => { c.visible = false; c.userData.onc = false; setBrake(c, false); }); otherCar.visible = false; busMesh.visible = false;
@@ -525,43 +525,56 @@ function pedCheck(){
    · 걸림: 앞차 · 횡단보도 중 필요 감속도가 AEB.on(6) 이상이고, 지금 실제로 줄이는 감속(운전자 ↓ · SCC)이 그보다 작음 → SCC도 꺼짐
    · 풀림: 서서 AEB.hold초 잡고 있은 뒤('멈춤') / ↑를 AEB.ovrT초 계속 누름('가속으로 풀림' — 그 위험이 사라질 때까지 다시 안 걸림) /
            달리는 중에 위험이 사라짐 — 핸들로 피해 앞차가 진행선 밖 · 앞차가 더 빨라짐 · 사람이 다 건넘('위험 사라짐') / 충돌 · 판 끝 */
-// 지금 내 앞의 위험: 앞차(내 진행선 옆 AEB.lat m 안 · 앞, 마주 오는 차 뺌)와 횡단보도(사람이 건너거나 건너려 할 때, 앞 선까지) 중 필요 감속도가 큰 쪽. 없으면 null
+// 지금 내 앞의 위험(frontHaz): 앞차(두 차 몸이 겹치는 옆 폭 안 · 앞, 마주 오는 차 뺌)와 횡단보도(사람이 건너거나 건너려 할 때, 앞 선까지) 중 필요 감속도가 큰 쪽. 없으면 null
+/* 앞쪽 위험 하나의 필요 감속도. 차: 내 진행선에서 옆으로 두 차의 몸이 겹치는 폭(반폭 합 + AEB.latPad, hit()와 같은 여유) 안 · 앞에 있을 때만.
+   보행자: 건너거나 건너려 하는 횡단보도 앞 AEB.pedDist m 안에서만. 없으면 null */
+function carHaz(c){
+  if(!c || c.kind === 'onc') return null;
+  const fx = Math.sin(D.psi), fz = -Math.cos(D.psi), dx = c.x - D.x, dz = c.z - D.z, lon = dx*fx + dz*fz, lat = dx*(-fz) + dz*fx;
+  if(lon <= 0 || Math.abs(lat) > halfW(c) + DRV.carW/2 + AEB.latPad) return null;
+  const gap = lon - halfL(c) - DRV.carL/2, closing = D.v - c.v; return {kind:'lead', car:c, gap, closing, need:needDec(closing, gap)};
+}
+function pedHaz(){
+  const m = S.map; if(!(m.cw && path.cwS !== null && pedBlock(D.t) && D.x < m.cw.x0)) return null;
+  const s = project(path.P, D.x, D.z, -1).s; if(!(s > path.cwS - AEB.pedDist && s < path.cwS)) return null;
+  const gap = Math.max(0, path.cwS - s - DRV.carL/2); return {kind:'ped', car:null, gap, closing:D.v, need:needDec(D.v, gap)};
+}
 function frontHaz(){
-  const fx = Math.sin(D.psi), fz = -Math.cos(D.psi); let best = null;
-  D.cars.forEach(c => {
-    if(c.kind === 'onc') return;
-    const dx = c.x - D.x, dz = c.z - D.z, lon = dx*fx + dz*fz, lat = dx*(-fz) + dz*fx;
-    if(lon <= 0 || Math.abs(lat) > AEB.lat) return;
-    const gap = lon - halfL(c) - DRV.carL/2, closing = D.v - c.v, need = needDec(closing, gap);
-    if(!best || need > best.need || (need === best.need && gap < best.gap)) best = {kind:'lead', car:c, gap, closing, need};
-  });
-  const m = S.map;
-  if(m.cw && path.cwS !== null && pedBlock(D.t) && D.x < m.cw.x0){
-    const s = project(path.P, D.x, D.z, -1).s;
-    if(s > path.cwS - AEB.pedDist && s < path.cwS){ const gap = Math.max(0, path.cwS - s - DRV.carL/2), need = needDec(D.v, gap); if(!best || need > best.need) best = {kind:'ped', car:null, gap, closing:D.v, need}; }
-  }
+  let best = null;
+  D.cars.forEach(c => { const h = carHaz(c); if(h && (!best || h.need > best.need || (h.need === best.need && h.gap < best.gap))) best = h; });
+  const p = pedHaz(); if(p && (!best || p.need > best.need)) best = p;
   return best;
 }
 const aebWith = h => h.kind === 'ped' ? '보행자' : KIND_NAME[h.car.kind] || '앞차';
+const sameHaz = (a, b) => !!a && !!b && a.kind === b.kind && a.car === b.car;
+const hazOf = t => t.kind === 'ped' ? pedHaz() : (D.cars.includes(t.car) ? carHaz(t.car) : null);   // 정해 둔 대상(급제동 대상 · 가속으로 이긴 대상)의 지금 위험
+/* 2026-11-18 버그 고침(환경 3.4): ① 걸릴 때 제동을 0부터가 아니라 그때 실제로 줄이고 있던 세기부터 올림(SCC가 3.5로 줄이던 중이면 잠깐 더 약해지던 것)
+   ② '위험이 사라짐'으로 풀리는 것을 둘로: 대상이 앞길에서 벗어나면(핸들로 피함 · 사라짐) 바로, 대상이 아직 앞에 있는데 안 가까워지면 AEB.clearT초 그대로일 때 —
+      예전엔 가까워지는 속도가 0이 되는 순간 풀려(아직 서는 중인 앞차 0.3m 뒤) SCC가 꺼진 채 굴러가 다시 부딪혔음. 달리는 중에 풀리면 SCC를 다시 켜 앞차를 따라감
+   ③ '위험'은 필요 감속도 AEB.keep 이상만(멀리 있는 차가 아주 조금 가까워지는 것까지 위험으로 봐 핸들로 피한 뒤에도 안 풀리던 것)
+   ④ ↑로 이긴 뒤 다시 안 거는 것은 그 대상에만(예전엔 다른 위험 — 예: 그 뒤 건너는 보행자 — 에도 안 걸렸음)
+   ⑤ 앞차로 보는 옆 폭 = 두 차 몸이 겹치는 폭(예전 06과 같은 1.3m — 차로를 반쯤 걸친 버스 뒤에서 급제동 없이 부딪힘) */
 function aebStep(dt){
-  const A = D.aeb, h = D.haz = D.result ? null : frontHaz(), live = !!h && h.need > 0;   // live: 가까워지는 위험이 있음
-  if(A.latch && !live) A.latch = false;
+  const A = D.aeb, h = D.haz = D.result ? null : frontHaz(), live = !!h && h.need >= AEB.keep;   // live: 의미 있게 가까워지는 위험이 있음
+  if(A.latch){ const l = hazOf(A.latch); if(!l || l.need < AEB.keep) A.latch = null; }   // 가속으로 이긴 그 위험이 사라지면 다시 걸 수 있음
   if(!A.on){
-    if(live && !A.latch && h.need >= AEB.on && -D.acc < h.need){
-      Object.assign(A, {on:true, dec:0, ovrT:0, stopT:0, kind:h.kind, car:h.car, t0:D.t, v0:D.v}); D.sccOff = true; D.aebN++;
+    if(live && h.need >= AEB.on && -D.acc < h.need && !sameHaz(A.latch, h)){
+      Object.assign(A, {on:true, dec:Math.max(0, -D.acc), ovrT:0, stopT:0, calmT:0, kind:h.kind, car:h.car, t0:D.t, v0:D.v}); D.sccOff = true; D.aebN++;
       D.events.push({t:+D.t.toFixed(2), type:'aebOn', kind:h.kind, with:aebWith(h), kmh:Math.round(D.v*3.6), need:+h.need.toFixed(1), gap:+h.gap.toFixed(1)});
     }
     return;
   }
-  if(h && h.kind === A.kind) A.car = h.car;
-  if(KEYS.up){ A.ovrT += dt; if(A.ovrT >= AEB.ovrT){ aebEnd('override'); A.latch = live; return; } } else A.ovrT = 0;
+  const tgt = hazOf(A);
+  if(KEYS.up){ A.ovrT += dt; if(A.ovrT >= AEB.ovrT){ const lk = tgt ? {kind:A.kind, car:A.car} : null; aebEnd('override'); A.latch = lk; return; } } else A.ovrT = 0;   // 대상은 aebEnd가 지우기 전에 잡아 둠
   if(D.v < .05){ A.stopT += dt; if(A.stopT >= AEB.hold) aebEnd('stop'); return; }
   A.stopT = 0;
-  if(!live) aebEnd('clear');
+  if(!tgt){ aebEnd('clear'); return; }   // 대상이 앞길에서 벗어남 → 바로 풀림
+  if(tgt.need < AEB.keep && !live){ A.calmT += dt; if(A.calmT >= AEB.clearT) aebEnd('clear'); } else A.calmT = 0;
 }
 function aebEnd(why){
   const A = D.aeb; if(!A.on) return;
   A.on = false; A.dec = 0;
+  if(why === 'clear' && D.v > 1) D.sccOff = false;   // 달리는 중에 위험이 사라져 풀리면 SCC가 다시 앞차를 따라감(서서 풀린 뒤에는 ↑ 전까지 그대로 서 있음)
   D.events.push({t:+D.t.toFixed(2), type:'aebOff', why, kmh:Math.round(D.v*3.6), dur:+(D.t - A.t0).toFixed(2)});
   A.car = null;
 }

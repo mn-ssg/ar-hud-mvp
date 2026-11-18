@@ -157,7 +157,7 @@ function renderStatus(){
 function openSetup(open, anim){
   const el = $('#setup'); clearTimeout(el._close); el.classList.remove('closing'); $('#setupBtn').setAttribute('aria-expanded', String(open));
   if(open || el.hidden){ el.hidden = !open; return; }
-  if(!anim || matchMedia('(prefers-reduced-motion: reduce)').matches){ el.hidden = true; return; }
+  if(!anim || matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('driving')){ el.hidden = true; return; }   // 시연이 돌아가는 동안은 움직임 없이
   el.classList.add('closing'); el._close = setTimeout(() => { el.hidden = true; el.classList.remove('closing'); }, 220);
 }
 function goHome(){
