@@ -33,13 +33,12 @@ src/
     drive.js          주행 테스트: 내 차 조작 · 깜빡이(Q · E) · 교통 AI(양보) · 자동 급제동(aebStep — 어느 HUD든 같게) · 도로 판정 · 기록 값
   app/
     main.js           상태 · 매 프레임 루프 · 시연 흐름 · 화면 전환
-    intro.js          주행 테스트 안내 모션그래픽(TOUR) — 맨 앞에: 조작 · 눌러 보기 · 할 일 · 기록 · 준비 (2026-11-17 밤). Blender 3D 영상(assets/video/) 위에 자막을 얹음. 스타일 styles/intro.css
+    intro.js          주행 테스트 안내 모션그래픽(TOUR) — 맨 앞에: 조작 · 눌러 보기 · 할 일 · 기록 · 준비 (2026-11-17 밤). 2026-11-18 다시 디자인(D135 · D136): 흰 바탕 + 파랑 하나, 전부 SVG + JS(영상 · 그림 파일 없음) — 위에서 본 차 · 키캡 키보드 · 속도 하나에서 계산하는 빠르기 표현. 스타일 styles/intro.css
     session.js        참가자 진행 · 기록 · 엑셀 · 기록 서랍 · 방향키
 assets/
   tex/                노면 · 벽 · 잔디 · 금속 · 나무 재질 (코드가 읽음). 참고 시안은 ../04_리서치/assets/
   models/             차량 · 버스 GLB 5개(Higgsfield Tripo, 2026-11-07 · Draco 압축 2026-11-17) · 나무 · 가로등 · 가드레일 기둥(Blender) · 보행자 4명(Higgsfield + 리깅) · HUD 아이콘 2개. 못 불러오면 코드 메시
-  blender/            Blender 원본(.blend)과 만드는 스크립트(.py). 안내 모션그래픽: intro_mg.py(렌더) · intro_encode.sh(mp4 · webp)
-  video/              안내 모션그래픽 영상 3개 · 그림 8장(2.6MB) — 주행 테스트를 시작할 때만 받음
+  blender/            Blender 원본(.blend)과 만드는 스크립트(.py)
   cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js

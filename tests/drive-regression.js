@@ -437,31 +437,56 @@ const check = (name, ok, detail = '') => { results.push({name, ok:!!ok, detail})
     check('HUD 바꾸면 한 HUD만 보임', r.navVis, '');
   }
 
-  /* ---------- 7-1. 안내 모션그래픽 (intro.js TOUR, 2026-11-17 밤) ---------- */
+  /* ---------- 7-1. 안내 모션그래픽 (intro.js TOUR, 2026-11-17 밤 · 11-18 다시 디자인 D135 · D136) ---------- */
   {
     const t = await E(async () => { const o = {}; let done = 0;
-      TOUR.show(() => done++); await new Promise(r => setTimeout(r, 2500));   /* 영상 · 그림이 불러와질 시간 */ o.n = TOUR.scenes.length; o.ids = TOUR.scenes.map(q => q.id).join(',');
-      const texts = () => [...document.querySelectorAll('#tour svg > g')].map(g => +g.getAttribute('opacity'));
+      TOUR.show(() => done++); await new Promise(r => setTimeout(r, 300)); o.n = TOUR.scenes.length; o.ids = TOUR.scenes.map(q => q.id).join(',');
+      const layers = () => [...document.querySelectorAll('#tour svg > g')], texts = () => layers().map(g => +g.getAttribute('opacity'));
       // 장면마다 끝 시각으로 옮겨 그려 보고(오류 없이), 보이는 장면은 하나뿐
       o.one = TOUR.scenes.every((q, i) => { TOUR.seek(i, q.hold ? 3 : q.dur - .05); const v = texts(); return v[i] === 1 && v.filter(x => x > 0).length === 1; });
       // 조작 장면: 속도 글자가 50 → 80 근처 → 22 근처 → 50으로 바뀜
       const spd = tt => { TOUR.seek(1, tt); return +document.querySelector('#tour .t-speed').textContent; }; o.speed = [spd(1), spd(5.2), spd(7.5), spd(10)];
       // 눌러 보기: 방향키 4개 + Q · E를 누르면 6/6, 그 전에는 저절로 안 넘어감. 누른 키는 운전 입력(KEYS)으로 새지 않음
-      TOUR.go(2); const press = c => dispatchEvent(new KeyboardEvent('keydown', {code:c, key:c.replace('Arrow', 'Arrow'), bubbles:true, cancelable:true}));
-      ['ArrowLeft', 'ArrowRight', 'ArrowUp'].forEach(press); TOUR.seek(2, 30); o.half = {n:TOUR.scenes[2].draw.state().n, at:TOUR.state().id, leak:Object.values(KEYS).some(Boolean)};
+      const kev = (type, c) => dispatchEvent(new KeyboardEvent(type, {code:c, key:c, bubbles:true, cancelable:true})), press = c => kev('keydown', c), lift = c => kev('keyup', c);
+      TOUR.go(2); ['ArrowLeft', 'ArrowRight', 'ArrowUp'].forEach(press); TOUR.seek(2, 30); o.half = {n:TOUR.scenes[2].draw.state().n, at:TOUR.state().id, leak:Object.values(KEYS).some(Boolean)};
       ['ArrowDown', 'KeyQ', 'KeyE'].forEach(press); TOUR.seek(2, 31); TOUR.seek(2, 32.5); o.full = {at:TOUR.state().id};
+      // 눌러 보기의 차: 누르고 있는 동안 반응하고 떼면 돌아옴(시간을 0.05초씩 흘림)
+      TOUR.go(2); const S = () => TOUR.scenes[2].draw.state(); let tt = 1; const run = d => { for(const e = tt + d; tt < e - 1e-9;){ tt += .05; TOUR.seek(2, tt); } };
+      ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyQ', 'KeyE'].forEach(lift); TOUR.go(2); TOUR.seek(2, tt); const r = {};
+      press('ArrowUp'); run(1); r.up = S().v; const kUp = document.querySelector('#tour svg > g:nth-of-type(3) g[data-k="up"] > g'); r.upKeyDown = kUp && /translate\(0 [3-9]/.test(kUp.getAttribute('transform'));
+      lift('ArrowUp'); run(2.5); r.back = S().v;
+      press('ArrowDown'); run(.5); r.down = S().v; lift('ArrowDown'); run(2.5);
+      press('ArrowLeft'); run(.6); r.yawL = S().yaw; r.xL = S().x - S().mid; run(3); r.edge = S().x - S().lo; lift('ArrowLeft'); run(1.5); r.yaw0 = S().yaw;
+      r.held = S().held; r.n = S().n; r.at = TOUR.state().id; o.drive = r;
+      // 키보드: 처음엔 가운데 한 덩어리 → 1.1초 뒤 모두 제자리(data-home)
+      const kpos = () => [...layers()[1].querySelectorAll('g[data-k]')].map(g => { const m = /translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)/.exec(g.getAttribute('transform') || ''), h = g.dataset.home.split(',').map(Number); return m ? Math.hypot(+m[1] - h[0], +m[2] - h[1]) + Math.abs(+m[3] - 1)*100 : 999; });
+      TOUR.seek(1, .05); o.unfold0 = Math.min(...kpos()); TOUR.seek(1, 1.3); o.unfold1 = Math.max(...kpos()); o.keyN = layers()[1].querySelectorAll('g[data-k]').length;
+      // 준비: 8초 한 바퀴가 이음매 없이 — t와 t + 8의 그림이 같음
+      const rd = tt => { TOUR.seek(5, tt); return layers()[5].innerHTML; }; o.loop = [3.3, 6.1, 7.96].map(x => rd(x) === rd(x + 8));
+      // 색: 장면 여러 시각의 fill · stroke · stop-color가 모두 C 넷 · 그 음영 단계(TONE · KEYTONE) 또는 그 둘 사이 섞임 — HUD 신호색 · 다른 색 없음
+      const P = TOUR.parts, base = [...Object.values(P.C), ...Object.values(P.TONE.point), ...Object.values(P.TONE.gray), ...Object.values(P.KEYTONE), '#ffffff'];
+      const rgb = c => { c = (c || '').trim().toLowerCase(); let m = /^#([0-9a-f]{3})$/.exec(c); if(m) return [...m[1]].map(h => parseInt(h + h, 16)); m = /^#([0-9a-f]{6})$/.exec(c); if(m) return [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16)); m = /^rgba?\(([^)]+)\)/.exec(c); if(m) return m[1].split(',').slice(0, 3).map(Number); return null; };
+      const B = base.map(rgb), onSeg = (c, a, b) => { const ab = a.map((v, i) => b[i] - v), L = ab.reduce((s, v) => s + v*v, 0), k = L ? Math.max(0, Math.min(1, ab.reduce((s, v, i) => s + v*(c[i] - a[i]), 0)/L)) : 0; return Math.hypot(...c.map((v, i) => v - (a[i] + ab[i]*k))) < 2.5; };
+      const ok = c => B.some(a => B.some(b => onSeg(c, a, b))), bad = new Set();
+      TOUR.scenes.forEach((q, i) => [.3, 1, 2.5, 4, 6, 9, 12, 15, 18].forEach(x => { TOUR.seek(i, x); document.querySelectorAll('#tour svg *').forEach(e => { ['fill', 'stroke', 'stop-color'].forEach(at => { const v = e.getAttribute(at); if(v && !/^(none|url\(|currentColor)/.test(v)){ const c = rgb(v); if(!c || !ok(c)) bad.add(at + ':' + v); } });
+        if(e.tagName === 'text' || e.tagName === 'tspan'){ const c = rgb(getComputedStyle(e).fill); if(!c || !ok(c)) bad.add('text:' + getComputedStyle(e).fill); } }); }));
+      o.badColors = [...bad].slice(0, 8);
+      // 3D 영상 · 그림 없음(전부 SVG), 빛 번짐 · 그림자 필터는 차 · 키에만(그림자 = 먹색 사각형, 빛 = 꼬리등 선)
+      o.media = document.querySelectorAll('#tour video, #tour img, #tour image, #tour foreignObject').length + TOUR.scenes.filter(q => q.video || q.image).length;
+      const glow = [P.TONE.point.glow, P.TONE.gray.glow]; o.filters = [...document.querySelectorAll('#tour svg [filter]')].filter(e => !((e.tagName === 'rect' && e.getAttribute('fill') === P.C.ink) || (e.tagName === 'path' && glow.includes(e.getAttribute('stroke'))))).length;
       // Enter로 다음 · 마지막 장면에서 Enter(= 주행 시작)면 닫히고 done 한 번
       TOUR.go(5); const before = done; dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', bubbles:true, cancelable:true})); o.end = {done:done - before, hidden:document.querySelector('#tour').hidden, on:TOUR.state().on};
-      // 3D 영상 · 그림: 영상 3개 · 그림(눌러 보기 바탕 + 켜진 키 6장 · 기록/준비 바탕)이 실제로 불러와졌고, 그 장면에선 예전 SVG 그림(.ill)이 숨음
-      o.media = {videos:TOUR.scenes.filter(q => q.video).map(q => q.ok && q.el.videoWidth === 1280 && Math.abs(q.el.duration - q.dur) < .2), images:TOUR.scenes.filter(q => q.image).map(q => q.ok && q.el.naturalWidth === 1280), keys:[...document.querySelectorAll('#tour .tour-key')].map(e => e.dataset.k).sort().join(',')};
-      TOUR.show(null); TOUR.seek(1, 4); o.ill = getComputedStyle(document.querySelector('#tour g.has-media .ill') || document.body).display; TOUR.go(2); ['ArrowUp'].forEach(c => dispatchEvent(new KeyboardEvent('keydown', {code:c, bubbles:true, cancelable:true}))); TOUR.seek(2, 1); o.litOn = [...document.querySelectorAll('#tour .tour-key.got')].map(e => e.dataset.k + ':' + getComputedStyle(e).animationName).join(','); TOUR.go(2); o.litReset = document.querySelectorAll('#tour .tour-key.got').length; TOUR.hide();
       // HUD 표시의 뜻은 알려 주지 않음(대기 · 이동 같은 말 · HUD 색 설명이 없음)
-      o.words = /기다려|대기|이동하세요|청록|빨간 점|금지 표|꺾쇠/.test(document.querySelector('#tour').textContent);
+      o.words = /기다려|대기|이동하세요|청록|빨간 점|금지 표|꺾쇠|급제동/.test(document.querySelector('#tour').textContent);
       return o; });
     check('안내 모션그래픽: 장면 6개(시작 · 조작 · 눌러 보기 · 할 일 · 기록 · 준비)가 오류 없이 그려지고 한 번에 한 장면만 보임, 조작 장면의 속도가 50 → 가속 → 브레이크 → 50으로 바뀜', t.n === 6 && t.ids === 'start,keys,try,task,data,ready' && t.one && t.speed[0] === 50 && t.speed[1] > 70 && t.speed[2] < 35 && Math.abs(t.speed[3] - 50) < 6, JSON.stringify({n:t.n, one:t.one, speed:t.speed}));
     check('안내 모션그래픽: 눌러 보기는 여섯 키를 다 눌러야 넘어가고(3개만 누르면 그대로) 운전 입력으로 새지 않음, 마지막 장면에서 Enter면 닫히며 주행으로 넘어감(한 번만)', t.half.n === 3 && t.half.at === 'try' && !t.half.leak && t.full.at === 'task' && t.end.done === 1 && t.end.hidden && !t.end.on, JSON.stringify({half:t.half, full:t.full, end:t.end}));
-    check('안내 모션그래픽: HUD 표시의 뜻(기다려 · 이동 · 색)은 알려 주지 않음 — 조작 · 할 일 · 기록 항목만', !t.words, '');
-    check('안내 모션그래픽: Blender 3D 영상 3개(1280 × 720, 길이가 장면 길이와 같음) · 그림이 불러와지고 그 위에 자막이 얹힘(예전 SVG 그림은 숨음), 눌러 보기에는 키 6개의 눌리는 그림띠가 있고 누른 키(↑)만 눌리는 움직임을 재생, 장면을 다시 열면 모두 꺼짐', t.media.videos.length === 3 && t.media.videos.every(Boolean) && t.media.images.every(Boolean) && t.media.keys === 'down,e,left,q,right,up' && t.ill === 'none' && t.litOn === 'up:tourKey' && t.litReset === 0, JSON.stringify({media:t.media, ill:t.ill, lit:t.litOn, reset:t.litReset}));
+    check('안내 모션그래픽(D136): 눌러 보기의 차가 키를 누르는 동안 반응 — ↑ 1초면 빨라지고(키가 눌려 내려감) 떼면 50으로, ↓면 느려짐, ← 누르면 왼쪽으로 기울며 가다가 도로 끝에서 멈추고(끝까지 2px 안, 넘지 않음) 떼면 곧게. 키를 떼면 눌린 키 없음, 네 키만 눌렀으니 넘어가지 않음',
+      t.drive.up > 68 && t.drive.upKeyDown && Math.abs(t.drive.back - 50) < 4 && t.drive.down < 35 && t.drive.yawL < -5 && t.drive.xL < -5 && t.drive.edge >= 0 && t.drive.edge < 2 && Math.abs(t.drive.yaw0) < 1.5 && t.drive.held === '' && t.drive.n === 3 && t.drive.at === 'try', JSON.stringify(t.drive));
+    check('안내 모션그래픽(D136): 조작 장면의 키보드 — 키 6개가 처음엔 가운데 덩어리로 모여 있다가(제자리에서 떨어짐) 1.1초 뒤 모두 제자리 · 제 크기', t.keyN === 6 && t.unfold0 > 30 && t.unfold1 < .5, JSON.stringify({n:t.keyN, start:+t.unfold0.toFixed(1), end:+t.unfold1.toFixed(2)}));
+    check('안내 모션그래픽(D136): 준비 장면의 반복은 8초 한 바퀴가 이음매 없이(t와 t + 8초의 그림이 같음 — 3.3 · 6.1 · 7.96초)', t.loop.every(Boolean), JSON.stringify(t.loop));
+    check('안내 모션그래픽(D135 · D136): 색은 흰 바탕 · 파랑 · 먹색 · 회색과 그 음영 단계(사이 섞임)뿐, 3D 영상 · 그림 없음(전부 SVG), 그림자 · 빛 번짐 필터는 차 · 키에만', t.badColors.length === 0 && t.media === 0 && t.filters === 0, JSON.stringify({bad:t.badColors, media:t.media, filters:t.filters}));
+    check('안내 모션그래픽: HUD 표시의 뜻(기다려 · 이동 · 색)은 알려 주지 않음 — 조작 · 할 일 · 기록 항목만(자동 급제동은 사용자 결정 전이라 넣지 않음)', !t.words, '');
   }
 
   /* ---------- 8-1. 화면 구조: HUD 선택은 현대 · 우리 두 개 · 버전 선택 없음 · 리뉴얼 HUD에 설명 글자 없음 ---------- */
