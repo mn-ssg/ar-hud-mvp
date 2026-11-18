@@ -275,7 +275,7 @@ const TOUR = (() => {
           {reset, state:() => ({n:KEYS6.filter(([k]) => got[k] !== undefined).length, v:st.v, x:st.x, yaw:st.yaw, dy:st.dy, mid:R.lanes[1], lo:R.lanes[0] - 26, hi:R.lanes[2] + 26, held:Object.keys(held).filter(k => held[k]).join(',')})});
     }},
     /* 4. 할 일: 규칙마다 그 뜻을 움직임으로(차가 실제로 그 행동을 한다). 글자는 그 움직임과 같이 나오고, 지나간 규칙은 작은 회색 글자로 위로.
-          ① 목적지 출구로: 표지판의 목적지 칸이 파랑 → 내 차에서 그 출구까지 파란 선 → 차가 그 선을 따라감
+          ① 목적지 출구로: 갈림 전 표지판(도로를 가로지르는 선 + 도로 밖 양 끝의 '직진' · '목적지')에서 목적지 칸이 파랑 → 내 차에서 그 출구까지 파란 선 → 차가 그 선을 따라감. 표지판은 ①에만
           ② 안전할 때 옮기기: 옆 차로 뒤에서 회색 차가 다가옴 → 깜빡이를 켠 채 기다림 → 지나간 뒤 부드럽게 옮김
           ③ 앞도 살피기: 앞차가 섬 → 천천히 줄여 멈춤 → 길이 비면 다시 감. HUD 그림 · 기호는 쓰지 않는다 */
     { id:'task', name:'할 일', dur:19.5, build(g){
@@ -284,9 +284,11 @@ const TOUR = (() => {
         svg('path', {d:`M${x0 + 2*lw} ${yF + 60} L${x0 + 2*lw} 40`, fill:'none', stroke:C.ink, 'stroke-width':1.5}, g);
         svg('path', {d:`M${x0 + 3*lw} 680 L${x0 + 3*lw} ${yF} Q${x0 + 3*lw} ${yF - 120} ${x0 + 3*lw + 150} ${yF - 240}`, fill:'none', stroke:C.ink, 'stroke-width':1.5}, g);
         svg('path', {d:`M${x0 + 2*lw} ${yF + 60} Q${x0 + 2*lw + 10} ${yF - 70} ${x0 + 2*lw + 140} ${yF - 220}`, fill:'none', stroke:C.ink, 'stroke-width':1.5}, g);
-        // 표지판: 가로 선 하나 + 칸 이름. 목적지 칸은 ①에서 파랑(글자 + 아래 막대)
-        line(g, x0 - 12, 120, x0 + 3*lw + 12, 120, C.mute, 1.5); txt(g, x0 + lw, 106, '직진', 't-cap', {'text-anchor':'middle'});
-        const dst = txt(g, L2, 106, '목적지', 't-cap', {'text-anchor':'middle'}), dstBar = svg('rect', {x:L2 - 30, y:113, width:0, height:4, fill:C.point}, g);
+        // 표지판(2026-11-18 밤 고침, D140): 갈림 전 세 차로가 다 있는 곳(SY)에 도로 전체 폭을 가로지르는 가는 회색 선 하나 + 칸 이름은 도로 밖 양 끝('직진' 왼쪽 · '목적지' 오른쪽).
+        // 글자를 차로 위에 두면 차선 점선 · 파란 길 · 차가 지나가 가림. ①에서 '목적지' 글자가 파랑 + 선 위 3차로 칸에만 파란 막대. ①이 끝나면 파란 길과 같이 통째로 사라짐(② ③ · 정리에는 도로만)
+        const SY = 450, sign = svg('g', {}, g);
+        line(sign, x0 - 12, SY, x0 + 3*lw + 12, SY, C.mute, 1.5); txt(sign, x0 - 28, SY + 8, '직진', 't-sign', {'text-anchor':'end'});
+        const dst = txt(sign, x0 + 3*lw + 28, SY + 8, '목적지', 't-sign'), dstBar = svg('rect', {x:x0 + 2*lw, y:SY - 2, width:0, height:4, fill:C.point}, sign);
         // ① 길: 내 차에서 출구까지
         const route = svg('path', {d:`M${L1} 560 C${L1} 470 ${L2} 490 ${L2} 400 L${L2} ${yF} Q${L2} ${yF - 120} ${L2 + 150} ${yF - 240} L${L2 + 290} ${yF - 352}`, fill:'none', stroke:C.point, 'stroke-width':3, 'stroke-linecap':'round', pathLength:1}, g);
         const lead = other(g, .9), rear = other(g, .9), me = car(g, .9);
@@ -306,8 +308,8 @@ const TOUR = (() => {
           small.forEach((q, i) => { q.style.display = t >= RE[i] + .2 ? '' : 'none'; rise(q, t, RE[i] + .2); });
           strip.style.display = t >= 17.6 ? '' : 'none'; rise(strip, t, 17.6); alt.es.forEach((_, i) => alt.pop(i, back(seg(t, 17.9 + i*.07, 18.25 + i*.07), 2.6))); legend.setAttribute('opacity', cl((t - 18.4)*4));
           // ① 0.4 ~ 6.2
-          const dOn = seg(t, .9, 1.2)*(1 - seg(t, 6.0, 6.3)); dst.setAttribute('class', dOn > .5 ? 't-cap em' : 't-cap'); dstBar.setAttribute('width', (60*eo(dOn)).toFixed(1));
-          drawn(route, eo(seg(t, 1.4, 2.5))); route.setAttribute('opacity', (1 - seg(t, 5.4, 5.9)).toFixed(2));
+          const dOn = seg(t, .9, 1.2)*(1 - seg(t, 6.0, 6.3)); dst.setAttribute('class', dOn > .5 ? 't-sign em' : 't-sign'); dstBar.setAttribute('width', (lw*eo(dOn)).toFixed(1));
+          drawn(route, eo(seg(t, 1.4, 2.5))); const fade = (1 - seg(t, 5.4, 5.9)).toFixed(2); route.setAttribute('opacity', fade); sign.setAttribute('opacity', fade);
           let mx = L1, my = 560, myaw = 0, mbrake = 0, mdy = 0, blink = 0;
           if(t < 6.2){ const u = seg(t, 2.7, 5.4); if(u > 0){ const [px, py, a] = along(ss(u)*.98); mx = px; my = py; myaw = a; } me.g.setAttribute('opacity', (1 - seg(t, 5.0, 5.4)).toFixed(2)); }
           // ② 6.2 ~ 12: 1차로로 다시 들어와 깜빡이를 켜고 기다림 → 2차로 뒤에서 온 회색 차가 지나간 뒤 옮김

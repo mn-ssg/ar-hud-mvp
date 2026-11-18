@@ -35,6 +35,8 @@
 #tour .t-small{ font-size:19px; font-weight:500; fill:var(--ink); }
 #tour .t-cap{ font-size:14px; font-weight:600; fill:var(--mute); }
 #tour .t-cap.em{ fill:var(--point); }
+#tour .t-sign{ font-size:22px; font-weight:700; fill:var(--mute); }   /* 할 일 ①의 표지판 칸 이름(도로 밖 양 끝, D140) */
+#tour .t-sign.em{ fill:var(--point); }
 #tour .t-idx{ font-size:15px; font-weight:700; fill:var(--mute); font-variant-numeric:tabular-nums; }
 #tour .t-idx.on{ fill:var(--point); font-size:18px; }
 #tour .t-item{ font-size:28px; font-weight:700; }
