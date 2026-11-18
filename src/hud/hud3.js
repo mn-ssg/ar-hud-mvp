@@ -2,8 +2,8 @@
    hud3.js — 리뉴얼 HUD 3차 (3.0, 2026-11-17) · 피그마 '기말 / 11주차' (3차 HUD 디자인 근거 ① ② · HUD 정보 구조 · 상태 변화 01 ~ 06)
    2차(2.4, hud2.js)의 구조(자리 · 크기 · ① 들어갈 차로 ② 갈 방향 ③ 막대 · 뒤차 정보)는 그대로 두고 2차 실험에서 문제였던 네 가지만 고쳤다.
    01 앞쪽 위험 먼저: 앞차와 간격이 좁아지거나 보행자가 건너려 하면 주황 삼각형 · 앞쪽 간격이 가장 크게, 들어갈 차로 · 갈 방향 · 뒤차는 작고 옅게
-   02 들어갈 때를 분명하게: 기다림(빨간 점 세 개 · 마감선까지 남은 거리 밝게) → 확인(틈 자리 흰 점선 · 거울 표시) → 이동(틈 초록 · 꺾쇠 크게)
-   03 색 하나에 뜻 하나: 초록 = 옮겨도 됨 / 주황 = 조심 / 빨강 = 지금 옮기지 마 / 청록 = 길 안내(늘 그대로). 꺾쇠 = 옮길 방향 · 삼각형 = 앞쪽 주의 · 점 세 개 = 기다려.
+   02 들어갈 때를 분명하게: 기다림(갈 방향 화살표 옆에 옆으로 옮기기 금지 표지 · 마감선까지 남은 거리 밝게) → 확인(틈 자리 흰 점선 · 거울 표시) → 이동(틈 초록 · 꺾쇠 크게)
+   03 색 하나에 뜻 하나: 초록 = 옮겨도 됨 / 주황 = 조심 / 빨강 = 지금 옮기지 마 / 청록 = 길 안내(늘 그대로). 꺾쇠 = 옮길 방향 · 삼각형 = 앞쪽 주의 · 꺾쇠에 빨간 원 빗금 = 지금 옮기지 마(옆으로 옮기기 금지 표지).
       2차에서 뜻이 겹치던 곳을 정리: 막대 · 마감선의 초록 → 주황 → 빨강(무채색으로) · 정지선 빨간 막대(주황으로) · 차로 변경 뒤 차로가 초록으로 바뀌던 칭찬 · 해소 때 차로 전체 초록(틈만 초록으로) ·
       내 차 아이콘의 빨간 미등 · 제한속도 표지의 빨간 테(표지를 뺌) · 화살표 머리 삼각형(꺾쇠로) · 차로 경계 빨간 선(대기에 합침)
    04 미니 도로 투시: 손으로 맞춘 원근식(hud.js K · PXM · HY_*)을 버리고, 실제 차선 좌표를 장면 카메라와 같은 방향 · 같은 화각으로 투영한다(makeProj3).
@@ -16,6 +16,27 @@
 $('#hudSvgTop').classList.toggle('screen', !HUD3.warnSolid);
 // 대기 기준 · 확인 시간은 판단 게이트(guide.js)가 쓴다 → 설정값을 넣는다 (처음 값은 2차와 같음)
 GUIDE.rearGap = HUD3.waitGap; GUIDE.rearTtc = HUD3.waitTtc; GUIDE.hold = HUD3.confirmT;
+/* 03 대기의 옆으로 옮기기 금지 표지(#cHold) 모양 — 한 번만 넣는다(값은 config.js HUD3.hold, 화살표 그림 단위). 원 가운데가 (0, 0), 빗금은 그 가운데를 지나는 왼쪽 위 → 오른쪽 아래.
+   꺾쇠는 노면 이동 꺾쇠(gchev3)와 같은 여섯 점 꼴, 오른쪽을 가리키게 그려 두고 왼쪽으로 옮길 때는 꺾쇠 그룹만 원 가운데를 축으로 좌우로 뒤집는다(빗금은 그대로).
+   · 두 꺾쇠를 묶은 상자(getBBox)의 가운데 = 원 가운데: 꺾쇠 하나의 가로 범위가 [cx - a - w, cx + a]라 묶음 가운데 = (cx1 + cx2)/2 - w/2 → cx = w/2 ∓ dx/2.
+     묶음이 위아래 대칭이라 좌우로 뒤집은 '<<'는 '>>'를 원 가운데로 반 바퀴 돌린 것과 같다 → 빗금과의 관계도 그대로
+   · 두 꺾쇠의 간격 dx: 위팔(빗금과 나란함)의 가운데 줄이 빗금에서 가로로 cx + a - w/2만큼 떨어진다 → 안쪽 꺾쇠의 위팔이 빗금 바깥으로 clear만큼 비켜나는 가장 좁은 값.
+     빗금이 덮는 것은 바깥 꺾쇠 아래팔의 끝뿐 */
+(() => {
+  const H = HUD3.hold, c = H.chev, b = 2*c.a, rm = H.r - H.ring/2, k = rm/Math.SQRT2, dx = 2*c.a + c.w + Math.SQRT2*(H.bar + 2*c.clear);
+  const set = (el, o) => Object.entries(o).forEach(([a, v]) => el.setAttribute(a, v)), f3 = q => q.map(v => +v.toFixed(3)).join(' ');
+  const chev = cx => 'M' + [[cx - c.a, b], [cx + c.a, 0], [cx - c.a, -b], [cx - c.a - c.w, -b], [cx + c.a - c.w, 0], [cx - c.a - c.w, b]].map(f3).join('L') + 'Z';
+  $$('#cHoldChev path').forEach((q, i) => q.setAttribute('d', chev(c.w/2 + (i ? dx : -dx)/2)));
+  set($('#cHold .c-hold-ring'), {r:rm, 'stroke-width':H.ring});
+  set($('#cHold .c-hold-bar'), {d:`M${f3([-k, -k])}L${f3([k, k])}`, 'stroke-width':H.bar});
+  set($('#cHold .c-hold-rim'), {r:H.r + H.rim/2, 'stroke-width':H.rim});
+})();
+// 갈 방향 화살표의 그린 모양 상자(getBBox, 그림 단위) — 처음 보일 때 재서 둔다. 표지 높이 · 묶음 가운데 계산에 쓴다(우 · 좌회전 화살표는 원점이 모양 가운데가 아님)
+const ICO_BOX3 = {};
+function icoBox3(id){
+  if(!ICO_BOX3[id]){ const r = $('#' + id + ' path').getBBox(); if(r.width > 0) ICO_BOX3[id] = {x0:r.x, x1:r.x + r.width, yc:r.y + r.height/2}; }
+  return ICO_BOX3[id] || {x0:-8, x1:8, yc:0};   // 아직 못 잼(한 번도 안 보임): 직진 화살표의 상자
+}
 
 /* ---------- 투영: 장면 카메라와 같은 방향 · 화각, 자리만 뒤 · 위 ----------
    돌려줌: (월드 x, z, 높이 y = 0) → [상자 x, 상자 y, 축척(내 차 줄 = 1), 내 차 기준 앞 거리 m] | null(그리는 범위 밖).
@@ -138,15 +159,13 @@ function car3Render(){
   c.setViewOffset(L.W, L.H, L.W/2 - L.hud.w/2, L.hud.bottomY - L.hud.h, L.hud.w, L.hud.h); c.updateProjectionMatrix();
   r.render(CAR3.scene, c);
 }
-/* 도로 면 위 도형(같은 투영) — 꺾쇠 · 점 · 틈 테두리를 화면 도형이 아니라 노면에 그려진 표시처럼 눕힌다 (2026-11-17 사용자: '점선 · 화살표 투시를 맞춰').
+/* 도로 면 위 도형(같은 투영) — 꺾쇠 · 틈 테두리를 화면 도형이 아니라 노면에 그려진 표시처럼 눕힌다 (2026-11-17 사용자: '점선 · 화살표 투시를 맞춰').
    내 차 줄에서 앞뒤 1m는 약 3 상자 단위, 옆 1m는 약 34 단위라(가상 카메라가 5° 내려다봄) 노면 표시는 실제 도로의 화살표처럼 앞뒤로 길게 그린다 */
 const gpoly3 = (proj, pts) => { const q = pts.map(a => proj(a[0], a[1])); return q.every(Boolean) ? 'M' + q.map(fmt).join('L') + 'Z' : ''; };
 // 옆을 가리키는 꺾쇠 '>' : 가운데 (cx, cz), s = 가리키는 쪽(±1), a = 옆 반길이 · b = 앞뒤 반길이 · t = 옆 굵기(m)
 const gchev3 = (proj, cx, cz, s, a, b, t) => gpoly3(proj, [[cx - s*a, cz + b], [cx + s*a, cz], [cx - s*a, cz - b], [cx - s*(a + t), cz - b], [cx + s*(a - t), cz], [cx - s*(a + t), cz + b]]);
 // 앞(-z)을 가리키는 꺾쇠 '^' : 끝이 cz - b, a = 옆 반폭 · t = 앞뒤 굵기
 const gfwd3 = (proj, cx, cz, a, b, t) => gpoly3(proj, [[cx - a, cz + b], [cx, cz - b], [cx + a, cz + b], [cx + a, cz + b + t], [cx, cz - b + t], [cx - a, cz + b + t]]);
-// 타원 점: 옆 반지름 rx · 앞뒤 반지름 rz
-const gdot3 = (proj, cx, cz, rx, rz) => gpoly3(proj, Array.from({length:16}, (_, i) => [cx + rx*Math.cos(i*Math.PI/8), cz + rz*Math.sin(i*Math.PI/8)]));
 // 틈 테두리: 옆 xa ~ xb, 앞뒤 z0(가까운 쪽) ~ z1. dashed면 점선(긴 변 1.5m 칠 · 1m 빈칸, 짧은 변 0.48m 칠 · 0.3m 빈칸) — 선 굵기도 노면 기준(옆 0.13m · 앞뒤 0.6m)
 function gframe3(proj, xa, xb, z0, z1, dashed){
   const t = .13, tz = .6; let d = '';
@@ -180,13 +199,14 @@ function laneRibbon3(zNear, onMain, offFn, proj){
 }
 
 /* ---------- 상태 ---------- */
-const C3 = {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1};
+const C3 = {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1, holdA:0, holdP:0, holdSide:1, lastIco:null};   // holdA · holdP · holdSide: 03 대기 금지 표지의 밝기 · 닫힘 진행 · 놓인 쪽, lastIco: 마지막으로 보인 갈 방향 화살표
 function resetHud3(){
-  Object.assign(C3, {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1});
+  Object.assign(C3, {h:makeH3(), lastT:null, alpha:0, gapDraw:null, primRef:null, edgeW:0, edgeA:0, blinkT0:0, icon:null, iconSince:0, iconOp:1, dim:0, warnA:0, gapA:0, barA:.78, lastBase:1, holdA:0, holdP:0, holdSide:1, lastIco:null});
   S.H3 = null; VIEW3.x = null; VIEW3.lastT = null;
-  ['cSurf', 'cLaneFill', 'cEdges', 'cDash', 'cRails', 'cSolid', 'cGate', 'cSlot', 'cQueue', 'cStop', 'cPed', 'cFrontBand', 'cLead', 'cLeadGlass', 'cDistBand', 'cFlow', 'cAhead', 'cWork', 'cWorkBars', 'cGap', 'cGapLine', 'cZebra', 'cZebraHot', 'cTrail1', 'cTrail2', 'cRing1', 'cRing2', 'cRear', 'cRearGlass', 'cEgo', 'cEgoGlass', 'cDots'].forEach(id => $('#' + id).setAttribute('d', ''));
+  ['cSurf', 'cLaneFill', 'cEdges', 'cDash', 'cRails', 'cSolid', 'cGate', 'cSlot', 'cQueue', 'cStop', 'cPed', 'cFrontBand', 'cLead', 'cLeadGlass', 'cDistBand', 'cFlow', 'cAhead', 'cWork', 'cWorkBars', 'cGap', 'cGapLine', 'cZebra', 'cZebraHot', 'cTrail1', 'cTrail2', 'cRing1', 'cRing2', 'cRear', 'cRearGlass', 'cEgo', 'cEgoGlass'].forEach(id => $('#' + id).setAttribute('d', ''));
   $$('#cChev path, #cAppr path').forEach(q => q.setAttribute('d', ''));
   $('#cEdgeL').setAttribute('opacity', 0); $('#cEdgeR').setAttribute('opacity', 0); $('#cWarn').setAttribute('opacity', 0); $('#cJam').setAttribute('opacity', 0);
+  $('#cHold').setAttribute('opacity', 0); $('#cHold').style.display = 'none';
   $('#arHud3').dataset.state = 1; $('#mirCue').hidden = true;
 }
 
@@ -255,17 +275,47 @@ function drawAr3(p, f, C, k){
   C3.lastBase = base;
   const blinkOn = wait && H.gate === 'wait' ? ((t - C3.blinkT0) % HUD3.blink) < HUD3.blink*HUD3.blinkDuty : true;
 
-  /* ② 갈 방향 — 2차와 같은 자리 · 모양, 색은 늘 청록. 대기 중엔 흐리게, 앞쪽 위험이면 작고 옅게(삼각형이 그 위) */
+  const next = G && G.side ? G.next : null, laneX = next !== null && next >= 0 && next < m.lanes ? m.laneX(next) : tx, side = (G && G.side) || Math.sign(tx - p.x) || sgn || 1;   // 차로 선을 막 넘은 뒤(판단의 옮길 쪽이 0)에도 들어갈 차로 쪽
+  /* ② 갈 방향 — 2차와 같은 자리 · 모양, 색은 늘 청록. 대기 중엔 조금 흐리게(HUD3.hold.arrowOp — 길 안내는 그대로 읽히게), 앞쪽 위험이면 작고 옅게(삼각형이 그 위) */
   const icon = C.d >= -8 ? {L:'cIcoLeft', S:'cIcoUp', R:'cIcoRight'}[C.node.key] : null;
   if(icon !== C3.icon){ C3.icon = icon; C3.iconSince = now; }
+  if(icon) C3.lastIco = icon;
   const act = $('#cAct'), e = ease(clamp((now - C3.iconSince)/200));
   ['cIcoRight', 'cIcoLeft', 'cIcoUp'].forEach(n => $('#' + n).style.display = n === icon ? '' : 'none');
   act.style.display = icon ? '' : 'none';
+
+  /* 03 대기 — '지금 옮기지 마': 갈 방향 화살표 옆(옮길 쪽)에 옆으로 옮기기 금지 표지(빨간 원 테두리 + 빗금 + 흰 꺾쇠 둘, 모양은 맨 위에서 한 번 넣음) (2026-11-18).
+     운전자가 '지금 할 행동'을 확인하러 보는 곳이 위쪽 가운데 화살표라 거기서 말한다. 화살표(청록 = 길 안내)는 그대로 두고 그 위에 겹치지 않는다 — 길은 맞고, 옆으로 옮기는 것만 아직.
+     · 늘 화살표 옆, 옮길 쪽에: 왼쪽으로 옮기면 화살표 왼쪽에 놓고 꺾쇠만 '<<'로 뒤집는다(빗금 방향은 그대로). 직진 화살표여도 위가 아니라 옆
+     · 높이: 표지 가운데 = 화살표 그린 모양(getBBox)의 가운데. 간격: 화살표 선 바깥 끝 ~ 표지 흰 테 바깥 끝 = HUD3.hold.gap
+     · 가로: 표지가 보이면 '화살표 + 간격 + 표지'를 한 묶음으로 보고 그 가운데를 남은 거리 막대 가운데(HX, HUD 가운데 선)에 둔다 → 화살표가 반대쪽으로 비켜난다.
+       표지가 나타나고 사라지는 시간(holdA: inT초 · fade초)에 맞춰 옮겨 가고, 표지가 없으면 화살표는 원래 자리(원점 = HX)
+     · 06 앞쪽 위험: 묶음이 통째로 삼각형 오른쪽으로 — 묶음 왼쪽 끝이 화살표만 있을 때의 왼쪽 끝(HX + 52)과 같은 자리. 표지가 오른쪽이면 화살표 자리는 예전과 같고,
+       왼쪽이면 표지가 삼각형 밑에 깔리지 않게 화살표가 표지 폭만큼 더 오른쪽으로. 묶음은 같은 비율로 작고 옅어진다(삼각형이 먼저)
+     · #cAct 안이 아니라 형제 그룹이라 화살표가 숨겨져도(마지막으로 보인 화살표 자리에) 보인다
+     · 나타날 때: 옆에서 HUD3.hold.inT초에 닫히듯 들어온다. 풀릴 때: 화살표 옆에 붙은 채 HUD3.fade초에 사라진다. 깜빡이지 않는다(뒤차 테두리 · 가장자리 빛이 이미 깜빡임) */
+  const HD = HUD3.hold, hold = $('#cHold'), holdOn = needMove && wait;
+  if(holdOn){ C3.holdSide = side; C3.holdP = ramp(C3.holdP, 1, HD.inT); } else if(C3.holdA <= 0) C3.holdP = 0;
+  C3.holdA = ramp(C3.holdA, holdOn ? 1 : 0, holdOn ? HD.inT : HUD3.fade);
+  const hs = C3.holdSide, B = icoBox3(icon || C3.lastIco || 'cIcoUp'), sw = C3.icoW || (C3.icoW = parseFloat(getComputedStyle($('#cIcon')).strokeWidth) || 5), Rx = HD.r + HD.rim;
+  const hx = hs > 0 ? B.x1 + sw/2 + HD.gap + Rx : B.x0 - sw/2 - HD.gap - Rx;   // 화살표 원점에서 표지 가운데까지(그림 단위)
+  const gL = hs > 0 ? B.x0 - sw/2 : hx - Rx, gR = hs > 0 ? hx + Rx : B.x1 + sw/2;   // 묶음(화살표 선 바깥 끝 ~ 표지 흰 테 바깥 끝)의 왼 · 오른 끝
+  const sA = (.88 + .12*e)*(1 - .3*dim), kU = sA*T.iconScale, wE = ease(C3.warnA || 0), hE = ease(C3.holdA);   // kU: 그림 단위 → 상자 단위
+  const gShift = hE*((1 - wE)*(-kU*(gL + gR)/2) + wE*(hs > 0 ? 0 : kU*(HD.gap + 2*Rx)));   // 보통: 묶음 가운데 → HX / 06: 묶음 왼쪽 끝 → 화살표만 있을 때의 왼쪽 끝
   // 앞쪽 위험(06)이 뜨면 화살표는 작고 옅어져 삼각형 오른쪽으로 비켜난다(삼각형 밑에 깔려 끝만 삐져나오던 것, 2026-11-17)
-  act.setAttribute('transform', `translate(${(HX + 52*ease(C3.warnA || 0)).toFixed(1)} ${ICON_Y}) scale(${((.88 + .12*e)*(1 - .3*dim)).toFixed(3)})`);
-  C3.iconOp = ramp(C3.iconOp, wait ? .45 : 1, .18);
+  const actTr = `translate(${(HX + 52*wE + gShift).toFixed(2)} ${ICON_Y}) scale(${sA.toFixed(3)})`;   // 03 대기의 금지 표지(#cHold)도 이 자리 · 배율을 그대로 따른다
+  act.setAttribute('transform', actTr);
+  C3.iconOp = ramp(C3.iconOp, wait ? HD.arrowOp : 1, .18);
   act.setAttribute('opacity', (e*C3.iconOp*(1 - .78*dim)).toFixed(3));
   $('#cIcon').setAttribute('transform', `scale(${T.iconScale})`);
+  const holdShow = C3.holdA > .001;
+  if(holdShow){
+    const x = hx + hs*HD.slide*(1 - ease(C3.holdP));   // 닫히는 동안은 더 바깥에서
+    hold.setAttribute('transform', `${actTr} scale(${T.iconScale}) translate(${x.toFixed(3)} ${B.yc.toFixed(3)})`);
+    $('#cHoldChev').setAttribute('transform', `scale(${hs} 1)`);
+  }
+  hold.style.display = holdShow ? '' : 'none';   // 안 보일 때는 그리지 않음 — 설명 이름표(explain.js) · 색 점검이 '없음'으로 읽게
+  hold.setAttribute('opacity', holdShow ? (C3.holdA*(1 - .78*dim)).toFixed(3) : '0');
 
   /* ③ 마감선까지 남은 거리 — 색 없는 막대. 옮겨야 하면 마감선(정체면 줄 끝 10m 뒤)까지, 이미 맞는 차로면 다음 갈림까지. 대기 중엔 밝아지고 테두리 */
   const frac = clamp((p.z - gateZ)/(0 - gateZ));
@@ -317,7 +367,6 @@ function drawAr3(p, f, C, k){
   set('cRails', laneRibbon3(zNear, onMain, w => [-w - .1, -w + .1], proj) + laneRibbon3(zNear, onMain, w => [w - .1, w + .1], proj)); $('#cRails').setAttribute('opacity', lf.toFixed(3));
 
   // 마감선(흰 가로선) + 그 뒤 실선 구간: 점선은 옮길 수 있는 곳, 실선부터는 옮길 수 없는 곳. 정체면 줄 끝 10m 뒤에 가로선만
-  const next = G && G.side ? G.next : null, laneX = next !== null && next >= 0 && next < m.lanes ? m.laneX(next) : tx, side = (G && G.side) || Math.sign(tx - p.x) || sgn || 1;   // 차로 선을 막 넘은 뒤(판단의 옮길 쪽이 0)에도 들어갈 차로 쪽
   const showGate = needMove && !besideQueue, dlOp = ((wait ? 1 : .72)*soft).toFixed(3);
   set('cGate', showGate ? quadZ(tx - 1.75, tx + 1.75, gateZ + .45, gateZ - .45, proj) : ''); $('#cGate').setAttribute('fill-opacity', dlOp);
   set('cSolid', showGate && tail === null ? line3(laneX - side*1.75, Math.min(gateZ, zNear), FORK_Z, .11, proj) : ''); $('#cSolid').setAttribute('fill-opacity', dlOp);
@@ -414,26 +463,19 @@ function drawAr3(p, f, C, k){
   set('cEgo', es ? es.d : ''); set('cEgoGlass', es ? es.glass : '');
   if(es) car3Put(ex, p.z, ef.x, ef.z, DRV.carL, DRV.carW, HUD3.icon, T.core, S.light === 'night' ? .85 : 1);
 
-  /* 이동 화살표(초록 꺾쇠) · 기다려(빨간 점 세 개) — 내 차 옆에서 옮길 차로 쪽으로, 앞으로 갈수록 한 칸씩 옆으로(대각선). 노면에 그려진 표시처럼 같은 투영으로 눕힌다
-     01 안전 · 02 주의: 꺾쇠 2개가 흐름 / 05 이동: 꺾쇠 3개가 크게 흐름 / 03 대기: 점 3개(멈춤) / 04 확인: 없음(틈 상자와 거울 표시만).
+  /* 이동 화살표(초록 꺾쇠) — 내 차 옆에서 옮길 차로 쪽으로. 노면에 그려진 표시처럼 같은 투영으로 눕힌다
+     01 안전 · 02 주의: 꺾쇠 2개가 흐름 / 05 이동: 꺾쇠 3개가 크게 흐름 / 03 대기: 없음(위쪽 화살표 옆의 금지 표지가 '옮기지 마'를 말한다) / 04 확인: 없음(틈 상자와 거울 표시만).
      자리: 내 차 옆 1.3m부터 옮길 차로 가운데 조금 너머까지 — 차가 넘어가며 남은 폭이 줄면 간격도 같이 줄어든다 */
-  const chev = $$('#cChev path'), dots = $('#cDots');
-  if(needMove && !confirm){
+  const chev = $$('#cChev path');
+  if(needMove && !confirm && !wait){
     const mo = 1 - .55*dim, span = Math.max(.6, (laneX - ex)*side + .55 - 1.3);
-    if(wait){
-      const dx = Math.min(.74, (span - .6)/2);
-      dots.setAttribute('d', [0, 1, 2].map(i => gdot3(proj, ex + side*(1.62 + i*dx), p.z - 2 - i*2.2, .3, 3.5)).join(''));
-      dots.setAttribute('opacity', mo.toFixed(2)); chev.forEach(q => q.setAttribute('d', ''));
-    } else {
-      dots.setAttribute('d', '');
-      const n = move ? 3 : 2, a = move ? .52 : .44, b = move ? 5 : 4, tk = move ? .46 : .4, dx = Math.min(move ? .82 : .9, (span - 2*a)/(n - 1)), ph = now/850;   // 앞뒤로 8 ~ 10m 길이(노면 화살표처럼 길게) — 화면에서 '>' 모양으로 읽히게
-      chev.forEach((q, i) => {
-        if(i >= n){ q.setAttribute('d', ''); return; }
-        q.setAttribute('d', gchev3(proj, ex + side*(1.3 + a + i*dx), p.z - 3, side, a, b, tk));   // 같은 줄에 나란히 '>>' (앞뒤로 엇갈리면 겹쳐 보임)
-        q.setAttribute('opacity', ((.34 + .66*(.5 + .5*Math.cos(2*Math.PI*(ph - i/n))))*mo).toFixed(3));   // 내 차 쪽 → 옮길 차로 쪽으로 차례로 밝아짐(흐름)
-      });
-    }
-  } else { dots.setAttribute('d', ''); chev.forEach(q => q.setAttribute('d', '')); }
+    const n = move ? 3 : 2, a = move ? .52 : .44, b = move ? 5 : 4, tk = move ? .46 : .4, dx = Math.min(move ? .82 : .9, (span - 2*a)/(n - 1)), ph = now/850;   // 앞뒤로 8 ~ 10m 길이(노면 화살표처럼 길게) — 화면에서 '>' 모양으로 읽히게
+    chev.forEach((q, i) => {
+      if(i >= n){ q.setAttribute('d', ''); return; }
+      q.setAttribute('d', gchev3(proj, ex + side*(1.3 + a + i*dx), p.z - 3, side, a, b, tk));   // 같은 줄에 나란히 '>>' (앞뒤로 엇갈리면 겹쳐 보임)
+      q.setAttribute('opacity', ((.34 + .66*(.5 + .5*Math.cos(2*Math.PI*(ph - i/n))))*mo).toFixed(3));   // 내 차 쪽 → 옮길 차로 쪽으로 차례로 밝아짐(흐름)
+    });
+  } else chev.forEach(q => q.setAttribute('d', ''));
 
   /* 가장자리 빛: 뒤차 쪽. 02 주황(좁게) · 03 빨강(넓게, 깜빡임) · 대기 중 그쪽으로 넘어가기 시작하면 더 넓고 밝게. 앞쪽 위험이면 끔 */
   const E = !needMove || front ? [0, 0] : wait ? (G && G.intent ? HUD3.edge.intent : HUD3.edge.wait) : caution ? HUD3.edge.caution : [0, 0];

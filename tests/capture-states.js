@@ -1,5 +1,5 @@
 /* 리뉴얼 HUD 3차(3.0)의 상태 6가지를 같은 장면에서 주간 · 야간으로 찍어 한 장으로 모은다 (2026-11-17 — 2026-11-03의 1 · 2차 비교판은 git 기록에).
-   현대 HUD 줄은 같은 장면의 대조군 화면(상태 표시 없음)
+   현대 HUD 줄은 같은 장면의 대조군 화면(상태 표시 없음). 그 밖에 '06 앞쪽 위험 + 대기'(06w — 대기 중에 앞쪽 위험이 겹친 장면)를 리뉴얼 HUD만 낱장 · 대비로 남긴다(한 장 모음에는 안 넣음)
    실행: cd tests && node capture-states.js <출력 폴더>   → <폴더>/상태6_주간.png · 상태6_야간.png (행 = 리뉴얼 HUD / 현대 HUD) + 낱장 png(_full = 운전석 전체) + 대비.md
    뒤차는 실제 시뮬레이터 차 한 대를 정해진 간격 · 속도로 놓는다(hud2 자동 테스트와 같은 방법). 사람 실험이 아님 */
 const { chromium } = require('playwright-core');
@@ -16,8 +16,10 @@ const STATES = [
   {id:'03', name:'대기', gap:7, closing:4, secs:1.6},
   {id:'04', name:'확인', gap:7, closing:4, secs:1.45, jumpAt:1},
   {id:'05', name:'이동', gap:7, closing:4, secs:2.6, jumpAt:1},
-  {id:'06', name:'앞쪽 위험', gap:80, closing:2, secs:.9, lead:[13, -6]}
+  {id:'06', name:'앞쪽 위험', gap:80, closing:2, secs:.9, lead:[13, -6]},
+  {id:'06w', name:'앞쪽 위험 + 대기', gap:7, closing:4, secs:1.6, lead:[13, -6], extra:true}
 ];
+const SHEET = STATES.filter(s => !s.extra);
 (async () => {
   fs.mkdirSync(OUT, {recursive:true});
   const srv = await serve(), url = `http://127.0.0.1:${srv.address().port}/index.html`;
@@ -46,13 +48,15 @@ const STATES = [
   const ROWS = [['ar3', '', '', '리뉴얼 HUD (3.0)'], ['nav', '', '', '현대 HUD (3.5)']];
   for(const light of ['day', 'night']) for(const [hud, tone, skin, label] of ROWS){
     for(const st of STATES){
+      if(st.extra && hud !== 'ar3') continue;
       const box = await page.evaluate(([hud, light, tone, st]) => setupScene(hud, light, tone, st), [hud, light, tone, st]);
+      await page.waitForTimeout(260); await page.evaluate(() => update(0));   // 갈 방향 화살표가 나타나는 움직임(실제 시간 0.2초)이 끝난 화면을 찍는다 — 화살표 밝기 · 크기가 실제 값
       await page.waitForTimeout(120);
       const name = `${light}_${hud}_${st.id}`;
       const buf = await page.screenshot({clip:{x:box.x, y:box.y, width:box.w, height:box.h}});
       fs.writeFileSync(path.join(OUT, name + '.png'), buf); shots[name] = {buf, label, st, light, lv:box.lv, gate:box.gate};
       // 대비: 요소마다 HUD 켬 / 끔 같은 프레임 (E20 방법). 달라진 픽셀 = HUD 픽셀, 그 자리의 끈 화면 밝기 = 배경
-      const els = hud === 'ar3' ? {'들어갈 차로 테두리':'#cRails', '갈 방향':'#cIcon', '남은 거리 막대':'#cCdBar', '이동 꺾쇠':'#cChev', '기다려 점':'#cDots', '틈':'#cGap', '뒤차':'#cRear', '가장자리 빛':'#cEdgeR', '내 차':'#cEgo', '앞쪽 경고':'#cWarn', '앞차':'#cLead'} : {};
+      const els = hud === 'ar3' ? {'들어갈 차로 테두리':'#cRails', '갈 방향':'#cIcon', '남은 거리 막대':'#cCdBar', '이동 꺾쇠':'#cChev', '금지 표지':'#cHold', '틈':'#cGap', '뒤차':'#cRear', '가장자리 빛':'#cEdgeR', '내 차':'#cEgo', '앞쪽 경고':'#cWarn', '앞차':'#cLead'} : {};
       const boxes = await page.evaluate(sel => { const o = {}; Object.entries(sel).forEach(([k, q]) => { const e = document.querySelector(q); if(!e) return; const b = e.getBoundingClientRect(); if(b.width > 1 && b.height > 1) o[k] = [b.left, b.top, b.width, b.height]; }); return o; }, els);
       const on = await page.screenshot(); fs.writeFileSync(path.join(OUT, name + '_full.png'), on);   // 운전석 전체(실내 · 앞유리 · HUD)도 저장 (2026-11-07) 
       await page.evaluate(() => { $('#hudWrap').style.visibility = 'hidden'; }); await page.waitForTimeout(60);
@@ -75,9 +79,9 @@ const STATES = [
   }
   // 한 장으로: 행 = HUD(3) · 열 = 상태(6)
   for(const light of ['day', 'night']){
-    const rows = ROWS.map(([hud, tone, skin]) => ({label:shots[`${light}_${hud}_01`].label, cells:STATES.map(st => shots[`${light}_${hud}_${st.id}`])}));
+    const rows = ROWS.map(([hud, tone, skin]) => ({label:shots[`${light}_${hud}_01`].label, cells:SHEET.map(st => shots[`${light}_${hud}_${st.id}`])}));
     const html = `<html><body style="margin:0;background:#101418;color:#e7ecf1;font-family:-apple-system,'Pretendard','Apple SD Gothic Neo',sans-serif"><div style="padding:18px 22px 6px;font-size:20px;font-weight:700">리뉴얼 HUD 3차 — 상태 6가지 · ${light === 'day' ? '주간' : '야간'} (같은 장면: ① IC 오른쪽 진출, 옮길 차로 뒤차 한 대 · 06은 내 차로 앞차)</div>
-      <table style="border-collapse:collapse;margin:8px 16px 18px"><tr><td></td>${STATES.map(s => `<td style="padding:6px 8px;font-size:14px;font-weight:600;color:#9fb3c8">${s.id} ${s.name}</td>`).join('')}</tr>
+      <table style="border-collapse:collapse;margin:8px 16px 18px"><tr><td></td>${SHEET.map(s => `<td style="padding:6px 8px;font-size:14px;font-weight:600;color:#9fb3c8">${s.id} ${s.name}</td>`).join('')}</tr>
       ${rows.map(r => `<tr><td style="padding:6px 10px;font-size:13px;font-weight:700;white-space:nowrap;color:#e7ecf1">${r.label}</td>${r.cells.map(c => `<td style="padding:4px"><img src="data:image/png;base64,${c.buf.toString('base64')}" style="width:300px;display:block;border-radius:6px"></td>`).join('')}</tr>`).join('')}</table></body></html>`;
     const p2 = await browser.newPage({viewport:{width:1990, height:440}, deviceScaleFactor:1});
     await p2.setContent(html); await p2.waitForTimeout(300);

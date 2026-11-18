@@ -35,7 +35,7 @@
     <p class="field">HUD</p>
     <div class="seg" id="modeSeg">
       <button data-mode="nav" aria-pressed="false" title="현대 HUD (대조군)">현대</button>
-      <button data-mode="ar3" aria-pressed="true" title="리뉴얼 HUD 3차 (3.2) — 3차 실험 조건">3차</button>
+      <button data-mode="ar3" aria-pressed="true" title="리뉴얼 HUD 3차 (3.3) — 3차 실험 조건">3차</button>
       <button data-mode="ar2" aria-pressed="false" title="리뉴얼 HUD 2차 (2.4) — 2차 실험 때 화면">2차</button>
       <button data-mode="ar" aria-pressed="false" title="리뉴얼 HUD 1차 (1.9) — 1차 실험 때 화면">1차</button>
     </div>
@@ -298,8 +298,8 @@
         </g>
 
         <!-- ===== 리뉴얼 HUD 3차 (3.0, 2026-11-17 · 피그마 '기말 / 11주차') =====
-             자리 · 크기 · 정보 구조는 2차와 같다. 고친 것 네 가지: ① 앞쪽 위험 먼저(#cWarn · #cLead · #cFrontBand) ② 기다림 → 확인 → 이동(#cDots → #cGap 흰 점선 → #cGap 초록 + #cChev)
-             ③ 색 하나에 뜻 하나(초록 = 옮겨도 됨 · 주황 = 조심 · 빨강 = 지금 옮기지 마 · 청록 = 길 안내, 꺾쇠 = 옮길 방향 · 삼각형 = 앞쪽 주의 · 점 세 개 = 기다려)
+             자리 · 크기 · 정보 구조는 2차와 같다. 고친 것 네 가지: ① 앞쪽 위험 먼저(#cWarn · #cLead · #cFrontBand) ② 기다림 → 확인 → 이동(#cHold 옆으로 옮기기 금지 표지 → #cGap 흰 점선 → #cGap 초록 + #cChev)
+             ③ 색 하나에 뜻 하나(초록 = 옮겨도 됨 · 주황 = 조심 · 빨강 = 지금 옮기지 마 · 청록 = 길 안내, 꺾쇠 = 옮길 방향 · 삼각형 = 앞쪽 주의 · 꺾쇠에 빨간 원 빗금 = 지금 옮기지 마)
              ④ 미니 도로 · 차 아이콘 · 띠를 모두 장면 카메라와 같은 투영으로(hud3.js makeProj3). 상태는 data-state(1 안전 · 2 주의 · 3 대기 · 4 확인 · 5 이동 · 6 앞쪽 위험).
              글자 없음(느낌표도 도형). 제한속도 표지는 뺌 — 빨간 테가 '지금 옮기지 마'와 겹침. 그리기는 hud3.js drawAr3(), 값은 config.js HUD3 -->
         <g id="arHud3" data-state="1" style="display:none">
@@ -338,10 +338,9 @@
             <!-- 내 차: 실제 자리 · 방향 그대로, 도로 면 위의 납작한 상자 -->
             <path id="cEgo" class="c-ego"/><path id="cEgoGlass" class="c-glass"/>
           </g>
-          <!-- 이동 화살표 = 초록 꺾쇠(흐름) / 기다려 = 빨간 점 세 개(멈춤). 도로 면에 그려진 표시처럼 같은 투영으로 눕힌다 -->
+          <!-- 이동 화살표 = 초록 꺾쇠(흐름). 도로 면에 그려진 표시처럼 같은 투영으로 눕힌다. 03 대기에는 꺾쇠를 지우고 위쪽 화살표 옆에 옆으로 옮기기 금지 표지(#cHold)를 띄운다 -->
           <g id="cMoveGrp" filter="url(#glow2)" mask="url(#roadMask3)">
             <g id="cChev" class="c-chev"><path/><path/><path/></g>
-            <path id="cDots" class="c-dots"/>
           </g>
           <rect id="cEdgeL" x="0" y="14" width="0" height="256" fill="url(#edgeGrad3L)" mask="url(#edgeMaskV)" opacity="0"/>
           <rect id="cEdgeR" x="520" y="14" width="0" height="256" fill="url(#edgeGrad3R)" mask="url(#edgeMaskV)" opacity="0"/>
@@ -351,6 +350,15 @@
               <g id="cIcoLeft"><path d="M6 13 V4 Q6 -4 -5 -9 M1 -13 L-8 -9 L-4 -1"/></g>
               <g id="cIcoUp"><path d="M0 13 V-12 M-8 -4 L0 -13 L8 -4"/></g>
             </g>
+          </g>
+          <!-- 03 대기 = '지금 옮기지 마': 옆으로 옮기기 금지 표지 — 빨간 원 테두리 + 빨간 빗금(왼쪽 위 → 오른쪽 아래) + 원 안의 흰 꺾쇠 둘 '>>'(노면의 이동 꺾쇠와 같은 꼴).
+               '꺾쇠 = 옮겨' · '꺾쇠에 빗금 = 옮기지 마'가 짝이 된다. 청록 화살표 위에 겹치지 않고 그 옆(옮길 쪽)에 따로 둔다 — 화살표 + 빨간 원 빗금은 실제 '우회전 금지' 표지와 같아 '이 출구가 아니다'로 읽힌다.
+               왼쪽으로 옮길 때는 꺾쇠만 '<<'로 뒤집고 빗금 방향은 그대로. 채움 없이 선만 + 다른 요소와 같은 빛 번짐(실제 HUD는 검정을 못 낸다), 빨간 테 바깥에 얇은 흰 테.
+               #cAct 안이 아니라 형제 그룹 — 화살표가 숨겨져도 같은 자리에 보인다. 높이는 화살표 그린 모양의 가운데, '화살표 + 간격 + 표지' 묶음의 가운데는 HUD 가운데 선(hud3.js). 모양 · 크기 · 시간은 config.js HUD3.hold -->
+          <g id="cHold" opacity="0" style="display:none" filter="url(#glow2)">
+            <g id="cHoldChev" class="c-hold-chev"><path/><path/></g>
+            <circle class="c-hold-ring" opacity="1"/><path class="c-hold-bar" opacity="1"/>
+            <circle class="c-hold-rim"/>
           </g>
           <!-- ③ 마감선까지 남은 거리: 색 없는 막대(왼쪽 고정, 오른쪽에서 줄어듦). 대기 중엔 밝아지고 테두리가 붙는다 -->
           <g id="cCd" filter="url(#glow2)">

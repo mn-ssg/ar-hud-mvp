@@ -43,8 +43,8 @@ assets/
   cabin/              실내 바탕 · 핸들(WebP, 앞유리 투명) · 센터 화면 지도. 못 불러오면 단순 대시보드
 tests/
   guide.test.js       판단 로직 단위 테스트        node --test guide.test.js
-  drive-regression.js 브라우저 자동 운전 회귀 142항목  node drive-regression.js (Chrome 필요)
-  capture-states.js   리뉴얼 HUD 3차 상태 6가지 캡처(주간 · 야간, 현대 HUD 줄 포함) + 대비 측정   node capture-states.js <폴더>
+  drive-regression.js 브라우저 자동 운전 회귀 144항목  node drive-regression.js (Chrome 필요)
+  capture-states.js   리뉴얼 HUD 3차 상태 6가지 캡처(주간 · 야간, 현대 HUD 줄 포함) + '앞쪽 위험 + 대기' 낱장 + 대비 측정   node capture-states.js <폴더>
   handling-check.js   조작감 점검(보조 켬 → handling-check-assist.json · ASSIST=0 이면 실제 값 → handling-check.json) — 새 조작 모델을 키 입력으로 돌려 차로 변경 시간 · 우회전 핸들 각도 · 가속 · 제동을 실제 값과 견줌(결과 handling-check.json)
   perf-check.js       성능 재기 — 장면 4개 프레임 시간 · 삼각형 · 그리기 호출 · 로딩 용량   node perf-check.js after (결과 perf-after.json, 그래픽 작업 전 값 perf-before.json)
   autodrive-batch.js  자동 운전 묶음(현대 · 리뉴얼 같은 시나리오의 기록 값이 같은지, 3차 상태 통계)

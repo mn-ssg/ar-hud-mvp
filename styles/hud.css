@@ -57,7 +57,7 @@
 /* ============================================================
    리뉴얼 HUD 3차 (3.0, 2026-11-17) — 색 · 굵기 토큰은 2차와 같은 것(--h2-*)을 쓴다. 색 하나에 뜻 하나:
    청록 route = 길 안내(들어갈 차로 · 갈 방향, 상태가 바뀌어도 그대로) / 초록 go = 옮겨도 됨(이동 꺾쇠 · 채워진 틈) /
-   주황 warn = 조심(다가오는 뒤차 · 앞쪽 간격 · 앞쪽 경고 · 멈출 곳 · 정체) / 빨강 danger = 지금 옮기지 마(기다려 점 · 옆에 붙은 뒤차 · 가장자리 빛) /
+   주황 warn = 조심(다가오는 뒤차 · 앞쪽 간격 · 앞쪽 경고 · 멈출 곳 · 정체) / 빨강 danger = 지금 옮기지 마(옆으로 옮기기 금지 표지 · 옆에 붙은 뒤차 · 가장자리 빛) /
    무채색 neutral · core = 도로 윤곽 · 내 차 · 마감선 · 남은 거리 막대 · 틈 테두리(확인).
    상태에 따라 바뀌는 값(색 · 투명도)은 hud3.js가 넣는다
    ============================================================ */
@@ -88,8 +88,11 @@
 #hudCars{ position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; mix-blend-mode:screen; -webkit-mask-image:linear-gradient(to bottom, transparent 28.5%, #000 39.5%); mask-image:linear-gradient(to bottom, transparent 28.5%, #000 39.5%); }
 .cab.night #hudCars{ filter:brightness(.9); }
 #arHud3 .c-chev path{ fill:var(--h2-go); stroke:var(--h2-go); stroke-width:1.2; stroke-linejoin:round; }
-#arHud3 .c-dots{ fill:var(--h2-danger); stroke:var(--h2-core); stroke-width:.8; stroke-opacity:.7; }
 #arHud3 .c-icon{ stroke:var(--h2-route); stroke-width:var(--h2-icon-w); }
+/* 03 대기 — 옆으로 옮기기 금지 표지: 채움 없음(실제 HUD는 검정을 못 냄) · 흰 꺾쇠(초록 아님 — 초록 = 옮겨도 됨) · 빨간 테와 빗금 · 바깥의 얇은 흰 테(빨강은 밝기가 낮아서). 굵기는 hud3.js가 config.js HUD3.hold에서 넣는다 */
+#arHud3 .c-hold-chev path{ fill:var(--h2-core); }
+#arHud3 .c-hold-ring, #arHud3 .c-hold-bar{ fill:none; stroke:var(--h2-danger); }
+#arHud3 .c-hold-rim{ fill:none; stroke:var(--h2-core); stroke-opacity:.7; }
 #arHud3 .c-work{ fill:var(--h2-warn); }
 #arHud3 #cCdBg{ fill:var(--h2-neutral); fill-opacity:.3; }   /* 2026-11-17 사용자: 막대가 얇아 잘 안 보임 → 두께 6 → 10, 바탕 .16 → .3 */
 #arHud3 #cCdBar{ fill:var(--h2-neutral); }
